@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpiryGuard — AI-Powered Billing for Indian Pharmacies</title>
+  
+  <!-- SEO & Meta Description -->
+  <meta name="description" content="ExpiryGuard helps Indian pharmacies reduce repetitive billing work with AI-powered camera billing, inventory updates, and pharmacy-first workflows. Join our early pilot.">
+  <meta name="keywords" content="AI pharmacy billing, pharmacy billing software India, pharmacy inventory software, AI billing software, pharmacy management software, mobile pharmacy billing, pharmacy inventory management">
+  <meta name="author" content="ExpiryGuard">
+  
+  <!-- OpenGraph Social Tags -->
+  <meta property="og:title" content="ExpiryGuard — AI-Powered Billing for Indian Pharmacies">
+  <meta property="og:description" content="Turn a photo of medicines into a bill without entering the same sale twice. AI camera billing and live inventory for Indian pharmacies.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://expiryguard.in">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%2316A34A%22/><path d=%22M32 50h36M50 32v36%22 stroke=%22white%22 stroke-width=%2212%22 stroke-linecap=%22round%22/></svg>">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/landing.css?v=2.2">
+</head>
+<body>
+
+  <!-- ==========================================================================
+       1. STICKY NAVBAR
+       ========================================================================== -->
+  <header id="main-navbar" class="navbar">
+    <div class="container nav-container">
+      <a href="#" class="nav-brand">
+        <div class="brand-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M12 4v16m-8-8h16"/>
+          </svg>
+        </div>
+        <span>ExpiryGuard</span>
+      </a>
+
+      <nav>
+        <ul id="nav-menu" class="nav-menu">
+          <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+          <li><a href="#why-expiryguard" class="nav-link">Why ExpiryGuard</a></li>
+          <li><a href="#features" class="nav-link">Features</a></li>
+          <li><a href="#pricing" class="nav-link">Pricing</a></li>
+          <li><a href="#pilot" class="nav-link">Pilot</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="#pilot-form" class="btn btn-emerald btn-arrow">
+          Join the Pilot
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <button id="mobile-menu-toggle" class="nav-mobile-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       2. HERO SECTION
+       ========================================================================== -->
+  <section class="hero-section text-center">
+    <div class="container">
+      
+      <!-- Product Status Card (Transparent Early Stage) -->
+      <div class="product-status-card desktop-only">
+        <div class="product-status-header">
+          <span class="status-dot"></span>
+          <span>PRODUCT STATUS: EARLY PILOT</span>
+        </div>
+        <p style="font-size: 14.5px; color: var(--text-secondary); margin: 0 auto;">
+          Currently working with select pharmacies in India.
+        </p>
+        <div class="status-pills-row">
+          <span class="status-mini-pill"><strong>Availability:</strong> Limited Pilot</span>
+          <span class="status-mini-pill"><strong>Pricing:</strong> Coming Soon</span>
+          <span class="status-mini-pill"><strong>Product:</strong> Actively Developing</span>
+        </div>
+      </div>
+
+      <!-- Mobile-only Hero Badge -->
+      <div class="mobile-hero-badge mobile-only">AI-Powered Pharmacy Management</div>
+
+      <!-- Headline & Subheadline -->
+      <h1 class="hero-headline desktop-only">Why enter every bill twice?</h1>
+      <h1 class="hero-headline mobile-only">Smarter Pharmacy.<br>Less Manual Work.</h1>
+      
+      <p class="hero-subheadline desktop-only">
+        ExpiryGuard uses your phone camera to identify medicines, generate the bill, and update inventory — so pharmacists spend less time re-entering the same sale.
+      </p>
+      <p class="hero-subheadline mobile-only">
+        ExpiryGuard helps pharmacies manage billing, inventory and expiry tracking with intelligent automation.
+      </p>
+
+      <!-- CTAs -->
+      <div class="hero-cta-group">
+        <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow">
+          Join the Pilot
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <a href="#how-it-works" class="btn btn-secondary btn-lg">
+          See How It Works
+        </a>
+      </div>
+
+      <!-- Micro Reassurance -->
+      <div class="hero-micro-copy desktop-only">
+        <span>✓ No hardware required</span>
+        <span>•</span>
+        <span>✓ Works alongside Marg</span>
+        <span>•</span>
+        <span>✓ Built for Indian counters</span>
+      </div>
+
+      <!-- ==========================================================================
+           3. HERO PRODUCT VISUAL: SMARTPHONE REAR CAMERA SCAN WORKFLOW
+           ========================================================================== -->
+      <div class="hero-visual-wrapper">
+        <div class="hero-product-stage">
+          
+          <!-- Workflow Progress Indicator -->
+          <div class="stage-workflow-bar">
+            <div class="workflow-step-pill active" data-step="0">
+              <span>📸</span> 1. Scan Medicines
+            </div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step-pill active" data-step="1">
+              <span>🤖</span> 2. AI Recognition
+            </div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step-pill active" data-step="2">
+              <span>💳</span> 3. Bill Generated
+            </div>
+            <span class="workflow-arrow">→</span>
+            <div class="workflow-step-pill active" data-step="3">
+              <span>📦</span> 4. Stock Updated
+            </div>
+          </div>
+
+          <!-- Interactive Mockup Grid -->
+          <div class="stage-interactive-grid">
+            
+            <!-- Left: Smartphone Rear Camera Viewfinder -->
+            <div class="phone-mockup-frame">
+              <div class="phone-screen">
+                <div class="camera-header-hud">
+                  <span>📸 Rear Camera Active</span>
+                  <span style="color: #86EFAC; font-weight: 600;">AI Auto-Detect</span>
+                </div>
+
+                <div class="camera-viewfinder-lens">
+                  <div class="optical-scan-hud"></div>
+                  <div id="demo-laser" class="scanning-laser-beam"></div>
+
+                  <!-- Medicine Packages On Counter -->
+                  <div class="medicine-counter-layout">
+                    <div class="medicine-box-card">
+                      <div class="med-name">Augmentin 625 Duo</div>
+                      <div class="med-sub">Amox + Clav (10 Tabs)</div>
+                      <span class="med-badge">Batch: AUG-8812</span>
+                    </div>
+                    <div class="medicine-box-card">
+                      <div class="med-name">Dolo 650 mg</div>
+                      <div class="med-sub">Paracetamol (15 Tabs)</div>
+                      <span class="med-badge">Batch: DL-4401</span>
+                    </div>
+                    <div class="medicine-box-card">
+                      <div class="med-name">Pantocid 40 mg</div>
+                      <div class="med-sub">Pantoprazole (15 Tabs)</div>
+                      <span class="med-badge">Batch: PN-9102</span>
+                    </div>
+                    <div class="medicine-box-card" style="border-left-color: #059669;">
+                      <div class="med-name">Montair-LC</div>
+                      <div class="med-sub">Levocet + Montel (10 Tabs)</div>
+                      <span class="med-badge">Batch: MT-3309</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Real-time Generated Bill & Inventory Deductions -->
+            <div class="bill-output-card text-left">
+              <div class="output-header">
+                <div>
+                  <div class="output-title">Instant Tax Invoice</div>
+                  <div style="font-size: 12px; color: var(--text-muted);">Generated automatically from camera scan</div>
+                </div>
+                <span id="demo-timer-badge" class="output-badge-success">Demo Time: ~2.8s ✓</span>
+              </div>
+
+              <table class="bill-table-mini">
+                <thead>
+                  <tr>
+                    <th>Medicine</th>
+                    <th>Qty</th>
+                    <th>MRP</th>
+                    <th style="text-align: right;">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="demo-bill-row">
+                    <td><strong>Augmentin 625 Duo</strong><br><span style="font-size: 11px; color: var(--text-muted);">Exp: 10/2027</span></td>
+                    <td>1 Strip</td>
+                    <td class="mono">₹204.50</td>
+                    <td class="mono" style="text-align: right;">₹204.50</td>
+                  </tr>
+                  <tr class="demo-bill-row">
+                    <td><strong>Dolo 650 mg</strong><br><span style="font-size: 11px; color: var(--text-muted);">Exp: 08/2027</span></td>
+                    <td>1 Strip</td>
+                    <td class="mono">₹34.00</td>
+                    <td class="mono" style="text-align: right;">₹34.00</td>
+                  </tr>
+                  <tr class="demo-bill-row">
+                    <td><strong>Pantocid 40 mg</strong><br><span style="font-size: 11px; color: var(--text-muted);">Exp: 12/2026</span></td>
+                    <td>1 Strip</td>
+                    <td class="mono">₹174.00</td>
+                    <td class="mono" style="text-align: right;">₹174.00</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid var(--border-color); margin-bottom: 16px;">
+                <span style="font-weight: 700; font-size: 15px;">Grand Total (incl. GST)</span>
+                <span class="mono" style="font-size: 18px; font-weight: 800; color: var(--primary-emerald);">₹412.50</span>
+              </div>
+
+              <div id="demo-stock-sync" class="stock-sync-indicator">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+                <span><strong>Live Stock Updated:</strong> 3 batch quantities deducted automatically.</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       3.5 MOBILE TRUST / VALUE STRIP (MOBILE-ONLY)
+       ========================================================================== -->
+  <section class="trust-strip mobile-only">
+    <div class="container">
+      <div class="trust-strip-grid">
+        <div class="trust-strip-item">
+          <div class="trust-strip-icon">⚡</div>
+          <div>
+            <h4 class="trust-strip-title">Faster Billing</h4>
+            <p class="trust-strip-desc">Reduce repetitive manual billing work.</p>
+          </div>
+        </div>
+        <div class="trust-strip-item">
+          <div class="trust-strip-icon">📦</div>
+          <div>
+            <h4 class="trust-strip-title">Smarter Inventory</h4>
+            <p class="trust-strip-desc">Keep track of stock with less effort.</p>
+          </div>
+        </div>
+        <div class="trust-strip-item">
+          <div class="trust-strip-icon">💊</div>
+          <div>
+            <h4 class="trust-strip-title">Expiry Intelligence</h4>
+            <p class="trust-strip-desc">Identify and manage products approaching expiry.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       4. PROBLEM SECTION
+       ========================================================================== -->
+  <section class="section-wrapper problem-section">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">The Counter Reality</span>
+        <h2 class="section-title desktop-only">The problem isn’t billing. It’s doing it twice.</h2>
+        <h2 class="section-title mobile-only">Running a Pharmacy Shouldn’t Feel This Manual.</h2>
+        <p class="section-subtitle mx-auto desktop-only">
+          At a busy pharmacy counter, a customer waits while a pharmacist writes a bill by hand. Later, the same information has to be entered again into desktop billing software.
+        </p>
+        <p class="section-subtitle mx-auto mobile-only">
+          Manual billing, re-entering medicine information, difficult inventory tracking, and human errors steal hours of your time and lead to expiry-related losses.
+        </p>
+        <p style="font-size: 16px; color: var(--text-muted); margin-top: 12px; font-weight: 500;" class="desktop-only">
+          Do that 50, 100, or 200 times a day, and a few extra steps quickly become hours of repetitive work.
+        </p>
+      </div>
+
+      <!-- Visual Workflow Comparison -->
+      <div class="problem-comparison-grid">
+        
+        <!-- Current Manual Workflow (Gray) -->
+        <div class="workflow-card workflow-card-traditional">
+          <div class="workflow-header">
+            <span class="workflow-pill pill-gray">Current Workflow</span>
+            <strong style="color: var(--dark-slate-700);">Double Data Entry</strong>
+          </div>
+          <ul class="step-flow-list">
+            <li class="step-flow-item dim">
+              <span class="flow-icon">👥</span>
+              <span>1. Customer arrives at counter</span>
+            </li>
+            <li class="step-flow-item dim">
+              <span class="flow-icon">✍️</span>
+              <span>2. Pharmacist writes paper bill by hand</span>
+            </li>
+            <li class="step-flow-item dim">
+              <span class="flow-icon">💊</span>
+              <span>3. Hand over medicines & collect cash/UPI</span>
+            </li>
+            <li class="step-flow-item" style="border-left: 4px solid #EF4444; background: #FEF2F2; color: #991B1B;">
+              <span class="flow-icon">🔄</span>
+              <span>4. Sit at desktop computer & re-type entire bill</span>
+            </li>
+            <li class="step-flow-item dim">
+              <span class="flow-icon">📊</span>
+              <span>5. Manually adjust software inventory counts</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- ExpiryGuard Automated Workflow (Emerald Green) -->
+        <div class="workflow-card workflow-card-expiryguard">
+          <div class="workflow-header">
+            <span class="workflow-pill pill-emerald">ExpiryGuard Workflow</span>
+            <strong style="color: var(--primary-emerald-dark);">One-Touch Automation</strong>
+          </div>
+          <ul class="step-flow-list">
+            <li class="step-flow-item highlight">
+              <span class="flow-icon">👥</span>
+              <span>1. Customer arrives at counter</span>
+            </li>
+            <li class="step-flow-item highlight" style="border-left: 4px solid #16A34A; background: #F0FDF4;">
+              <span class="flow-icon">📸</span>
+              <span>2. Take one photo of the medicine packages</span>
+            </li>
+            <li class="step-flow-item highlight">
+              <span class="flow-icon">🤖</span>
+              <span>3. AI identifies medicines, batches & MRP automatically</span>
+            </li>
+            <li class="step-flow-item highlight">
+              <span class="flow-icon">💳</span>
+              <span>4. Tax bill generated instantly with GST calculation</span>
+            </li>
+            <li class="step-flow-item highlight">
+              <span class="flow-icon">📦</span>
+              <span>5. Inventory stock numbers update immediately</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       5. HOW IT WORKS (THREE STEPS)
+       ========================================================================== -->
+  <section id="how-it-works" class="section-wrapper">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">How It Works</span>
+        <h2 class="section-title">Three steps. That’s it.</h2>
+        <p class="section-subtitle mx-auto">
+          No keyboard. No barcode hunting. No repeated data entry.
+        </p>
+      </div>
+
+      <div class="how-it-works-grid">
+        
+        <!-- Step 1 -->
+        <div class="step-card-large">
+          <span class="step-number-badge">STEP 01</span>
+          <div class="step-icon-wrap">📸</div>
+          <h3 class="step-title">Take a Photo</h3>
+          <p class="step-desc">
+            Place the medicine packages together on the counter and capture one photo using your phone.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-card-large">
+          <span class="step-number-badge">STEP 02</span>
+          <div class="step-icon-wrap">🤖</div>
+          <h3 class="step-title">AI Creates the Bill</h3>
+          <p class="step-desc">
+            ExpiryGuard identifies the medicines, matching batches and calculating MRP and GST automatically.
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-card-large">
+          <span class="step-number-badge">STEP 03</span>
+          <div class="step-icon-wrap">📦</div>
+          <h3 class="step-title">Inventory Updates</h3>
+          <p class="step-desc">
+            The sale is recorded and your inventory is updated without another round of computer data entry.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="no-steps-banner">
+        <span>🛡️</span>
+        <span>No keyboard. No repeated entry. No unnecessary steps.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       6. DIFFERENTIATION & CORE ADVANTAGES
+       ========================================================================== -->
+  <section id="why-expiryguard" class="section-wrapper" style="background-color: #FFFFFF; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Why ExpiryGuard</span>
+        <h2 class="section-title desktop-only">Built for the pharmacy counter.</h2>
+        <h2 class="section-title mobile-only">Meet ExpiryGuard</h2>
+        <p class="section-subtitle mx-auto desktop-only">
+          Existing pharmacy software can handle the records. We’re focused on making the moment of billing faster.
+        </p>
+        <p class="section-subtitle mx-auto mobile-only">
+          ExpiryGuard brings pharmacy operations into one intelligent, mobile-first system designed for faster billing, automated inventory, and proactive medicine, batch, and expiry tracking.
+        </p>
+      </div>
+
+      <div class="diff-grid">
+        
+        <div class="diff-card">
+          <div class="diff-card-icon">📸</div>
+          <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--dark-slate-900);">AI Camera Billing</h3>
+          <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6;">
+            Use your phone camera to identify medicines instead of manually searching and typing every item.
+          </p>
+        </div>
+
+        <div class="diff-card">
+          <div class="diff-card-icon">📱</div>
+          <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--dark-slate-900);">Mobile-First</h3>
+          <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6;">
+            Designed around a smartphone workflow so billing doesn’t have to stay tied to a desktop workstation.
+          </p>
+        </div>
+
+        <div class="diff-card">
+          <div class="diff-card-icon">🏥</div>
+          <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--dark-slate-900);">Pharmacy-Specific</h3>
+          <p style="font-size: 15px; color: var(--text-secondary); line-height: 1.6;">
+            Built around Indian pharmacy workflows — including batch tracking, expiry management, MRP, loose tablets vs. strips, and prescription info.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       7. WORKFLOW COMPATIBILITY & POSITIONING
+       ========================================================================== -->
+  <section class="section-wrapper positioning-section">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Workflow Compatibility</span>
+        <h2 class="section-title desktop-only">You don’t have to change everything overnight.</h2>
+        <h2 class="section-title mobile-only">Built for the Modern Pharmacy</h2>
+        <p class="section-subtitle mx-auto desktop-only">
+          ExpiryGuard is starting with one specific workflow: making billing faster and reducing repeated data entry.
+        </p>
+        <p class="section-subtitle mx-auto mobile-only">
+          ExpiryGuard is designed to bring automation and simplicity to active pharmacy counters.
+        </p>
+        <p style="font-size: 16px; color: var(--text-muted); margin-top: 12px; font-weight: 500; max-width: 680px;" class="mx-auto desktop-only">
+          Your existing pharmacy processes can evolve alongside ExpiryGuard as we learn from real pharmacy workflows. We’re not asking you to discard your current systems — we’re solving the repetitive friction at the counter.
+        </p>
+      </div>
+
+      <div class="positioning-card">
+        <div class="positioning-flow-diagram desktop-only">
+          
+          <div class="flow-box">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px;">Traditional Approach</div>
+            <div style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800); line-height: 1.8;">
+              Paper / Manual Entry<br>
+              ↓<br>
+              Desktop Software<br>
+              ↓<br>
+              Repeated Data Entry
+            </div>
+          </div>
+
+          <div class="flow-box active">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--primary-emerald); margin-bottom: 12px;">ExpiryGuard Approach</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--primary-emerald-dark); line-height: 1.8;">
+              Phone Camera<br>
+              ↓<br>
+              AI Recognition<br>
+              ↓<br>
+              Automatic Bill & Inventory Update
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Mobile Points List (Mobile-Only) -->
+        <div class="mobile-why-points mobile-only">
+          <div class="why-point-item">
+            <span class="why-point-icon">🛡️</span>
+            <span>Designed for real pharmacy workflows</span>
+          </div>
+          <div class="why-point-item">
+            <span class="why-point-icon">🤖</span>
+            <span>AI-powered automation</span>
+          </div>
+          <div class="why-point-item">
+            <span class="why-point-icon">⚡</span>
+            <span>Reduces repetitive manual work</span>
+          </div>
+          <div class="why-point-item">
+            <span class="why-point-icon">📉</span>
+            <span>Helps minimize expiry-related losses</span>
+          </div>
+          <div class="why-point-item">
+            <span class="why-point-icon">📱</span>
+            <span>Easy-to-use interface</span>
+          </div>
+          <div class="why-point-item">
+            <span class="why-point-icon">🇮🇳</span>
+            <span>Built with Indian pharmacies in mind</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       7B. QUALIFICATION SECTION (IS EXPIRYGUARD RIGHT FOR MY PHARMACY?)
+       ========================================================================== -->
+  <section class="section-wrapper qualification-section">
+    <div class="container text-center">
+      <span class="section-tag">Qualification</span>
+      <h2 class="section-title">Built for pharmacies that want less repetitive work.</h2>
+      <p class="section-subtitle mx-auto">
+        ExpiryGuard is designed around the specific daily rhythms of active retail pharmacies in India.
+      </p>
+
+      <div class="qualification-card-wrapper text-left">
+        <div class="qualification-grid-2col">
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Process multiple bills every day</div>
+          </div>
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Spend time entering the same information more than once</div>
+          </div>
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Want faster billing</div>
+          </div>
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Want better visibility over inventory</div>
+          </div>
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Already use smartphones in daily operations</div>
+          </div>
+          <div class="qualification-item">
+            <div class="qualification-check-icon">✓</div>
+            <div>Interested in testing a simpler workflow</div>
+          </div>
+        </div>
+
+        <div class="qualification-action-bar">
+          <div>
+            <strong style="font-size: 17px; color: var(--dark-slate-900);">Sounds like your pharmacy?</strong>
+            <div style="font-size: 13.5px; color: var(--text-muted);">Join our early pilot cohort and help shape the counter experience.</div>
+          </div>
+          <a href="#pilot-form" class="btn btn-emerald btn-arrow">
+            Join the Pilot
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       8. PHARMACY-SPECIFIC FEATURES GRID (8 ITEMS)
+       ========================================================================== -->
+  <section id="features" class="section-wrapper">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Features</span>
+        <h2 class="section-title desktop-only">Designed around real pharmacy workflows.</h2>
+        <h2 class="section-title mobile-only">Everything Your Pharmacy Needs</h2>
+        <p class="section-subtitle mx-auto desktop-only">
+          Every capability is built specifically for the realities of running a retail pharmacy in India.
+        </p>
+        <p class="section-subtitle mx-auto mobile-only">
+          Every capability is built to simplify the counter experience and minimize manual inventory friction.
+        </p>
+      </div>
+
+      <div class="features-grid-8 desktop-only">
+        
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">🏷️</div>
+          <h4 class="feature-bento-title">Batch Tracking</h4>
+          <p class="feature-bento-desc">Track products by batch number and ensure FEFO dispensing.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">⏳</div>
+          <h4 class="feature-bento-title">Expiry Management</h4>
+          <p class="feature-bento-desc">Keep expiry information connected to live inventory and avoid dead stock.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">₹</div>
+          <h4 class="feature-bento-title">MRP Handling</h4>
+          <p class="feature-bento-desc">Designed around Indian MRP-based billing and automatic discount computation.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">💊</div>
+          <h4 class="feature-bento-title">Loose vs Strip</h4>
+          <p class="feature-bento-desc">Support pharmacy-specific selling patterns with partial strip calculations.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📋</div>
+          <h4 class="feature-bento-title">Prescription Details</h4>
+          <p class="feature-bento-desc">Keep doctor and prescription information where required for compliance.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📊</div>
+          <h4 class="feature-bento-title">Inventory Sync</h4>
+          <p class="feature-bento-desc">Keep stock counts dynamically connected to every single counter sale.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📱</div>
+          <h4 class="feature-bento-title">Mobile Billing</h4>
+          <p class="feature-bento-desc">Use your phone directly at the counter without walking back to a PC.</p>
+        </div>
+
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">🤖</div>
+          <h4 class="feature-bento-title">AI Recognition</h4>
+          <p class="feature-bento-desc">Reduce manual medicine entry errors with smart optical recognition.</p>
+        </div>
+
+      </div>
+
+      <!-- Mobile Features Grid (6 Cards - Mobile-Only) -->
+      <div class="features-grid-mobile mobile-only">
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📸</div>
+          <h4 class="feature-bento-title">AI-Powered Billing</h4>
+          <p class="feature-bento-desc">Make billing faster and reduce repetitive data entry.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📦</div>
+          <h4 class="feature-bento-title">Live Inventory</h4>
+          <p class="feature-bento-desc">Know what’s in stock without relying on manual tracking.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">⏳</div>
+          <h4 class="feature-bento-title">Expiry Tracking</h4>
+          <p class="feature-bento-desc">Stay ahead of medicines approaching expiry.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">🏷️</div>
+          <h4 class="feature-bento-title">Batch Management</h4>
+          <p class="feature-bento-desc">Keep medicine batches organized and traceable.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">🔄</div>
+          <h4 class="feature-bento-title">Smart Restock Suggestions</h4>
+          <p class="feature-bento-desc">Identify products that may need replenishment.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">📊</div>
+          <h4 class="feature-bento-title">Pharmacy Analytics</h4>
+          <p class="feature-bento-desc">Understand your pharmacy operations through useful insights.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       8B. REAL ORIGINAL PRODUCT SHOWCASE (WEB & MOBILE APPLICATION)
+       ========================================================================== -->
+  <section class="section-wrapper product-showcase-section">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Original Product Interface</span>
+        <h2 class="section-title">The actual ExpiryGuard experience.</h2>
+        <p class="section-subtitle mx-auto">
+          No mockups or generic concept art. Here is the actual ExpiryGuard web and mobile interface built for Indian pharmacy counters.
+        </p>
+      </div>
+
+      <div class="product-showcase-wrapper">
+        
+        <!-- 1. Web Application Showcase in Browser Frame -->
+        <div class="product-feature-split">
+          <div>
+            <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--primary-emerald); letter-spacing: 0.05em; margin-bottom: 8px;">Web Application</div>
+            <h3 style="font-size: 28px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 14px; letter-spacing: -0.02em;">
+              Desktop & Tablet Web Workspace
+            </h3>
+            <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+              Designed for speed and clinical precision. Full POS counter billing, batch-level FEFO inventory intelligence, automated CGST/SGST multi-slab tax calculations, loose tablet dispensing, and pending payment ledgers.
+            </p>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14.5px; color: var(--text-secondary); margin-bottom: 24px;">
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> Unified sidebar navigation and fast hotkeys
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> 60-day soft-delete recovery and inventory safety
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> Instant thermal and A4 GST invoice generator
+              </li>
+            </ul>
+          </div>
+
+          <!-- Professional Browser Window Frame -->
+          <div class="browser-mockup-frame">
+            <div class="browser-header-bar">
+              <div class="browser-dots">
+                <div class="browser-dot red"></div>
+                <div class="browser-dot yellow"></div>
+                <div class="browser-dot green"></div>
+              </div>
+              <div class="browser-address-pill">
+                <span>🔒</span> https://app.expiryguard.in/billing
+              </div>
+            </div>
+            <div class="browser-screen">
+              <img src="assets/product/expiryguard-web-app-original.png" alt="ExpiryGuard Web Application Dashboard" class="real-product-screenshot" loading="lazy">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Mobile Application Showcase in Smartphone Frame -->
+        <div class="product-feature-split reverse">
+          <!-- Realistic Smartphone Device Mockup Frame -->
+          <div class="smartphone-mockup-container">
+            <div class="smartphone-mockup-frame">
+              <div class="smartphone-speaker-notch"></div>
+              <div class="smartphone-screen">
+                <img src="assets/product/expiryguard-mobile-app-original.jpg" alt="ExpiryGuard Mobile Pharmacy App Interface" class="real-mobile-screenshot" loading="lazy">
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--primary-emerald); letter-spacing: 0.05em; margin-bottom: 8px;">Mobile Application</div>
+            <h3 style="font-size: 28px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 14px; letter-spacing: -0.02em;">
+              Smartphone Camera Counter App
+            </h3>
+            <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+              Perform billing directly at the counter without walking back to a computer. Point the rear camera at medicine packages, verify identified items on-screen, and sync transactions in real time.
+            </p>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14.5px; color: var(--text-secondary); margin-bottom: 24px;">
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> Camera-first medicine recognition
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> Real-time batch and expiry verification
+              </li>
+              <li style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--primary-emerald); font-weight: 700;">✓</span> Instant stock sync to backend inventory
+              </li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       9. PRICING COMING SOON SECTION
+       ========================================================================== -->
+  <section id="pricing" class="section-wrapper" style="background-color: #FFFFFF; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Pricing & Rollout</span>
+        <h2 class="section-title">Pricing is coming soon.</h2>
+        <p class="section-subtitle mx-auto">
+          We’re building the product first. Pricing comes next.
+        </p>
+      </div>
+
+      <div class="pricing-coming-soon-card">
+        <span class="pricing-badge-soon">Pricing: Coming Soon</span>
+        <h3 style="font-size: 24px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 14px;">
+          Working with Early Pharmacy Partners
+        </h3>
+        <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.6; max-width: 620px; margin: 0 auto 24px auto;">
+          We’re currently working with early pharmacy partners to understand their workflows and finalize a pricing model that delivers real value without unnecessary complexity.
+        </p>
+
+        <!-- Intentional Roadmap Flow -->
+        <div class="roadmap-timeline">
+          <div class="roadmap-node">1. Product Development</div>
+          <span style="color: var(--text-muted);">→</span>
+          <div class="roadmap-node current">2. Early Pilot</div>
+          <span style="color: var(--text-muted);">→</span>
+          <div class="roadmap-node">3. Feedback</div>
+          <span style="color: var(--text-muted);">→</span>
+          <div class="roadmap-node">4. Pricing Launch</div>
+        </div>
+
+        <p style="font-size: 14.5px; color: var(--text-muted); margin-bottom: 24px;">
+          Join the early pilot and be among the first to know when pricing launches.
+        </p>
+
+        <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow">
+          Join the Pilot
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 14px;">
+          Pricing will be announced soon.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       10. PILOT / EARLY ACCESS HERO BANNER, STEPS & FORM
+       ========================================================================== -->
+  <section id="pilot" class="section-wrapper">
+    <div class="container">
+      
+      <div class="pilot-banner-section text-center">
+        <h2 style="font-size: 40px; font-weight: 800; color: #FFFFFF; margin-bottom: 16px; letter-spacing: -0.02em;" class="desktop-only">
+          Want to try a faster way to bill?
+        </h2>
+        <h2 style="font-size: 28px; font-weight: 800; color: #FFFFFF; margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.25;" class="mobile-only">
+          Be One of the First Pharmacies to Try ExpiryGuard
+        </h2>
+        <p style="font-size: 18px; color: #DCFCE7; max-width: 680px; margin: 0 auto 16px auto; line-height: 1.6;" class="desktop-only">
+          We’re currently working with a limited number of pharmacies to test ExpiryGuard in real-world workflows.
+        </p>
+        <p style="font-size: 15px; color: #DCFCE7; max-width: 680px; margin: 0 auto 16px auto; line-height: 1.5;" class="mobile-only">
+          We’re inviting selected pharmacies to test ExpiryGuard and help shape the future of pharmacy management.
+        </p>
+        <p style="font-size: 16px; color: #F0FDF4; max-width: 640px; margin: 0 auto 28px auto; opacity: 0.95;" class="desktop-only">
+          If you run a pharmacy and process dozens of bills every day, we’d love to hear how you currently work — and show you what we’re building.
+        </p>
+        <div style="font-size: 13.5px; color: #DCFCE7; font-weight: 600;" class="desktop-only">
+          🛡️ No commitment. Just an early conversation.
+        </div>
+        <div class="pilot-badge-list mobile-only" style="margin-top: 14px; font-size: 13.5px; color: #DCFCE7; font-weight: 600; display: flex; flex-direction: column; gap: 8px; align-items: center;">
+          <span>✓ Early access</span>
+          <span>✓ Direct feedback</span>
+          <span>✓ Help shape the product</span>
+        </div>
+      </div>
+
+      <!-- What Happens After You Join (3 Simple Steps) -->
+      <div class="after-join-wrapper">
+        <div class="text-center" style="margin-bottom: 28px;">
+          <h3 style="font-size: 26px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 8px;">
+            What happens after you join?
+          </h3>
+          <p style="font-size: 14.5px; color: var(--text-muted);">
+            Pilot access is limited and subject to availability.
+          </p>
+        </div>
+
+        <div class="after-join-grid">
+          <div class="after-join-step-card">
+            <span class="after-join-step-num">01</span>
+            <h4 class="after-join-step-title">Tell us about your pharmacy</h4>
+            <p class="after-join-step-desc">Submit a short pilot request so we understand your pharmacy and current workflow.</p>
+          </div>
+          <div class="after-join-step-card">
+            <span class="after-join-step-num">02</span>
+            <h4 class="after-join-step-title">Talk to the ExpiryGuard team</h4>
+            <p class="after-join-step-desc">We’ll connect with you, understand your workflow, and explain the pilot.</p>
+          </div>
+          <div class="after-join-step-card">
+            <span class="after-join-step-num">03</span>
+            <h4 class="after-join-step-title">Try ExpiryGuard</h4>
+            <p class="after-join-step-desc">If your pharmacy is suitable for the pilot, we’ll help you get started.</p>
+          </div>
+        </div>
+
+        <div class="text-center" style="margin-top: 16px;">
+          <a href="#pilot-form" class="btn btn-emerald btn-arrow">
+            Join the Pilot
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Pilot Form Card -->
+      <div id="pilot-form" class="pilot-form-card" style="margin-top: 40px;">
+        <div class="text-center" style="margin-bottom: 32px;">
+          <h3 style="font-size: 26px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 8px;">
+            Request Pilot Access
+          </h3>
+          <p style="font-size: 15px; color: var(--text-secondary);">
+            Tell us about your counter workflow. We’ll get in touch to walk you through the pilot.
+          </p>
+        </div>
+
+        <form id="pilot-lead-form">
+          <div class="form-grid-2">
+            
+            <div class="form-group-landing">
+              <label for="full_name" class="form-label-landing">Full Name *</label>
+              <input type="text" id="full_name" class="form-input-landing" placeholder="e.g. Ramesh Patel" required>
+            </div>
+
+            <div class="form-group-landing">
+              <label for="pharmacy_name" class="form-label-landing">Pharmacy Name *</label>
+              <input type="text" id="pharmacy_name" class="form-input-landing" placeholder="e.g. Sanjeevani Medicos" required>
+            </div>
+
+          </div>
+
+          <div class="form-grid-2">
+            
+            <div class="form-group-landing">
+              <label for="city" class="form-label-landing">City / Town *</label>
+              <input type="text" id="city" class="form-input-landing" placeholder="e.g. Ahmedabad, Surat, Pune" required>
+            </div>
+
+            <div class="form-group-landing">
+              <label for="phone" class="form-label-landing">Phone Number (WhatsApp) *</label>
+              <input type="tel" id="phone" class="form-input-landing" placeholder="e.g. 9876543210" required>
+            </div>
+
+          </div>
+
+          <div class="form-grid-2">
+            
+            <div class="form-group-landing">
+              <label for="current_billing_method" class="form-label-landing">Current Billing Software *</label>
+              <select id="current_billing_method" class="form-select-landing" required>
+                <option value="" disabled selected>Select billing software</option>
+                <option value="Paper / Manual">Paper / Manual Billing</option>
+                <option value="Marg ERP">Marg ERP</option>
+                <option value="MargBooks">MargBooks</option>
+                <option value="Other">Other Software</option>
+              </select>
+            </div>
+
+            <div class="form-group-landing">
+              <label for="bills_per_day" class="form-label-landing">Approximate Bills Per Day *</label>
+              <select id="bills_per_day" class="form-select-landing" required>
+                <option value="" disabled selected>Select daily bill volume</option>
+                <option value="Under 50">Under 50 bills / day</option>
+                <option value="50–100">50–100 bills / day</option>
+                <option value="100–200">100–200 bills / day</option>
+                <option value="200+">200+ bills / day</option>
+              </select>
+            </div>
+
+          </div>
+
+          <div class="form-grid-2">
+            
+            <div class="form-group-landing">
+              <label for="num_pharmacies" class="form-label-landing">Number of Pharmacies *</label>
+              <select id="num_pharmacies" class="form-select-landing" required>
+                <option value="" disabled selected>Select number of outlets</option>
+                <option value="1 Outlet">1 Outlet</option>
+                <option value="2-5 Outlets">2-5 Outlets</option>
+                <option value="5+ Outlets">5+ Outlets</option>
+              </select>
+            </div>
+
+            <div class="form-group-landing" style="display: flex; align-items: flex-end;">
+              <!-- Grid placeholder alignment -->
+            </div>
+
+          </div>
+
+          <div class="form-group-landing">
+            <label for="biggest_problem" class="form-label-landing">
+              What is the biggest problem with your current billing workflow? <span style="font-weight: 400; color: var(--text-muted);">(Optional)</span>
+            </label>
+            <textarea id="biggest_problem" class="form-textarea-landing" placeholder="e.g. Entering bills into Marg after rush hours takes 2 hours every evening..."></textarea>
+          </div>
+
+          <button id="btn-submit-pilot" type="submit" class="btn btn-emerald btn-lg btn-arrow" style="width: 100%; margin-top: 8px;">
+            Join the Pilot
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+
+          <div id="form-status-box" class="form-status-box"></div>
+          
+          <div style="text-align: center; margin-top: 20px; font-size: 13.5px; color: var(--text-muted); border-top: 1px dashed var(--border-color); padding-top: 16px;">
+            Have questions? Want to understand how the pilot works? Get in touch with us at <a href="tel:+919817066533" style="color: var(--primary-emerald); font-weight: 600; text-decoration: none;">+91 98170 66533</a> (<a href="https://wa.me/919817066533?text=Hi%20ExpiryGuard%20team%2C%20I%20have%20questions%20about%20the%20pilot" target="_blank" style="color: var(--primary-emerald); font-weight: 600; text-decoration: none;">WhatsApp</a> / Call)
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       10B. PRIVACY & DATA TRUST SECTION
+       ========================================================================== -->
+  <section class="section-wrapper trust-section">
+    <div class="container text-center">
+      <span class="section-tag">Security & Privacy</span>
+      <h2 class="section-title">Your pharmacy data matters.</h2>
+      <p class="section-subtitle mx-auto">
+        Security and privacy are being treated as core parts of ExpiryGuard as we move from pilot to production.
+      </p>
+
+      <div class="trust-grid-4 text-left">
+        <div class="trust-pillar-card">
+          <div class="trust-pillar-icon">🔒</div>
+          <h4 class="trust-pillar-title">Secure Communication</h4>
+          <p class="trust-pillar-desc">All API traffic and web access are protected via encrypted TLS/HTTPS transmission.</p>
+        </div>
+        <div class="trust-pillar-card">
+          <div class="trust-pillar-icon">🛡️</div>
+          <h4 class="trust-pillar-title">Controlled Access</h4>
+          <p class="trust-pillar-desc">Multi-tenant session authentication with shop-level isolation ensures store data remains strictly private.</p>
+        </div>
+        <div class="trust-pillar-card">
+          <div class="trust-pillar-icon">🗄️</div>
+          <h4 class="trust-pillar-title">Protected Backend</h4>
+          <p class="trust-pillar-desc">Relational PostgreSQL database architecture with parameterized queries and API rate limiting.</p>
+        </div>
+        <div class="trust-pillar-card">
+          <div class="trust-pillar-icon">📋</div>
+          <h4 class="trust-pillar-title">Responsible Data Handling</h4>
+          <p class="trust-pillar-desc">Your inventory, bills, and documents are used solely for your store operations and never resold.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       11. SOCIAL PROOF & CO-CREATION
+       ========================================================================== -->
+  <section class="section-wrapper" style="background-color: #FFFFFF; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+    <div class="container text-center">
+      <span class="section-tag">Co-Creation</span>
+      <h2 class="section-title">We’re building this with pharmacy owners.</h2>
+      <p class="section-subtitle mx-auto">
+        ExpiryGuard is currently in the early pilot stage. We’re talking directly to pharmacy owners, observing real workflows, and using that feedback to build the product.
+      </p>
+      <div style="margin-top: 24px; font-size: 16px; font-weight: 700; color: var(--primary-emerald-dark); background: var(--very-light-emerald); display: inline-block; padding: 10px 24px; border-radius: var(--radius-pill); border: 1px solid #86EFAC;">
+        💡 Your workflow helps shape the product.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       12. FOUNDER STORY (WITH VISUAL PROGRESSION)
+       ========================================================================== -->
+  <section class="section-wrapper">
+    <div class="container">
+      <div class="founder-story-card">
+        
+        <!-- Visual Progression Flow -->
+        <div class="founder-progression-flow">
+          <div class="progression-step">Problem observed</div>
+          <span class="progression-arrow">→</span>
+          <div class="progression-step">Repeated billing workflow</div>
+          <span class="progression-arrow">→</span>
+          <div class="progression-step">ExpiryGuard idea</div>
+          <span class="progression-arrow">→</span>
+          <div class="progression-step">Building with pharmacy owners</div>
+          <span class="progression-arrow">→</span>
+          <div class="progression-step active">Early pilot</div>
+        </div>
+
+        <div class="founder-quote-mark">“</div>
+        <h3 style="font-size: 26px; font-weight: 800; color: var(--dark-slate-900); margin-bottom: 20px;">
+          This started at the pharmacy counter.
+        </h3>
+        <p class="founder-text">
+          I saw the same workflow repeated again and again: write the bill for the customer, then enter the same information again later.
+        </p>
+        <p class="founder-text">
+          We started ExpiryGuard because that felt like a problem technology should be able to solve.
+        </p>
+        <p class="founder-text" style="margin-bottom: 0; font-weight: 600; color: var(--dark-slate-900);">
+          Instead of building another complicated pharmacy management system, we’re starting with one thing that wastes time every day — billing.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       13. FAQ ACCORDION
+       ========================================================================== -->
+  <section class="section-wrapper" style="background-color: #FFFFFF; border-top: 1px solid var(--border-color);">
+    <div class="container">
+      <div class="text-center">
+        <span class="section-tag">Questions & Answers</span>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-subtitle mx-auto">
+          Honest answers about the product, pilot stage, and rollout.
+        </p>
+      </div>
+
+      <div class="faq-container">
+        
+        <!-- Q1 -->
+        <div class="faq-item active">
+          <button class="faq-trigger" aria-expanded="true">
+            <span>Is ExpiryGuard available yet?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            We’re currently in the pilot stage and onboarding select pharmacies in India. If you run an independent retail pharmacy, you can request early pilot access.
+          </div>
+        </div>
+
+        <!-- Q2 -->
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false">
+            <span>Does ExpiryGuard replace my existing pharmacy software?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            Not necessarily. Our initial focus is making billing faster and reducing repeated data entry. Integration with existing systems like Marg can evolve as we learn from pilots.
+          </div>
+        </div>
+
+        <!-- Q3 -->
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false">
+            <span>Do I need special hardware?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            No. The product is designed around a smartphone camera rather than dedicated barcode scanning hardware or expensive point-of-sale setups.
+          </div>
+        </div>
+
+        <!-- Q4 -->
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false">
+            <span>How does the AI identify medicines?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            ExpiryGuard uses camera-based AI vision to recognize medicine packaging information, matching the brand, pack size, MRP, batch, and expiry dates from the image.
+          </div>
+        </div>
+
+        <!-- Q5 -->
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false">
+            <span>How much does it cost?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            Pricing hasn’t launched yet. We’re currently working with early pharmacy partners and will announce simple, value-aligned pricing soon.
+          </div>
+        </div>
+
+        <!-- Q6 -->
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false">
+            <span>Can my pharmacy join the pilot?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-content">
+            Yes. If you’re an independent pharmacy in India and interested in testing the workflow, submit the pilot request form above and we’ll get in touch.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       14. FINAL DARK CTA
+       ========================================================================== -->
+  <section class="container">
+    <div class="final-cta-section">
+      <h2 class="desktop-only">Your counter moves fast.<br>Your software should too.</h2>
+      <h2 class="mobile-only">Ready to Make Your Pharmacy Smarter?</h2>
+      <p class="desktop-only">
+        We’re building ExpiryGuard to make pharmacy billing simpler, faster, and less repetitive.
+      </p>
+      <p class="mobile-only">
+        Join the ExpiryGuard pilot and help us build the future of pharmacy management.
+      </p>
+      <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow">
+        Join the Pilot
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       15. FOOTER
+       ========================================================================== -->
+  <footer class="footer-landing">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="brand-logo-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 15px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M12 4v16m-8-8h16"/>
+              </svg>
+            </div>
+            <span style="font-weight: 800; font-size: 19px; color: var(--dark-slate-900);">ExpiryGuard</span>
+          </div>
+          <div class="footer-desc mobile-only" style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; max-width: 280px;">
+            AI-powered pharmacy management for a smarter, more efficient pharmacy.
+          </div>
+        </div>
+
+        <ul class="footer-links desktop-only">
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#pilot">Join Pilot</a></li>
+          <li><a href="/web/" style="color: var(--primary-emerald); font-weight: 600;">Pharmacist Portal →</a></li>
+        </ul>
+
+        <ul class="footer-links mobile-only" style="display: flex; flex-direction: column; gap: 10px; list-style: none;">
+          <li><a href="#">Home</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#pilot">Pilot</a></li>
+          <li><a href="tel:+919817066533">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>AI-powered billing for Indian pharmacies.</div>
+        <div>© 2026 ExpiryGuard. All rights reserved. • <a href="tel:+919817066533" style="color: var(--text-muted); text-decoration: none;">+91 98170 66533</a> • <a href="mailto:vashistkanishak9@gmail.com" style="color: var(--text-muted); text-decoration: none;">vashistkanishak9@gmail.com</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile Sticky CTA Bar (Visible on scroll on mobile devices) -->
+  <div id="mobile-sticky-cta" class="mobile-sticky-cta-bar">
+    <div class="mobile-sticky-inner">
+      <div>
+        <div class="mobile-sticky-title">ExpiryGuard Pilot</div>
+        <div class="mobile-sticky-sub">Limited early access for pharmacies</div>
+      </div>
+      <a href="#pilot-form" class="btn btn-emerald btn-sm">
+        Join the Pilot →
+      </a>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/landing.js?v=1.1"></script>
+</body>
+</html>

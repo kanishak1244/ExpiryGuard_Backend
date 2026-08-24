@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Inventory — ExpiryGuard Web App</title>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container" id="inventory-page">
+    
+    <!-- Sidebar -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span class="nav-text">AI Camera Billing</span>
+        </a>
+        <a href="inventory.html" class="nav-item active" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="restock.html" class="nav-item" data-nav-id="restock">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <span class="nav-text">Restock Suggestions</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Today's Returns</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Live Inventory & Stock Management</h1>
+          <p style="font-size: 13px; color: var(--muted-text);">Manage active medicine stock, batch numbers, FEFO expiry tracking, and loose tablet pricing.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <a href="/api/inventory/import-template" download="ExpiryGuard_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Standardized Excel Import Template">
+            <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Template (.xlsx)</span>
+          </a>
+          <button class="btn btn-secondary" onclick="openAddInventoryModal(); showBulkImportStep();" style="display: flex; align-items: center; gap: 6px;" title="Upload Excel or CSV file directly without AI">
+            <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <span>Upload Excel</span>
+          </button>
+          <button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Inventory</button>
+          <div class="live-indicator">
+            <div class="pulse-dot"></div>
+            <span>REAL-TIME SYNC</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="content-body">
+        
+        <div class="panel">
+          
+          <!-- Search & Filter Controls -->
+          <div class="filter-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <input type="text" id="inventory-search" class="form-input" style="max-width: 280px;" placeholder="🔍 Search medicine or batch...">
+              
+              <button class="filter-btn active" data-filter="all">All</button>
+              <button class="filter-btn" data-filter="instock">In Stock</button>
+              <button class="filter-btn" data-filter="lowstock">Low Stock (≤10)</button>
+              <button class="filter-btn" data-filter="expiring">Expiring Soon (≤60d)</button>
+              <button class="filter-btn" data-filter="expired">Expired</button>
+            </div>
+
+            <!-- Inventory Action Buttons -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button id="btn-delete-selected" class="btn btn-secondary" style="display: none; color: #DC2626; border-color: #FCA5A5; font-weight: 600;" onclick="openDeleteSelectedModal()">
+                🗑️ Delete Selected (<span id="selected-count">0</span>)
+              </button>
+              <button id="btn-delete-all" class="btn btn-secondary" style="color: #DC2626; border-color: #E2E8F0;" onclick="openDeleteAllModal()">
+                ⚠️ Delete All Stock
+              </button>
+              <a href="settings.html#deleted-stock" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+                <span>♻️ Recently Deleted</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Inventory Data Table -->
+          <div class="table-responsive" style="margin-top: 14px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px; text-align: center;">
+                    <input type="checkbox" id="select-all-stock" style="cursor: pointer; width: 16px; height: 16px;" onchange="toggleSelectAllStock(this)" title="Select All Medicines">
+                  </th>
+                  <th>Medicine Name</th>
+                  <th>Batch No.</th>
+                  <th>Quantity / Stock</th>
+                  <th>MRP / Unit Price</th>
+                  <th>Expiry Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-table-body">
+                <tr><td colspan="8" style="text-align: center; color: var(--muted-text); padding: 24px;">Loading inventory items...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Delete Selected Modal -->
+  <div id="delete-selected-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="panel-title" style="color: #DC2626;">🗑️ Move to Recently Deleted</h3>
+        <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 14px;" onclick="closeDeleteSelectedModal()">✕</button>
+      </div>
+      <div style="padding: 16px 0; font-size: 14px; line-height: 1.5; color: var(--color-text-primary);">
+        <p>Are you sure you want to delete <strong id="modal-delete-count">0</strong> selected medicine batches?</p>
+        <p style="font-size: 12.5px; color: var(--color-text-muted); margin-top: 8px; background: #FEF2F2; border-left: 3px solid #EF4444; padding: 8px 12px; border-radius: 4px;">
+          ℹ️ Items are <strong>soft-deleted</strong> and can be recovered within <strong>60 days</strong> from the <em>Recently Deleted</em> section.
+        </p>
+      </div>
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+        <button class="btn btn-secondary" onclick="closeDeleteSelectedModal()">Cancel</button>
+        <button id="btn-confirm-delete-selected" class="btn btn-primary" style="background: #DC2626; border-color: #DC2626;" onclick="executeDeleteSelected()">Move to Deleted</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete All Stock Modal -->
+  <div id="delete-all-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 class="panel-title" style="color: #DC2626;">⚠️ Delete All Stock</h3>
+        <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 14px;" onclick="closeDeleteAllModal()">✕</button>
+      </div>
+      <div style="padding: 16px 0; font-size: 14px; line-height: 1.5; color: var(--color-text-primary);">
+        <p>This will remove <strong>all <span id="modal-total-stock-count">0</span> items</strong> from your active live inventory.</p>
+        <p style="font-size: 12.5px; color: #991B1B; margin-top: 10px; background: #FEF2F2; border-left: 3px solid #DC2626; padding: 10px 12px; border-radius: 4px;">
+          🛡️ <strong>60-Day Recovery Guarantee:</strong> All items will be moved to <em>Recently Deleted</em>. You can recover them anytime within the next 60 days before permanent purging.
+        </p>
+      </div>
+      <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+        <button class="btn btn-secondary" onclick="closeDeleteAllModal()">Cancel</button>
+        <button id="btn-confirm-delete-all" class="btn btn-primary" style="background: #DC2626; border-color: #DC2626;" onclick="executeDeleteAll()">Yes, Delete All Stock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-notification" style="position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #1E293B; color: #FFFFFF; padding: 12px 20px; border-radius: 8px; font-size: 13.5px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); display: none; align-items: center; gap: 10px; transition: opacity 0.3s ease;">
+    <span id="toast-icon">✅</span>
+    <span id="toast-message">Action successful</span>
+  </div>
+
+      <script src="js/api.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/add_inventory_flow.js?v=9.0"></script>
+  <script src="js/billing_flow.js?v=9.0"></script>
+</body>
+</html>

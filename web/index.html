@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpiryGuard — AI-Powered Pharmacy ERP</title>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container" id="dashboard-page">
+    
+    <!-- Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item active" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span class="nav-text">AI Camera Billing</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="restock.html" class="nav-item" data-nav-id="restock">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <span class="nav-text">Restock Suggestions</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Today's Returns</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+      
+      <!-- Topbar -->
+      <header class="topbar">
+        <h1 class="page-title">Dashboard Overview</h1>
+        <div class="topbar-right" style="display: flex; align-items: center; gap: 12px;">
+          <a href="billing.html" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; padding: 8px 16px; font-weight: 700; font-size: 13.5px;">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ New Bill</span>
+          </a>
+          <div class="live-indicator">
+            <div class="pulse-dot"></div>
+            <span>LIVE SYNC WITH MOBILE</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Body -->
+      <main class="content-body">
+        
+        <!-- 6 KPI Summary Cards -->
+        <div class="grid-6">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Stock Items</span>
+            <span class="kpi-value" id="kpi-total-products">0</span>
+            <span class="kpi-sub positive">Active Inventory</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Today's Bills</span>
+            <span class="kpi-value" id="kpi-sales-count">0</span>
+            <span class="kpi-sub positive">Completed Sales</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Today's Revenue</span>
+            <span class="kpi-value" id="kpi-revenue">₹0</span>
+            <span class="kpi-sub positive">GST Included</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Expiring Soon (60d)</span>
+            <span class="kpi-value" id="kpi-expiring">0</span>
+            <span class="kpi-sub warning">Sell First (FEFO)</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Expired Medicines</span>
+            <span class="kpi-value" id="kpi-expired">0</span>
+            <span class="kpi-sub danger">Do Not Sell</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Today's Returns</span>
+            <span class="kpi-value" id="kpi-returns">₹0</span>
+            <span class="kpi-sub danger">Refunded</span>
+          </div>
+        </div>
+
+        <!-- Quick Action Cards (Connected Shortcuts - Symmetrical 6 Cards) -->
+        <div class="grid-6" style="margin-bottom: 24px;">
+          <div class="quick-action-card primary" style="cursor: pointer;" onclick="openAddInventoryModal()">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.5;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <div>
+              <div class="action-title">+ Add Inventory</div>
+              <div class="action-desc">Scan bills or search catalog</div>
+            </div>
+          </div>
+          <a href="inventory.html" class="quick-action-card">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            </div>
+            <div>
+              <div class="action-title">Live Inventory</div>
+              <div class="action-desc">Stock batches & FEFO expiry</div>
+            </div>
+          </a>
+          <a href="restock.html" class="quick-action-card">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+            </div>
+            <div>
+              <div class="action-title">Restock Suggestions</div>
+              <div class="action-desc">Demand & reorder insights</div>
+            </div>
+          </a>
+          <a href="documents.html" class="quick-action-card">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            </div>
+            <div>
+              <div class="action-title">Documents & OCR</div>
+              <div class="action-desc">Invoices & AI bill extraction</div>
+            </div>
+          </a>
+          <a href="suppliers.html" class="quick-action-card">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div>
+              <div class="action-title">Suppliers</div>
+              <div class="action-desc">Distributor directory & CRM</div>
+            </div>
+          </a>
+          <a href="sales.html" class="quick-action-card">
+            <div class="action-icon">
+              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+            <div>
+              <div class="action-title">Live Sales</div>
+              <div class="action-desc">POS sales & customer bills</div>
+            </div>
+          </a>
+        </div>
+
+        <!-- Live Sales Feed Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Live Transactions Feed (Auto-Syncing)</h2>
+            <a href="sales.html" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">View All Sales</a>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Bill No.</th>
+                  <th>Customer</th>
+                  <th>Time</th>
+                  <th>Total Amount</th>
+                  <th>Payment Method</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="live-sales-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--muted-text); padding: 20px;">Loading live transactions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Pending Payments Ledger Panel -->
+        <div class="panel" id="pending-payments-panel" style="margin-top: 24px;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+                <span>⏳</span>
+                <span>Pending Payments Ledger</span>
+                <span class="badge badge-warning" id="pending-payments-count-badge" style="font-size: 11.5px;">0 Pending</span>
+              </h2>
+              <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">
+                Customers with outstanding credit/unsettled bills.
+              </div>
+            </div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--status-warning);" id="total-pending-amount-header">
+              Total Outstanding: ₹0.00
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Customer / Party</th>
+                  <th>Contact Phone</th>
+                  <th>Bill No.</th>
+                  <th>Bill Date</th>
+                  <th>Pending Amount</th>
+                  <th>Status</th>
+                  <th style="text-align: center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="pending-payments-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--muted-text); padding: 20px;">No pending payments. All bills cleared! 🎉</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+      <script src="js/api.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/add_inventory_flow.js?v=9.0"></script>
+  <script src="js/billing_flow.js?v=9.0"></script>
+</body>
+</html>

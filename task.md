@@ -1,0 +1,6 @@
+- [x] Harden CORS configuration in `app.py` to use `allow_origins=ALLOWED_ORIGINS`
+- [x] Implement `check_file_size` and apply it to upload endpoints in `app.py`
+- [x] Harden `/auth/session` and `/test-notification` endpoints in `app.py` against production access
+- [x] Sanitize exception output in `global_exception_handler` in `app.py`
+- [x] Implement `safe_print` and update prints in `notification_service.py`
+- [x] Run security verification and functional test suites

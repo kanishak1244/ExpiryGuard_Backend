@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suppliers & Vendor Directory — ExpiryGuard ERP</title>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .supplier-tabs {
+      display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;
+    }
+    .supplier-tab-btn {
+      padding: 10px 16px; border: none; background: transparent; color: var(--dark-text);
+      font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .supplier-tab-btn.active {
+      color: var(--primary-green); border-bottom-color: var(--primary-green); font-weight: 600;
+    }
+    .tab-content-panel { display: none; }
+    .tab-content-panel.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="suppliers-page">
+    
+    <!-- Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span class="nav-text">AI Camera Billing</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="restock.html" class="nav-item" data-nav-id="restock">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <span class="nav-text">Restock Suggestions</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item active" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Today's Returns</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Suppliers & Vendor Management</h1>
+          <p style="font-size: 13px; color: var(--muted-text);">Manage pharmaceutical distributors, contact details, GSTIN, payment terms, and trace stock batches.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary" onclick="openAddSupplierModal()">+ Add New Supplier</button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        
+        <!-- Filter & Search Toolbar -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-body" style="padding: 16px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+              <input type="text" id="supplier-search-input" class="form-input" placeholder="Search Supplier Name, GSTIN, Phone..." oninput="loadSuppliers()">
+              <select id="supplier-status-filter" class="form-input" onchange="loadSuppliers()">
+                <option value="ALL">All Statuses</option>
+                <option value="Active">Active Only</option>
+                <option value="Inactive">Inactive Only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supplier Data Table -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="panel-title">Registered Distributors Directory</h3>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Supplier Name</th>
+                    <th>GSTIN</th>
+                    <th>Contact Person</th>
+                    <th>Phone / Email</th>
+                    <th>State</th>
+                    <th>Total Purchases</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="suppliers-table-body">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <div id="suppliers-empty-state" style="display: none; text-align: center; padding: 40px 20px;">
+              <div style="font-size: 48px; margin-bottom: 12px;">🏪</div>
+              <h4>No suppliers registered yet</h4>
+              <p style="font-size: 14px; color: var(--muted-text); margin-bottom: 16px;">Add your first pharmaceutical distributor to enable purchase invoice tracking.</p>
+              <button class="btn btn-primary" onclick="openAddSupplierModal()">Add First Supplier</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT SUPPLIER MODAL -->
+  <div id="supplier-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="panel-title" id="supplier-modal-title">Add New Supplier</h3>
+        <button class="close-btn" onclick="closeSupplierModal()">&times;</button>
+      </div>
+      <form id="supplier-form" onsubmit="saveSupplier(event)">
+        <input type="hidden" id="edit-supplier-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Supplier Name *</label>
+            <input type="text" id="sup-name" class="form-input" required placeholder="Cipla Healthcare Ltd">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Person</label>
+            <input type="text" id="sup-contact" class="form-input" placeholder="Rajesh Kumar">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">GSTIN Number</label>
+            <input type="text" id="sup-gstin" class="form-input" placeholder="07AAAAA0000A1Z5">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="text" id="sup-phone" class="form-input" placeholder="+91-9876543210">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="sup-email" class="form-input" placeholder="orders@cipla.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">State</label>
+            <input type="text" id="sup-state" class="form-input" value="Delhi">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Payment Terms</label>
+            <input type="text" id="sup-payment-terms" class="form-input" value="Net 30">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="sup-status" class="form-input">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <textarea id="sup-address" class="form-input" rows="2"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeSupplierModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Supplier</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SUPPLIER PROFILE DRAWER MODAL -->
+  <div id="supplier-profile-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <div>
+          <h2 id="prof-modal-name" style="margin: 0; color: var(--primary-green);">Supplier Name</h2>
+          <p id="prof-modal-gstin" style="font-size: 13px; color: var(--muted-text); margin: 0;">GSTIN: N/A</p>
+        </div>
+        <button class="close-btn" onclick="closeProfileModal()">&times;</button>
+      </div>
+
+      <!-- Financial Metrics Summary -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 20px 0;">
+        <div class="card" style="padding: 12px; background: var(--bg-main);">
+          <span style="font-size: 12px; color: var(--muted-text);">Total Purchases</span>
+          <h3 id="prof-metric-total" style="margin-top: 4px; color: var(--primary-green);">₹0.00</h3>
+        </div>
+        <div class="card" style="padding: 12px; background: var(--bg-main);">
+          <span style="font-size: 12px; color: var(--muted-text);">Invoices Count</span>
+          <h3 id="prof-metric-count" style="margin-top: 4px;">0</h3>
+        </div>
+        <div class="card" style="padding: 12px; background: var(--bg-main);">
+          <span style="font-size: 12px; color: var(--muted-text);">Last Purchase</span>
+          <h3 id="prof-metric-date" style="margin-top: 4px; font-size: 16px;">N/A</h3>
+        </div>
+      </div>
+
+      <!-- Tabs Navigation -->
+      <div class="supplier-tabs">
+        <button class="supplier-tab-btn active" onclick="switchSupplierTab('overview')">Overview</button>
+        <button class="supplier-tab-btn" onclick="switchSupplierTab('purchases')">Purchase History</button>
+        <button class="supplier-tab-btn" onclick="switchSupplierTab('medicines')">Linked Medicine Stock</button>
+      </div>
+
+      <!-- Tab Content Panels -->
+      <div id="sup-tab-overview" class="tab-content-panel active">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 14px;">
+          <div><strong>Contact Person:</strong> <span id="prof-info-contact">N/A</span></div>
+          <div><strong>Phone:</strong> <span id="prof-info-phone">N/A</span></div>
+          <div><strong>Email:</strong> <span id="prof-info-email">N/A</span></div>
+          <div><strong>State:</strong> <span id="prof-info-state">Delhi</span></div>
+          <div><strong>Payment Terms:</strong> <span id="prof-info-terms">Net 30</span></div>
+          <div><strong>Status:</strong> <span id="prof-info-status">Active</span></div>
+          <div style="grid-column: span 2;"><strong>Address:</strong> <span id="prof-info-address">N/A</span></div>
+        </div>
+      </div>
+
+      <div id="sup-tab-purchases" class="tab-content-panel">
+        <div class="table-responsive">
+          <table class="data-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th>Document Title</th>
+                <th>Invoice #</th>
+                <th>Date</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="prof-purchases-tbody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="sup-tab-medicines" class="tab-content-panel">
+        <div class="table-responsive">
+          <table class="data-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th>Product Name</th>
+                <th>Batch Number</th>
+                <th>Quantity</th>
+                <th>Purchase Price</th>
+                <th>Expiry Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="prof-medicines-tbody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let allSuppliers = [];
+    let currentProfileSupplierId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSuppliers();
+    });
+
+    async function loadSuppliers() {
+      const q = document.getElementById('supplier-search-input').value;
+      const status = document.getElementById('supplier-status-filter').value;
+
+      try {
+        allSuppliers = await api.getSuppliers(q, status);
+        renderSuppliersTable(allSuppliers);
+      } catch (err) {
+        console.error("Failed to load suppliers:", err);
+      }
+    }
+
+    function renderSuppliersTable(suppliers) {
+      const tbody = document.getElementById('suppliers-table-body');
+      const emptyState = document.getElementById('suppliers-empty-state');
+
+      if (!suppliers || suppliers.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      tbody.innerHTML = suppliers.map(s => {
+        const totalAmt = s.total_purchases ? `₹${s.total_purchases.toFixed(2)}` : '₹0.00';
+        const statusBadge = s.status === 'Active' ? 'badge-success' : 'badge-error';
+        const supName = escapeHtml(s.name);
+        const supGstin = escapeHtml(s.gstin || 'N/A');
+        const supContact = escapeHtml(s.contact_person || 'N/A');
+        const supContactInfo = escapeHtml(s.phone || s.email || 'N/A');
+        const supState = escapeHtml(s.state || 'Delhi');
+        const supStatus = escapeHtml(s.status);
+
+        return `
+          <tr>
+            <td><strong>${supName}</strong></td>
+            <td>${supGstin}</td>
+            <td>${supContact}</td>
+            <td style="font-size: 13px;">${supContactInfo}</td>
+            <td>${supState}</td>
+            <td><strong>${totalAmt}</strong></td>
+            <td><span class="badge ${statusBadge}">${supStatus}</span></td>
+            <td>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openSupplierProfile(${Number(s.id)})">👁️ Profile</button>
+                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openEditSupplierModal(${Number(s.id)})">✏️ Edit</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openAddSupplierModal() {
+      document.getElementById('edit-supplier-id').value = '';
+      document.getElementById('supplier-modal-title').textContent = 'Add New Supplier';
+      document.getElementById('supplier-form').reset();
+      document.getElementById('supplier-modal').classList.add('active');
+    }
+
+    function openEditSupplierModal(supId) {
+      const sup = allSuppliers.find(s => s.id === supId);
+      if (!sup) return;
+
+      document.getElementById('edit-supplier-id').value = sup.id;
+      document.getElementById('supplier-modal-title').textContent = `Edit Supplier: ${sup.name}`;
+      document.getElementById('sup-name').value = sup.name || '';
+      document.getElementById('sup-contact').value = sup.contact_person || '';
+      document.getElementById('sup-gstin').value = sup.gstin || '';
+      document.getElementById('sup-phone').value = sup.phone || '';
+      document.getElementById('sup-email').value = sup.email || '';
+      document.getElementById('sup-state').value = sup.state || 'Delhi';
+      document.getElementById('sup-payment-terms').value = sup.payment_terms || 'Net 30';
+      document.getElementById('sup-status').value = sup.status || 'Active';
+      document.getElementById('sup-address').value = sup.address || '';
+
+      document.getElementById('supplier-modal').classList.add('active');
+    }
+
+    function closeSupplierModal() {
+      document.getElementById('supplier-modal').classList.remove('active');
+    }
+
+    async function saveSupplier(e) {
+      e.preventDefault();
+      const supId = document.getElementById('edit-supplier-id').value;
+
+      const payload = {
+        name: document.getElementById('sup-name').value,
+        contact_person: document.getElementById('sup-contact').value,
+        gstin: document.getElementById('sup-gstin').value,
+        phone: document.getElementById('sup-phone').value,
+        email: document.getElementById('sup-email').value,
+        state: document.getElementById('sup-state').value,
+        payment_terms: document.getElementById('sup-payment-terms').value,
+        status: document.getElementById('sup-status').value,
+        address: document.getElementById('sup-address').value
+      };
+
+      try {
+        if (supId) {
+          await api.updateSupplier(parseInt(supId), payload);
+          alert('Supplier updated successfully.');
+        } else {
+          await api.createSupplier(payload);
+          alert('Supplier created successfully.');
+        }
+        closeSupplierModal();
+        loadSuppliers();
+      } catch (err) {
+        alert(`Failed to save supplier: ${err.message}`);
+      }
+    }
+
+    async function openSupplierProfile(supId) {
+      currentProfileSupplierId = supId;
+      const sup = allSuppliers.find(s => s.id === supId);
+      if (!sup) return;
+
+      document.getElementById('prof-modal-name').textContent = sup.name;
+      document.getElementById('prof-modal-gstin').textContent = `GSTIN: ${sup.gstin || 'N/A'}`;
+      document.getElementById('prof-metric-total').textContent = `₹${(sup.total_purchases || 0).toFixed(2)}`;
+      document.getElementById('prof-metric-count').textContent = sup.purchase_count || 0;
+      document.getElementById('prof-metric-date').textContent = sup.last_purchase_date || 'N/A';
+
+      document.getElementById('prof-info-contact').textContent = sup.contact_person || 'N/A';
+      document.getElementById('prof-info-phone').textContent = sup.phone || 'N/A';
+      document.getElementById('prof-info-email').textContent = sup.email || 'N/A';
+      document.getElementById('prof-info-state').textContent = sup.state || 'Delhi';
+      document.getElementById('prof-info-terms').textContent = sup.payment_terms || 'Net 30';
+      document.getElementById('prof-info-status').textContent = sup.status || 'Active';
+      document.getElementById('prof-info-address').textContent = sup.address || 'N/A';
+
+      // Load purchase documents
+      try {
+        const docs = await api.getSupplierPurchases(supId);
+        const tbody = document.getElementById('prof-purchases-tbody');
+        if (docs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No purchase invoices linked to this supplier.</td></tr>';
+        } else {
+          tbody.innerHTML = docs.map(d => `
+            <tr>
+              <td><strong>${escapeHtml(d.title)}</strong></td>
+              <td>${escapeHtml(d.invoice_number || 'N/A')}</td>
+              <td>${escapeHtml(new Date(d.created_at).toLocaleDateString())}</td>
+              <td>₹${(d.total_amount || 0).toFixed(2)}</td>
+              <td><span class="badge badge-success">${escapeHtml(d.ocr_status)}</span></td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {}
+
+      // Load linked medicines stock
+      try {
+        const prods = await api.getSupplierInventory(supId);
+        const tbody = document.getElementById('prof-medicines-tbody');
+        if (prods.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No active medicine stock linked to this supplier.</td></tr>';
+        } else {
+          tbody.innerHTML = prods.map(p => `
+            <tr>
+              <td><strong>${escapeHtml(p.product_name)}</strong></td>
+              <td>${escapeHtml(p.batch_number || 'N/A')}</td>
+              <td>${Number(p.quantity)} units</td>
+              <td>₹${(p.purchase_price || 0).toFixed(2)}</td>
+              <td>${escapeHtml(p.expiry_date)}</td>
+              <td><span class="badge badge-info">${escapeHtml(p.status)}</span></td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {}
+
+      switchSupplierTab('overview');
+      document.getElementById('supplier-profile-modal').classList.add('active');
+    }
+
+    function closeProfileModal() {
+      document.getElementById('supplier-profile-modal').classList.remove('active');
+    }
+
+    function switchSupplierTab(tabKey) {
+      document.querySelectorAll('.supplier-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content-panel').forEach(panel => panel.classList.remove('active'));
+
+      const activeBtn = Array.from(document.querySelectorAll('.supplier-tab-btn')).find(b => b.getAttribute('onclick').includes(tabKey));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const activePanel = document.getElementById(`sup-tab-${tabKey}`);
+      if (activePanel) activePanel.classList.add('active');
+    }
+  </script>
+      <script src="js/api.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/add_inventory_flow.js?v=9.0"></script>
+  <script src="js/billing_flow.js?v=9.0"></script>
+</body>
+</html>

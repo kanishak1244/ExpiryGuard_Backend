@@ -1,0 +1,50 @@
+# Sensitive environment secrets & API keys
+.env
+.env.local
+.env.production
+.env.development
+
+# Service Account Credentials
+credentials/
+*.json
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Local Virtual Environments
+venv/
+.venv/
+env/
+
+# Media Uploads & Temp Storage
+uploads/
+scratch/
+
+# IDE & Editor files
+.idea/
+.vscode/
+
+# Installer files, archives, and huge executable blobs
+*.exe
+*.zip
+OmniRoute-release-v3.8.50/
+Expiryguard1/
+
+# User spreadsheets, reports, and local data exports
+*.xlsx
+*.csv
+*.pdf
+*.jpeg
+*.jpg
+*.png
+
+# Un-ignore assets needed for web/public site
+!public_site/assets/**
+!web/assets/**
+
+# OS Artifacts
+.DS_Store
+Thumbs.db

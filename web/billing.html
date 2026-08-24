@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create New Bill — ExpiryGuard</title>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container" id="billing-page">
+    
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item active" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
+          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span class="nav-text">AI Camera Billing</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="restock.html" class="nav-item" data-nav-id="restock">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          <span class="nav-text">Restock Suggestions</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Today's Returns</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Retail Counter Billing</h1>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+            High-speed keyboard-driven billing with automated FEFO batch selection & GST tax invoice generation.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-secondary" onclick="openAddNewCustomerModal()" style="display: flex; align-items: center; gap: 6px;">
+            <span>+ Add New Party</span>
+          </button>
+          <button class="btn btn-secondary" onclick="resetBillForm()" style="display: flex; align-items: center; gap: 6px;">
+            <span>🔄 Clear / Reset</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        
+        <!-- Section 1: Billing Header Controls -->
+        <div class="billing-grid-header">
+          <!-- Customer Selection -->
+          <div>
+            <label class="form-label" style="font-weight: 600;">Customer / Patient Party</label>
+            <select id="bill-customer-select" class="form-input" onchange="handleCustomerSelectChange(this.value)"></select>
+          </div>
+
+          <!-- Invoice Number -->
+          <div>
+            <label class="form-label" style="font-weight: 600;">Invoice No</label>
+            <input type="text" id="bill-invoice-number-input" class="form-input" value="" oninput="activeBillState.invoiceNumber = this.value">
+          </div>
+
+          <!-- Invoice Date -->
+          <div>
+            <label class="form-label" style="font-weight: 600;">Date</label>
+            <input type="date" id="bill-invoice-date-input" class="form-input" value="" onchange="activeBillState.invoiceDate = this.value">
+          </div>
+
+          <!-- Payment Mode Toggle -->
+          <div>
+            <label class="form-label" style="font-weight: 600;">Payment Mode</label>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')" style="flex: 1; padding: 7px 0; font-size: 12px;">💵 Cash</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')" style="flex: 1; padding: 7px 0; font-size: 12px;">📱 UPI</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')" style="flex: 1; padding: 7px 0; font-size: 12px;">📋 Credit</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="PENDING" onclick="handlePaymentModeChange('PENDING')" style="flex: 1; padding: 7px 0; font-size: 12px;">⏳ Pending</button>
+            </div>
+            <!-- Inline Pending Customer Prompt -->
+            <div id="pending-customer-prompt" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warning); border-radius: var(--radius-md);">
+              <label style="font-size: 11.5px; font-weight: 600; color: var(--color-text-primary); display: block; margin-bottom: 3px;">Customer / Patient Name (for Pending Ledger):</label>
+              <input type="text" id="pending-customer-name-input" class="form-input" style="font-size: 12.5px; padding: 6px 10px;" placeholder="e.g. Ramesh Kumar" oninput="activeBillState.pendingCustomerName = this.value">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Search Medicine Autocomplete Input -->
+        <div class="billing-search-box">
+          <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 16px; border-radius: var(--radius-md);"
+                 placeholder="🔎 Type medicine name, brand, or salt (e.g. Augmentin, Dolo 650, Pan 40, Azithral)... [Press Enter to pick]"
+                 oninput="handleMedicineSearchInput(this.value)" autocomplete="off" autofocus>
+          <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
+        </div>
+
+        <!-- Section 3: Full Desktop Width Running Items Table -->
+        <div class="panel" style="margin-bottom: 20px;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="panel-title" style="font-size: 15px;">Billed Line Items</h2>
+            <span id="bill-item-count-badge" class="badge badge-info" style="font-size: 12px;">0 lines • 0 units</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th style="width: 30px; text-align: center;">#</th>
+                  <th style="min-width: 200px;">Medicine Name & Composition</th>
+                  <th style="min-width: 150px;">Batch & Expiry (FEFO)</th>
+                  <th style="min-width: 120px; text-align: center;">Unit Type</th>
+                  <th style="width: 80px; text-align: center;">Qty</th>
+                  <th style="width: 65px; text-align: center;">Free</th>
+                  <th style="width: 95px; text-align: right;">Rate (₹)</th>
+                  <th style="width: 70px; text-align: center;">Disc %</th>
+                  <th style="width: 70px; text-align: center;">GST %</th>
+                  <th style="width: 105px; text-align: right;">Amount (₹)</th>
+                  <th style="width: 45px; text-align: center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="bill-items-table-body">
+                <tr><td colspan="11" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">Loading bill items...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 4: Totals, Tax Breakup & Action Buttons -->
+        <div class="totals-card">
+          <!-- Left column: Bill discount & instructions -->
+          <div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+              <label class="form-label" style="margin: 0; font-weight: 600; font-size: 13.5px;">Bill Discount (%):</label>
+              <input type="number" id="bill-discount-percent-input" min="0" max="100" class="form-input" style="width: 80px; text-align: center; font-weight: 600;" value="0" oninput="handleBillDiscountChange(this.value)">
+            </div>
+            
+            <div class="totals-info-box">
+              <div>⚡ <strong>Automated FEFO Deduction:</strong> Stock is auto-debited in First-Expiry-First-Out order.</div>
+              <div style="margin-top: 4px;">⚡ <strong>Keyboard Navigation:</strong> Press <code>Enter</code> on Qty/Free/Rate/Disc to quickly advance through fields without mouse.</div>
+              <div style="margin-top: 4px;">⚡ <strong>GST Split:</strong> Computed live as 50% CGST + 50% SGST on taxable values.</div>
+            </div>
+          </div>
+
+          <!-- Right column: Computed totals stack & Action Buttons -->
+          <div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                <span style="color: var(--color-text-muted);">Subtotal (Taxable):</span>
+                <span id="bill-subtotal-val" style="font-weight: 600;">₹0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                <span style="color: var(--color-text-muted);">Bill Discount:</span>
+                <span id="bill-discount-amount-val" style="font-weight: 600; color: #059669;">- ₹0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                <span style="color: var(--color-text-muted);">CGST Tax:</span>
+                <span id="bill-cgst-val" style="font-weight: 600;">₹0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                <span style="color: var(--color-text-muted);">SGST Tax:</span>
+                <span id="bill-sgst-val" style="font-weight: 600;">₹0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
+                <span style="color: var(--color-text-muted);">Round-Off:</span>
+                <span id="bill-roundoff-val" style="font-weight: 600; color: var(--color-text-muted);">+₹0.00</span>
+              </div>
+              <div style="border-top: 2px solid var(--color-border); padding-top: 10px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 17px; font-weight: 800; color: var(--color-text-primary);">Grand Total:</span>
+                <span id="bill-grand-total-val" style="font-size: 24px; font-weight: 800; color: var(--status-safe);">₹0.00</span>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button type="button" class="btn btn-secondary" style="padding: 11px 22px; font-weight: 600; font-size: 13.5px;" onclick="commitBillTransaction(false, true)">
+                Save & New Bill
+              </button>
+              <button type="button" class="btn btn-primary" id="bill-save-print-btn" style="padding: 11px 28px; font-size: 14.5px; font-weight: 700;" onclick="commitBillTransaction(true, false)">
+                🖨️ Save & Print GST Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+      <script src="js/api.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/add_inventory_flow.js?v=9.0"></script>
+  <script src="js/billing_flow.js?v=9.0"></script>
+</body>
+</html>
