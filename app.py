@@ -281,6 +281,35 @@ async def global_exception_handler(request: Request, exc: Exception):
 def api_health():
     return {"message": "ExpiryGuard Backend Running"}
 
+@app.get("/robots.txt")
+def robots_txt():
+    from fastapi.responses import FileResponse
+    robots_path = PUBLIC_SITE_DIR / "robots.txt"
+    if robots_path.exists():
+        return FileResponse(robots_path)
+    raise HTTPException(status_code=404)
+
+@app.get("/favicon.ico")
+@app.get("/favicon.svg")
+def favicon():
+    from fastapi.responses import FileResponse
+    fav_path = PUBLIC_SITE_DIR / "favicon.svg"
+    if fav_path.exists():
+        return FileResponse(fav_path)
+    raise HTTPException(status_code=404)
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: HTTPException):
+    if not request.url.path.startswith("/api"):
+        from fastapi.responses import FileResponse
+        custom_404_page = PUBLIC_SITE_DIR / "404.html"
+        if custom_404_page.exists():
+            return FileResponse(custom_404_page, status_code=404)
+    return JSONResponse(
+        status_code=404,
+        content={"detail": exc.detail}
+    )
+
 @app.get("/")
 def home():
     """Serve ExpiryGuard Public SaaS Landing Page"""
@@ -298,7 +327,7 @@ def register(
     user: schemas.UserCreate,
     db: Session = Depends(get_db),
 ):
-    existing = db.query(models.User).filter(models.User.email == user.email).first()
+    existing = db.query(models.User).filter(models.User.email.ilike(user.email.strip())).first()
     if existing:
         return {"message": "Email already registered"}
 
@@ -306,7 +335,7 @@ def register(
     new_user = models.User(
         shop_name=user.shop_name,
         owner_name=user.owner_name,
-        email=user.email,
+        email=user.email.strip().lower(),
         password=hashed_password,
     )
 
@@ -326,7 +355,7 @@ def login(
     user: schemas.UserLogin,
     db: Session = Depends(get_db),
 ):
-    db_user = db.query(models.User).filter(models.User.email == user.email.strip()).first()
+    db_user = db.query(models.User).filter(models.User.email.ilike(user.email.strip())).first()
 
     if not db_user or not pwd_context.verify(user.password, db_user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
@@ -410,7 +439,7 @@ def login_token_alias(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    db_user = db.query(models.User).filter(models.User.email == form_data.username.strip()).first()
+    db_user = db.query(models.User).filter(models.User.email.ilike(form_data.username.strip())).first()
     if not db_user or not pwd_context.verify(form_data.password, db_user.password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 

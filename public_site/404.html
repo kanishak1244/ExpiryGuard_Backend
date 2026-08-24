@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Not Found — ExpiryGuard</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  
+  <style>
+    :root {
+      --primary-emerald: #10B981;
+      --dark-slate-900: #0F172A;
+      --dark-slate-800: #1E293B;
+      --text-muted: #64748B;
+      --bg-slate-50: #F8FAFC;
+      --border-color: #E2E8F0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-slate-50);
+      color: var(--dark-slate-900);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .error-container {
+      background-color: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 48px 32px;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    }
+
+    .error-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+      display: inline-block;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--dark-slate-900);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .btn-emerald {
+      background-color: var(--primary-emerald);
+      color: #FFFFFF;
+      border: 1px solid var(--primary-emerald);
+    }
+
+    .btn-emerald:hover {
+      background-color: #0D9488;
+      border-color: #0D9488;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      color: var(--dark-slate-800);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-outline:hover {
+      background-color: var(--bg-slate-50);
+      transform: translateY(-1px);
+    }
+
+    @media (min-width: 640px) {
+      .button-group {
+        flex-direction: row;
+      }
+      .btn {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="error-container">
+    <div class="error-icon">🛡️</div>
+    <h1>404 — Page Not Found</h1>
+    <p>We couldn't find the page you're looking for. It might have been moved or doesn't exist.</p>
+    
+    <div class="button-group">
+      <a href="/" class="btn btn-outline">Back to Home</a>
+      <a href="/#pilot" class="btn btn-emerald">Join the Pilot</a>
+    </div>
+  </div>
+
+</body>
+</html>

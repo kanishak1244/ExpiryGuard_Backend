@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /index.html
+Allow: /favicon.svg
+Allow: /css/landing.css
+Allow: /js/landing.js
+
+# Disallow indexing of private dashboard and backend endpoints
+Disallow: /web/
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /test-notification
+Disallow: /auth/
+Disallow: /login
+Disallow: /register
+Disallow: /token
