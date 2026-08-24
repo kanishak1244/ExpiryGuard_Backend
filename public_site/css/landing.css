@@ -1802,300 +1802,441 @@ h1, h2, h3, h4, .font-heading {
 }
 
 @media (max-width: 768px) {
+  /* -------------------------------------------------------------
+     1. GLOBAL SPACING & TYPOGRAPHY
+     ------------------------------------------------------------- */
+  .section-wrapper {
+    padding: 40px 16px !important;
+  }
+  
+  .section-title {
+    font-size: 24px !important;
+    line-height: 1.3 !important;
+    letter-spacing: -0.01em !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .section-subtitle {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    margin-bottom: 24px !important;
+    max-width: 100% !important;
+  }
+
+  /* -------------------------------------------------------------
+     2. NAVIGATION & DRAWER
+     ------------------------------------------------------------- */
+  .navbar {
+    padding: 0 16px !important;
+    height: 64px !important;
+  }
+
   .navbar .nav-menu {
-    display: none;
-  }
-  .navbar .nav-menu.mobile-open {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    top: 76px;
-    left: 0;
-    right: 0;
-    background: #FFFFFF;
-    border-bottom: 1px solid var(--border-color);
-    padding: 24px;
-    box-shadow: var(--shadow-raised);
-    gap: 18px;
-    z-index: 1000;
-  }
-  .nav-mobile-toggle {
-    display: block;
-  }
-  .hero-headline {
-    font-size: 32px;
-    line-height: 1.25;
-    margin-bottom: 16px;
-  }
-  .hero-subheadline {
-    font-size: 15px;
-    line-height: 1.5;
-    margin-bottom: 24px;
-  }
-  
-  /* Stack CTA buttons to full width for easy touch */
-  .hero-cta-group {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto 20px auto;
-    gap: 12px;
-  }
-  .hero-cta-group .btn {
-    width: 100%;
-    justify-content: center;
-    padding: 14px 20px;
-    font-size: 15px;
-  }
-  
-  .hero-micro-copy {
-    flex-direction: column;
-    gap: 8px;
-    font-size: 13px;
-  }
-  .hero-micro-copy span[style*="bullet"] {
     display: none !important;
   }
 
-  /* Grid wrapper structures */
+  /* Mobile Full-Screen Navigation Drawer */
+  .navbar .nav-menu.mobile-open {
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: 64px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: #FFFFFF !important;
+    padding: 32px 24px !important;
+    gap: 24px !important;
+    z-index: 9999 !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
+    overflow-y: auto !important;
+  }
+
+  .navbar .nav-menu.mobile-open a {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1E293B !important;
+    padding: 12px 0 !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    width: 100% !important;
+  }
+
+  .navbar .nav-menu.mobile-open a:last-child {
+    border-bottom: none !important;
+  }
+
+  .nav-mobile-toggle {
+    display: block !important;
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 8px !important;
+    color: #0F172A !important;
+  }
+
+  /* -------------------------------------------------------------
+     3. HERO SECTION
+     ------------------------------------------------------------- */
+  .hero-section {
+    padding: 96px 16px 40px 16px !important;
+    text-align: center !important;
+  }
+
+  .mobile-hero-badge {
+    display: inline-block !important;
+    background: #ECFDF5 !important;
+    color: #059669 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    padding: 6px 12px !important;
+    border-radius: 100px !important;
+    margin-bottom: 16px !important;
+    letter-spacing: 0.03em !important;
+    text-transform: uppercase !important;
+  }
+
+  .hero-headline {
+    font-size: 32px !important;
+    line-height: 1.2 !important;
+    font-weight: 800 !important;
+    color: #0F172A !important;
+    margin-bottom: 16px !important;
+    letter-spacing: -0.02em !important;
+  }
+
+  .hero-subheadline {
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+    color: #475569 !important;
+    margin-bottom: 28px !important;
+    padding: 0 8px !important;
+  }
+
+  .hero-cta-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 340px !important;
+    margin: 0 auto 24px auto !important;
+  }
+
+  .hero-cta-group .btn {
+    width: 100% !important;
+    padding: 14px 24px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+  }
+
+  /* -------------------------------------------------------------
+     4. TRUST STRIP & GRID LAYOUTS
+     ------------------------------------------------------------- */
+  .trust-strip {
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    padding: 20px 16px !important;
+  }
+
+  .trust-strip-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    align-items: center !important;
+  }
+
+  .trust-item {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  /* Force standard 1-column layouts on mobile grids */
   .problem-comparison-grid,
   .how-it-works-grid,
   .diff-grid,
-  .positioning-flow-diagram,
-  .form-grid-2,
   .qualification-grid-2col,
-  .after-join-grid {
+  .after-join-grid,
+  .form-grid-2 {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
-  
-  /* Horizontal scroll track for workflow step pills */
+
+  /* -------------------------------------------------------------
+     5. INTERACTIVE DEMO (VIEWFINDER & MOCKUPS)
+     ------------------------------------------------------------- */
+  .stage-interactive-grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  .phone-mockup-frame {
+    width: 100% !important;
+    max-width: 320px !important;
+    margin: 0 auto !important;
+    padding: 12px !important;
+    border-radius: 24px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06) !important;
+  }
+
+  .medicine-counter-layout {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    padding: 8px !important;
+  }
+
+  .medicine-box-card {
+    padding: 8px 10px !important;
+    border-radius: 6px !important;
+  }
+
+  .med-name {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+
+  .med-sub {
+    font-size: 10px !important;
+  }
+
+  .med-badge {
+    font-size: 9px !important;
+    padding: 3px 6px !important;
+  }
+
+  .bill-output-card {
+    width: 100% !important;
+    max-width: 320px !important;
+    margin: 0 auto !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .bill-table-mini {
+    font-size: 12px !important;
+  }
+
+  /* Workflow Steps horizontal scroll indicator */
   .stage-workflow-bar {
     display: flex !important;
     overflow-x: auto !important;
-    white-space: nowrap !important;
-    justify-content: flex-start !important;
-    padding: 10px 14px !important;
-    gap: 12px !important;
-    width: 100% !important;
-    -webkit-overflow-scrolling: touch !important;
-    border-bottom: 1px solid var(--border-color);
+    gap: 8px !important;
+    padding: 8px 0 !important;
+    margin-bottom: 16px !important;
     border-radius: 0 !important;
-    margin-bottom: 20px !important;
+    background: transparent !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    -webkit-overflow-scrolling: touch !important;
   }
+
   .workflow-step-pill {
     flex-shrink: 0 !important;
     font-size: 13px !important;
-    padding: 6px 12px !important;
+    padding: 8px 14px !important;
+    border-radius: 20px !important;
   }
+
   .workflow-arrow {
-    flex-shrink: 0 !important;
+    display: none !important; /* Hide visual arrows inside scrollbar */
   }
 
-  /* Vertical stack for Interactive Demo mockups */
-  .stage-interactive-grid {
+  /* -------------------------------------------------------------
+     6. POSITIONING & BENTO GRID
+     ------------------------------------------------------------- */
+  .mobile-why-points {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  .flow-box {
+    padding: 16px 20px !important;
+    border-radius: 8px !important;
+    border-left: 4px solid var(--primary-color) !important;
+    background: #F8FAFC !important;
+  }
+
+  .features-grid-mobile {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  .features-grid-mobile .step-card-large {
+    padding: 20px !important;
+    border-radius: 12px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+  }
+
+  /* -------------------------------------------------------------
+     7. PRODUCT SHOWCASE MODULES
+     ------------------------------------------------------------- */
+  .product-feature-split {
     grid-template-columns: 1fr !important;
-    gap: 20px !important;
-  }
-  .phone-mockup-frame {
-    width: 100% !important;
-    max-width: 290px !important;
-    margin: 0 auto !important;
-  }
-  .bill-output-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 14px !important;
-  }
-  .bill-table-mini {
-    font-size: 11.5px !important;
+    gap: 24px !important;
+    text-align: center !important;
   }
 
-  /* Product Showcase (Web & Mobile originals) */
-  .product-feature-split,
   .product-feature-split.reverse {
     grid-template-columns: 1fr !important;
-    gap: 28px !important;
   }
+
+  .product-feature-split h3 {
+    font-size: 20px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .product-feature-split p {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+
   .browser-mockup-frame {
     width: 100% !important;
     max-width: 100% !important;
-  }
-  .smartphone-mockup-container {
-    width: 100% !important;
-    max-width: 100% !important;
-    justify-content: center !important;
-  }
-  .smartphone-mockup-frame {
-    width: 270px !important;
+    border-radius: 8px !important;
   }
 
-  /* Vertical timeline adaptation for Roadmap */
-  .roadmap-timeline {
-    flex-direction: column !important;
-    gap: 12px !important;
-    align-items: center !important;
-    margin: 20px auto !important;
+  .smartphone-mockup-container {
+    justify-content: center !important;
+    width: 100% !important;
   }
+
+  .smartphone-mockup-frame {
+    width: 250px !important;
+    margin: 0 auto !important;
+  }
+
+  /* -------------------------------------------------------------
+     8. ROADMAP TIMELINE
+     ------------------------------------------------------------- */
+  .roadmap-timeline {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 24px auto !important;
+  }
+
   .roadmap-timeline span {
     transform: rotate(90deg) !important;
-    display: inline-block !important;
+    margin: 4px 0 !important;
   }
+
   .roadmap-node {
     width: 100% !important;
-    max-width: 240px !important;
+    max-width: 260px !important;
     text-align: center !important;
-    font-size: 13.5px !important;
-    padding: 8px 12px !important;
-  }
-
-  /* Spacing and margins updates */
-  .section-wrapper {
-    padding: 48px 0 !important;
-  }
-  .section-title {
-    font-size: 26px !important;
-    line-height: 1.3 !important;
-  }
-  .section-subtitle {
-    font-size: 14.5px !important;
-    margin-bottom: 28px !important;
-  }
-
-  .qualification-card-wrapper {
-    padding: 24px 20px !important;
-    margin: 24px auto 0 auto !important;
-  }
-  .qualification-action-bar {
-    flex-direction: column !important;
-    text-align: center !important;
-    gap: 14px !important;
-  }
-  
-  .faq-trigger {
-    padding: 16px 18px !important;
-    font-size: 15px !important;
-  }
-  .faq-content {
-    padding: 0 18px 16px 18px !important;
+    padding: 10px 16px !important;
     font-size: 14px !important;
+    border-radius: 8px !important;
   }
 
-  .founder-story-card {
-    padding: 28px 20px !important;
-  }
-  .founder-text {
-    font-size: 15.5px !important;
-    line-height: 1.6 !important;
-  }
-  .pricing-coming-soon-card {
-    padding: 28px 16px !important;
-  }
-  .pilot-banner-section {
-    padding: 32px 20px !important;
-  }
+  /* -------------------------------------------------------------
+     9. PILOT FORM CARD
+     ------------------------------------------------------------- */
   .pilot-form-card {
-    padding: 24px 20px !important;
-  }
-  .final-cta-section {
-    padding: 48px 20px !important;
-    margin-top: 48px !important;
-    margin-bottom: 32px !important;
-  }
-  .final-cta-section h2 {
-    font-size: 28px !important;
-  }
-  .final-cta-section p {
-    font-size: 15.5px !important;
-    margin-bottom: 24px !important;
-  }
-  
-  .footer-inner,
-  .footer-bottom {
-    flex-direction: column !important;
-    text-align: center !important;
-    gap: 20px !important;
+    padding: 24px 16px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04) !important;
+    margin: 20px auto 0 auto !important;
   }
 
-  /* Override inline styling for product showcase headings & descriptions */
-  .product-feature-split h3 {
-    font-size: 22px !important;
+  .pilot-form-card label {
+    font-size: 13.5px !important;
+    margin-bottom: 6px !important;
   }
-  .product-feature-split p {
+
+  .pilot-form-card input,
+  .pilot-form-card select,
+  .pilot-form-card textarea {
+    padding: 12px !important;
     font-size: 14.5px !important;
-    line-height: 1.55 !important;
+    border-radius: 6px !important;
+    height: auto !important;
   }
 
-  /* Responsive Visibility overrides */
+  .pilot-form-card select {
+    height: 46px !important;
+  }
+
+  .form-status-box {
+    font-size: 13px !important;
+    padding: 10px 14px !important;
+    border-radius: 6px !important;
+  }
+
+  /* -------------------------------------------------------------
+     10. VISIBILITY & DEFAULTS
+     ------------------------------------------------------------- */
   .mobile-only {
     display: block !important;
   }
   span.mobile-only, a.mobile-only {
     display: inline-block !important;
   }
-  div.mobile-only, section.mobile-only {
-    display: block !important;
-  }
   .desktop-only {
     display: none !important;
   }
 
-  .mobile-hero-badge {
-    display: inline-block !important;
-  }
-
-  .trust-strip-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .features-grid-mobile {
-    display: grid !important;
-  }
-
-  .mobile-why-points {
+  .pilot-badge-list.mobile-only {
     display: flex !important;
-  }
-
-  /* Viewfinder medicine counter spacing adjustments on mobile devices */
-  .medicine-counter-layout {
-    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
     gap: 8px !important;
-    padding: 10px !important;
+    align-items: center !important;
   }
-  .medicine-box-card {
-    padding: 6px 8px !important;
-  }
-  .med-name {
-    font-size: 11px !important;
-  }
-  .med-sub {
-    font-size: 9.5px !important;
-  }
-  .med-badge {
-    font-size: 8px !important;
-    padding: 2px 4px !important;
-  }
-}
 
-@media (max-width: 480px) {
-  .hero-headline {
+  /* -------------------------------------------------------------
+     11. FOOTER & STICKY ACTION BAR
+     ------------------------------------------------------------- */
+  .final-cta-section {
+    padding: 40px 16px !important;
+    margin-top: 32px !important;
+    border-radius: 0 !important;
+  }
+
+  .final-cta-section h2 {
     font-size: 26px !important;
   }
-  .section-title {
-    font-size: 22px !important;
+
+  .final-cta-section p {
+    font-size: 14.5px !important;
   }
-  .hero-section {
-    padding-top: 100px !important;
-    padding-bottom: 36px !important;
+
+  .footer-inner,
+  .footer-bottom {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 16px !important;
   }
-  .step-card-large,
-  .diff-card,
-  .flow-box {
-    padding: 20px 16px !important;
+
+  .mobile-sticky-cta-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    border-top: 1px solid #E2E8F0 !important;
+    padding: 12px 16px !important;
+    display: flex !important;
+    justify-content: center !important;
+    z-index: 9998 !important;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.05) !important;
   }
-  .btn-lg {
-    padding: 12px 24px !important;
-    font-size: 15px !important;
+
+  .mobile-sticky-cta-bar .btn {
+    width: 100% !important;
+    max-width: 340px !important;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
   }
 }

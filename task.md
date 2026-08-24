@@ -1,6 +1,7 @@
-- [x] Harden CORS configuration in `app.py` to use `allow_origins=ALLOWED_ORIGINS`
-- [x] Implement `check_file_size` and apply it to upload endpoints in `app.py`
-- [x] Harden `/auth/session` and `/test-notification` endpoints in `app.py` against production access
-- [x] Sanitize exception output in `global_exception_handler` in `app.py`
-- [x] Implement `safe_print` and update prints in `notification_service.py`
-- [x] Run security verification and functional test suites
+- [x] Rebuild mobile navigation drawer and toggle button
+- [x] Rebuild mobile hero headline, CTAs, and trust strip spacing
+- [x] Rebuild interactive viewfinder mockup stack
+- [x] Rebuild bento grid elements and product showcase sections
+- [x] Rebuild pilot form card input sizes and validation layout
+- [x] Rebuild vertical timeline roadmap
+- [x] Verify responsiveness and ensure no horizontal scrolling
