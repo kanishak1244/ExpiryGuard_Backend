@@ -2,4 +2,4 @@
 - [x] Add purchase return CRUD functions to crud.py
 - [x] Implement purchase return endpoints in app.py
 - [x] Create and run verification script test_returns_sync.py
-- [/] Commit changes to git and push
+- [x] Commit changes to git and push
