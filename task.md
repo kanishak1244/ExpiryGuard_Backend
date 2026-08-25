@@ -1,4 +1,4 @@
 - [x] Define new SQLAlchemy models in models.py
 - [x] Define corresponding Pydantic schemas in schemas.py
 - [x] Create and run verification script test_erp_models.py
-- [/] Commit changes to git and push
+- [x] Commit changes to git and push
