@@ -1,4 +1,4 @@
-- [x] Write dashboard stats CRUD calculation inside crud.py
-- [x] Implement GET /dashboard/stats in app.py
-- [x] Create and run verification script test_dashboard_stats.py
-- [x] Commit changes to git and push
+- [/] Create app_layout.dart with sidebar drawer and top app bar
+- [ ] Clean up redundant AppBars in billing_screen.dart and inventory_screen.dart
+- [ ] Verify navigation shell
+- [ ] Commit changes to git and push

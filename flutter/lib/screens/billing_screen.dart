@@ -563,21 +563,7 @@ class _BillingScreenState extends State<BillingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Counter POS Billing'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save_as_outlined),
-            tooltip: 'Save Draft',
-            onPressed: _billItems.isEmpty ? null : _saveDraftBill,
-          ),
-          IconButton(
-            icon: const Icon(Icons.restart_alt),
-            tooltip: 'Clear / Reset Bill',
-            onPressed: _billItems.isEmpty ? null : _resetForNewBill,
-          ),
-        ],
-      ),
+      appBar: null,
       body: Column(
         children: [
           // Scrollable upper content

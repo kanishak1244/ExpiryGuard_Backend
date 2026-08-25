@@ -397,12 +397,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final allSelected = filtered.isNotEmpty && _selectedIds.containsAll(filtered.map((e) => e['id'] as int));
 
     return Scaffold(
-      appBar: AppBar(
-        title: _isSelectMode
-            ? Text('${_selectedIds.length} Selected')
-            : const Text('Live Inventory & Stock'),
-        leading: _isSelectMode
-            ? IconButton(
+      appBar: _isSelectMode
+          ? AppBar(
+              title: Text('${_selectedIds.length} Selected'),
+              leading: IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () {
                   setState(() {
@@ -410,64 +408,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     _selectedIds.clear();
                   });
                 },
-              )
-            : null,
-        actions: [
-          if (_isSelectMode) ...[
-            IconButton(
-              icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
-              tooltip: allSelected ? 'Deselect All' : 'Select All',
-              onPressed: _toggleSelectAll,
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.dangerRed),
-              tooltip: 'Delete Selected',
-              onPressed: _deleteSelected,
-            ),
-          ] else ...[
-            IconButton(
-              icon: const Icon(Icons.checklist_rounded),
-              tooltip: 'Select Mode',
-              onPressed: () {
-                setState(() {
-                  _isSelectMode = true;
-                });
-              },
-            ),
-            PopupMenuButton<String>(
-              onSelected: (val) {
-                if (val == 'recently_deleted') {
-                  _showRecentlyDeletedSheet();
-                } else if (val == 'delete_all') {
-                  _deleteAllStock();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'recently_deleted',
-                  child: Row(
-                    children: [
-                      Icon(Icons.history, size: 18),
-                      SizedBox(width: 8),
-                      Text('Recently Deleted'),
-                    ],
-                  ),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+                  tooltip: allSelected ? 'Deselect All' : 'Select All',
+                  onPressed: _toggleSelectAll,
                 ),
-                const PopupMenuItem(
-                  value: 'delete_all',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_sweep_outlined, color: AppColors.dangerRed, size: 18),
-                      SizedBox(width: 8),
-                      Text('Delete All Stock', style: TextStyle(color: AppColors.dangerRed)),
-                    ],
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: AppColors.dangerRed),
+                  tooltip: 'Delete Selected',
+                  onPressed: _deleteSelected,
                 ),
               ],
-            ),
-          ],
-        ],
-      ),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
