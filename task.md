@@ -1,4 +1,4 @@
 - [x] Write purchase CRUD operations in crud.py
 - [x] Implement purchase HTTP endpoints in app.py
 - [x] Create and run verification script test_purchase_sync.py
-- [/] Commit changes to git and push
+- [x] Commit changes to git and push
