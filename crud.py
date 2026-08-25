@@ -2694,3 +2694,95 @@ def get_restock_suggestions(
     }
     _RESTOCK_CACHE[cache_key] = (final_output, now)
     return final_output
+
+
+# ==========================================
+# ERP PRIORITY 1 CRUD FUNCTIONS
+# ==========================================
+
+import uuid
+from datetime import datetime
+
+def create_purchase_invoice(db: Session, obj_in: schemas.PurchaseInvoiceCreate, user_id: int):
+    """Processes purchase invoice and automatically updates product inventory."""
+    # Check if supplier exists
+    supplier = db.query(models.Supplier).filter(
+        models.Supplier.id == obj_in.supplier_id,
+        models.Supplier.user_id == user_id
+    ).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found or access denied.")
+
+    # Create PurchaseInvoice
+    db_invoice = models.PurchaseInvoice(
+        user_id=user_id,
+        supplier_id=obj_in.supplier_id,
+        invoice_number=obj_in.invoice_number,
+        invoice_date=obj_in.invoice_date,
+        total_amount=obj_in.total_amount,
+        tax_amount=obj_in.tax_amount,
+        payment_status=obj_in.payment_status
+    )
+    db.add(db_invoice)
+    db.flush()  # Generate db_invoice.id
+
+    for item in obj_in.items:
+        # Check if product with ID exists in inventory
+        db_product = db.query(models.Product).filter(
+            models.Product.id == item.product_id,
+            models.Product.user_id == user_id
+        ).first()
+
+        # If matching product found, increment quantity and update price
+        if db_product:
+            db_product.quantity += item.quantity
+            db_product.purchase_price = item.purchase_price
+            db_product.unit_price = item.mrp
+            db_product.gst_rate = item.gst_rate
+            db_product.expiry_date = item.expiry_date
+        else:
+            raise HTTPException(status_code=404, detail=f"Product with ID {item.product_id} not found.")
+
+        # Create PurchaseItem record linked to invoice
+        db_item = models.PurchaseItem(
+            purchase_invoice_id=db_invoice.id,
+            product_id=db_product.id,
+            batch_number=item.batch_number,
+            quantity=item.quantity,
+            purchase_price=item.purchase_price,
+            mrp=item.mrp,
+            gst_rate=item.gst_rate,
+            expiry_date=item.expiry_date
+        )
+        db.add(db_item)
+
+        # Log Inventory Transaction
+        db_txn = models.InventoryTransaction(
+            transaction_id=f"TXN-{datetime.utcnow():%Y%m%d%H%M%S}-{uuid.uuid4().hex[:8].upper()}",
+            shop_id=user_id,
+            product_id=db_product.id,
+            transaction_type="purchase",
+            quantity=item.quantity,
+            unit_price=item.mrp,
+            purchase_price=item.purchase_price,
+            total_price=round(item.quantity * item.purchase_price, 2),
+            final_price=round(item.quantity * item.purchase_price, 2)
+        )
+        db.add(db_txn)
+
+    db.commit()
+    db.refresh(db_invoice)
+    return db_invoice
+
+
+def get_purchase_invoices(db: Session, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.PurchaseInvoice).filter(
+        models.PurchaseInvoice.user_id == user_id
+    ).offset(skip).limit(limit).all()
+
+
+def get_purchase_invoice(db: Session, purchase_id: int, user_id: int):
+    return db.query(models.PurchaseInvoice).filter(
+        models.PurchaseInvoice.id == purchase_id,
+        models.PurchaseInvoice.user_id == user_id
+    ).first()

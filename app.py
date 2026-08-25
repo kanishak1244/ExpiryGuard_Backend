@@ -246,7 +246,10 @@ def get_current_user(
         if user_id in _USER_CACHE:
             cached_user, timestamp = _USER_CACHE[user_id]
             if now - timestamp < 60:
-                return cached_user
+                try:
+                    return db.merge(cached_user, load=False)
+                except Exception:
+                    pass
 
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if user is None:
@@ -1134,8 +1137,43 @@ def get_supplier_inventory(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Get active medicine stock linked to supplier."""
     return crud.get_supplier_inventory(db=db, supplier_id=supplier_id, user_id=current_user.id)
+
+
+# ---------------- PURCHASES ENDPOINTS ---------------- #
+
+@app.post("/purchases", response_model=schemas.PurchaseInvoiceResponse, status_code=201)
+def create_purchase(
+    invoice: schemas.PurchaseInvoiceCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Register a new itemized purchase invoice and update stock levels."""
+    return crud.create_purchase_invoice(db=db, obj_in=invoice, user_id=current_user.id)
+
+
+@app.get("/purchases", response_model=List[schemas.PurchaseInvoiceResponse])
+def list_purchases(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Retrieve history of registered purchase invoices."""
+    return crud.get_purchase_invoices(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
+
+@app.get("/purchases/{purchase_id}", response_model=schemas.PurchaseInvoiceResponse)
+def get_purchase(
+    purchase_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Retrieve detailed items of a single purchase invoice."""
+    db_invoice = crud.get_purchase_invoice(db=db, purchase_id=purchase_id, user_id=current_user.id)
+    if not db_invoice:
+        raise HTTPException(status_code=404, detail="Purchase invoice not found.")
+    return db_invoice
 
 
 # ---------------- DOCUMENT ENDPOINTS ---------------- #
