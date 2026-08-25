@@ -1,4 +1,4 @@
 - [x] Write dashboard stats CRUD calculation inside crud.py
 - [x] Implement GET /dashboard/stats in app.py
 - [x] Create and run verification script test_dashboard_stats.py
-- [/] Commit changes to git and push
+- [x] Commit changes to git and push
