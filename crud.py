@@ -2981,3 +2981,81 @@ def get_supplier_payments(db: Session, supplier_id: int, user_id: int, skip: int
         models.SupplierPayment.supplier_id == supplier_id,
         models.SupplierPayment.user_id == user_id
     ).offset(skip).limit(limit).all()
+
+
+def get_dashboard_stats(db: Session, user_id: int):
+    """Computes real-time KPI metrics for the mobile business dashboard."""
+    import datetime
+    today = datetime.date.today()
+    start_of_today = datetime.datetime.combine(today, datetime.time.min)
+    start_of_month = datetime.datetime.combine(today.replace(day=1), datetime.time.min)
+
+    # 1. Total Receivables (Khata credit balance)
+    total_receivables = db.query(func.sum(models.Customer.pending_amount)).filter(
+        models.Customer.user_id == user_id
+    ).scalar() or 0.0
+
+    # 2. Total Payables (Supplier credit balance)
+    total_purchases = db.query(func.sum(models.PurchaseInvoice.total_amount)).filter(
+        models.PurchaseInvoice.user_id == user_id
+    ).scalar() or 0.0
+    total_supplier_paid = db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
+        models.SupplierPayment.user_id == user_id
+    ).scalar() or 0.0
+    total_payables = max(0.0, total_purchases - total_supplier_paid)
+
+    # 3. Today's Revenue and Monthly Revenue
+    today_revenue = db.query(func.sum(models.Sale.total_amount)).filter(
+        models.Sale.user_id == user_id,
+        models.Sale.created_at >= start_of_today
+    ).scalar() or 0.0
+
+    month_revenue = db.query(func.sum(models.Sale.total_amount)).filter(
+        models.Sale.user_id == user_id,
+        models.Sale.created_at >= start_of_month
+    ).scalar() or 0.0
+
+    # 4. Inventory stats
+    products = db.query(models.Product).filter(
+        models.Product.user_id == user_id,
+        models.Product.is_deleted == False
+    ).all()
+
+    low_stock_count = sum(1 for p in products if (p.quantity or 0) <= 20) # Low stock threshold = 20
+    
+    expired_products = [p for p in products if p.expiry_date and p.expiry_date < today]
+    expired_count = len(expired_products)
+    expired_value = sum((p.quantity or 0) * (p.purchase_price or 0.0) for p in expired_products)
+
+    # 5. Net Profit (Revenue - COGS) for current month
+    monthly_sales = db.query(models.Sale).filter(
+        models.Sale.user_id == user_id,
+        models.Sale.created_at >= start_of_month
+    ).all()
+    
+    monthly_revenue = sum(s.total_amount for s in monthly_sales)
+    
+    cogs = 0.0
+    for sale in monthly_sales:
+        for item in sale.items:
+            prod_purchase_price = 0.0
+            if item.product:
+                prod_purchase_price = item.product.purchase_price or 0.0
+            
+            if prod_purchase_price <= 0.0:
+                prod_purchase_price = (item.unit_price or 0.0) * 0.7
+                
+            cogs += (item.quantity or 0) * prod_purchase_price
+
+    net_profit = max(0.0, monthly_revenue - cogs)
+
+    return {
+        "today_revenue": round(today_revenue, 2),
+        "month_revenue": round(month_revenue, 2),
+        "net_profit": round(net_profit, 2),
+        "low_stock_count": low_stock_count,
+        "expired_count": expired_count,
+        "expired_value": round(expired_value, 2),
+        "credit_receivables": round(total_receivables, 2),
+        "supplier_payables": round(total_payables, 2)
+    }

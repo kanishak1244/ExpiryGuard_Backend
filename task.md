@@ -1,4 +1,4 @@
-- [x] Write payment and ledger CRUD operations in crud.py
-- [x] Add payments and ledger endpoints to app.py
-- [x] Create and run verification script test_payments_ledger.py
-- [x] Commit changes to git and push
+- [x] Write dashboard stats CRUD calculation inside crud.py
+- [x] Implement GET /dashboard/stats in app.py
+- [x] Create and run verification script test_dashboard_stats.py
+- [/] Commit changes to git and push

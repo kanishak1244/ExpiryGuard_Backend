@@ -2607,6 +2607,18 @@ def get_todays_returns_billing(
 # WEB APP DASHBOARD & REPORTS ENDPOINTS
 # ==========================================
 
+@app.get("/dashboard/stats")
+def get_dashboard_stats(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Mobile App Dashboard Stats Endpoint.
+    Returns real-time analytics KPIs: total sales, net profit, low stock count, expired stock valuation, credit receivables, and supplier payables.
+    """
+    return crud.get_dashboard_stats(db=db, user_id=current_user.id)
+
+
 @app.get("/dashboard/summary")
 def get_dashboard_summary(
     current_user: models.User = Depends(get_current_user),
