@@ -1,4 +1,4 @@
-- [/] Create app_layout.dart with sidebar drawer and top app bar
-- [ ] Clean up redundant AppBars in billing_screen.dart and inventory_screen.dart
-- [ ] Verify navigation shell
-- [ ] Commit changes to git and push
+- [x] Create app_layout.dart with sidebar drawer and top app bar
+- [x] Clean up redundant AppBars in billing_screen.dart and inventory_screen.dart
+- [x] Verify navigation shell
+- [x] Commit changes to git and push
