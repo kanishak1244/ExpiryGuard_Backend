@@ -4,6 +4,7 @@ import '../theme/app_typography.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tabular_text.dart';
+import '../services/api_service.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -16,6 +17,49 @@ class _InventoryScreenState extends State<InventoryScreen> {
   String _activeFilter = 'all';
   bool _isSelectMode = false;
   final Set<int> _selectedIds = {};
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInventory();
+  }
+
+  Future<void> _loadInventory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final data = await ApiService.fetchProducts();
+      setState(() {
+        _inventory.clear();
+        for (var item in data) {
+          _inventory.add({
+            'id': item['id'],
+            'name': item['product_name'],
+            'category': item['category'] ?? 'General',
+            'batch': item['batch_number'] ?? 'N/A',
+            'quantity': item['quantity'] ?? 0,
+            'unit': 'strip',
+            'tablets_per_strip': 10,
+            'loose_stock': item['loose_tablet_stock'] ?? 0,
+            'mrp': item['unit_price'] ?? 0.0,
+            'expiry': item['expiry_date'] ?? '',
+            'days_left': item['days_remaining'] ?? 365,
+            'purchase_price': item['purchase_price'] ?? 0.0,
+          });
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   final List<Map<String, dynamic>> _inventory = [
     {
@@ -424,7 +468,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ],
         ],
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error: $_errorMessage', style: const TextStyle(color: AppColors.dangerRed)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadInventory,
+                        child: const Text('Retry'),
+                      )
+                    ],
+                  ),
+                )
+              : Column(
         children: [
           // Filter Tabs
           SingleChildScrollView(

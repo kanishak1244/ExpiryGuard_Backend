@@ -5,6 +5,7 @@ import '../theme/app_typography.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/tabular_text.dart';
+import '../services/api_service.dart';
 
 /// Customer data model for retail counter billing
 class CustomerParty {
