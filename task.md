@@ -1,7 +1,4 @@
-- [x] Rebuild mobile navigation drawer and toggle button
-- [x] Rebuild mobile hero headline, CTAs, and trust strip spacing
-- [x] Rebuild interactive viewfinder mockup stack
-- [x] Rebuild bento grid elements and product showcase sections
-- [x] Rebuild pilot form card input sizes and validation layout
-- [x] Rebuild vertical timeline roadmap
-- [x] Verify responsiveness and ensure no horizontal scrolling
+- [x] Define new SQLAlchemy models in models.py
+- [x] Define corresponding Pydantic schemas in schemas.py
+- [x] Create and run verification script test_erp_models.py
+- [/] Commit changes to git and push

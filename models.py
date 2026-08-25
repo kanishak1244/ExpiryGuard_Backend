@@ -522,3 +522,111 @@ class PilotLead(Base):
     bills_per_day = Column(String, nullable=False)  # Under 50, 50–100, 100–200, 200+
     biggest_problem = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ==========================================
+# ERP PRIORITY 1 MODULES
+# ==========================================
+
+class PurchaseInvoice(Base):
+    __tablename__ = "purchase_invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+
+    invoice_number = Column(String, nullable=False, index=True)
+    invoice_date = Column(Date, nullable=False)
+    total_amount = Column(Float, nullable=False, default=0.0)
+    tax_amount = Column(Float, nullable=False, default=0.0)
+    payment_status = Column(String, nullable=False, default="UNPAID")  # PAID, UNPAID, PARTIAL
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+    supplier = relationship("Supplier")
+    items = relationship("PurchaseItem", back_populates="invoice", cascade="all, delete-orphan")
+
+
+class PurchaseItem(Base):
+    __tablename__ = "purchase_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_invoice_id = Column(Integer, ForeignKey("purchase_invoices.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+
+    batch_number = Column(String, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=0)
+    purchase_price = Column(Float, nullable=False, default=0.0)
+    mrp = Column(Float, nullable=False, default=0.0)
+    gst_rate = Column(Float, nullable=False, default=12.0)
+    expiry_date = Column(Date, nullable=False)
+
+    invoice = relationship("PurchaseInvoice", back_populates="items")
+    product = relationship("Product")
+
+
+class SupplierPayment(Base):
+    __tablename__ = "supplier_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+
+    amount_paid = Column(Float, nullable=False)
+    payment_method = Column(String, nullable=False, default="CASH")  # CASH, UPI, BANK_TRANSFER, CHEQUE
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    supplier = relationship("Supplier")
+
+
+class CustomerPayment(Base):
+    __tablename__ = "customer_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True, index=True)
+
+    amount_paid = Column(Float, nullable=False)
+    payment_method = Column(String, nullable=False, default="CASH")  # CASH, UPI, CARD
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    customer = relationship("Customer")
+    sale = relationship("Sale")
+
+
+class PurchaseReturn(Base):
+    __tablename__ = "purchase_returns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False, index=True)
+    purchase_invoice_id = Column(Integer, ForeignKey("purchase_invoices.id"), nullable=True, index=True)
+
+    total_returned_value = Column(Float, nullable=False, default=0.0)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    supplier = relationship("Supplier")
+    invoice = relationship("PurchaseInvoice")
+    items = relationship("PurchaseReturnItem", back_populates="purchase_return", cascade="all, delete-orphan")
+
+
+class PurchaseReturnItem(Base):
+    __tablename__ = "purchase_return_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_return_id = Column(Integer, ForeignKey("purchase_returns.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+
+    batch_number = Column(String, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=0)
+    purchase_price = Column(Float, nullable=False, default=0.0)
+
+    purchase_return = relationship("PurchaseReturn", back_populates="items")
+    product = relationship("Product")

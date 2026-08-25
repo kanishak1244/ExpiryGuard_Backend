@@ -992,3 +992,131 @@ class PilotLeadResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==========================================
+# ERP PRIORITY 1 SCHEMAS
+# ==========================================
+
+from datetime import date
+
+class PurchaseItemCreate(BaseModel):
+    product_id: int
+    batch_number: str
+    quantity: int
+    purchase_price: float
+    mrp: float
+    gst_rate: float
+    expiry_date: date
+
+class PurchaseItemResponse(BaseModel):
+    id: int
+    purchase_invoice_id: int
+    product_id: int
+    batch_number: str
+    quantity: int
+    purchase_price: float
+    mrp: float
+    gst_rate: float
+    expiry_date: date
+
+    class Config:
+        from_attributes = True
+
+class PurchaseInvoiceCreate(BaseModel):
+    supplier_id: int
+    invoice_number: str
+    invoice_date: date
+    total_amount: float
+    tax_amount: float
+    payment_status: str  # PAID, UNPAID, PARTIAL
+    items: List[PurchaseItemCreate]
+
+class PurchaseInvoiceResponse(BaseModel):
+    id: int
+    user_id: int
+    supplier_id: int
+    invoice_number: str
+    invoice_date: date
+    total_amount: float
+    tax_amount: float
+    payment_status: str
+    created_at: datetime
+    updated_at: datetime
+    items: List[PurchaseItemResponse]
+
+    class Config:
+        from_attributes = True
+
+class SupplierPaymentCreate(BaseModel):
+    supplier_id: int
+    amount_paid: float
+    payment_method: str  # CASH, UPI, BANK_TRANSFER, CHEQUE
+    notes: Optional[str] = None
+
+class SupplierPaymentResponse(BaseModel):
+    id: int
+    user_id: int
+    supplier_id: int
+    amount_paid: float
+    payment_method: str
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CustomerPaymentCreate(BaseModel):
+    customer_id: int
+    sale_id: Optional[int] = None
+    amount_paid: float
+    payment_method: str  # CASH, UPI, CARD
+
+class CustomerPaymentResponse(BaseModel):
+    id: int
+    user_id: int
+    customer_id: int
+    sale_id: Optional[int] = None
+    amount_paid: float
+    payment_method: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PurchaseReturnItemCreate(BaseModel):
+    product_id: int
+    batch_number: str
+    quantity: int
+    purchase_price: float
+
+class PurchaseReturnItemResponse(BaseModel):
+    id: int
+    purchase_return_id: int
+    product_id: int
+    batch_number: str
+    quantity: int
+    purchase_price: float
+
+    class Config:
+        from_attributes = True
+
+class PurchaseReturnCreate(BaseModel):
+    supplier_id: int
+    purchase_invoice_id: Optional[int] = None
+    total_returned_value: float
+    reason: Optional[str] = None
+    items: List[PurchaseReturnItemCreate]
+
+class PurchaseReturnResponse(BaseModel):
+    id: int
+    user_id: int
+    supplier_id: int
+    purchase_invoice_id: Optional[int] = None
+    total_returned_value: float
+    reason: Optional[str] = None
+    created_at: datetime
+    items: List[PurchaseReturnItemResponse]
+
+    class Config:
+        from_attributes = True
