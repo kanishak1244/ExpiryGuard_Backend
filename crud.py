@@ -2867,3 +2867,117 @@ def get_purchase_returns(db: Session, user_id: int, skip: int = 0, limit: int = 
     return db.query(models.PurchaseReturn).filter(
         models.PurchaseReturn.user_id == user_id
     ).offset(skip).limit(limit).all()
+
+
+def create_customer_payment(db: Session, obj_in: schemas.CustomerPaymentCreate, user_id: int):
+    """Logs credit collection payment and decrements customer pending amount."""
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == obj_in.customer_id,
+        models.Customer.user_id == user_id
+    ).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found or access denied.")
+
+    # Deduct customer pending amount
+    customer.pending_amount = max(0.0, customer.pending_amount - obj_in.amount_paid)
+
+    db_payment = models.CustomerPayment(
+        user_id=user_id,
+        customer_id=obj_in.customer_id,
+        sale_id=obj_in.sale_id,
+        amount_paid=obj_in.amount_paid,
+        payment_method=obj_in.payment_method
+    )
+    db.add(db_payment)
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
+
+
+def get_customer_payments(db: Session, customer_id: int, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.CustomerPayment).filter(
+        models.CustomerPayment.customer_id == customer_id,
+        models.CustomerPayment.user_id == user_id
+    ).offset(skip).limit(limit).all()
+
+
+def get_customer_ledger(db: Session, customer_id: int, user_id: int):
+    """Returns chronologically combined ledger list of credit sales and collections."""
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == customer_id,
+        models.Customer.user_id == user_id
+    ).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found.")
+
+    sales = db.query(models.Sale).filter(
+        models.Sale.customer_id == customer_id,
+        models.Sale.user_id == user_id,
+        models.Sale.payment_method.in_(["CREDIT", "PENDING"])
+    ).all()
+
+    payments = db.query(models.CustomerPayment).filter(
+        models.CustomerPayment.customer_id == customer_id,
+        models.CustomerPayment.user_id == user_id
+    ).all()
+
+    ledger = []
+    for s in sales:
+        ledger.append({
+            "type": "sale",
+            "id": s.id,
+            "reference": s.bill_number,
+            "amount": s.total_amount,
+            "date": s.created_at
+        })
+    for p in payments:
+        ledger.append({
+            "type": "payment",
+            "id": p.id,
+            "reference": f"PAY-{p.id}",
+            "amount": p.amount_paid,
+            "date": p.created_at
+        })
+
+    # Sort chronologically by date safely
+    def make_naive(dt):
+        if dt is None:
+            return datetime.min
+        return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+    ledger.sort(key=lambda x: make_naive(x["date"]))
+    return {
+        "customer_name": customer.name,
+        "phone": customer.phone,
+        "current_outstanding": customer.pending_amount,
+        "transactions": ledger
+    }
+
+
+def create_supplier_payment(db: Session, obj_in: schemas.SupplierPaymentCreate, user_id: int):
+    """Logs payment made to wholesale supplier."""
+    supplier = db.query(models.Supplier).filter(
+        models.Supplier.id == obj_in.supplier_id,
+        models.Supplier.user_id == user_id
+    ).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found or access denied.")
+
+    db_payment = models.SupplierPayment(
+        user_id=user_id,
+        supplier_id=obj_in.supplier_id,
+        amount_paid=obj_in.amount_paid,
+        payment_method=obj_in.payment_method,
+        notes=obj_in.notes
+    )
+    db.add(db_payment)
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
+
+
+def get_supplier_payments(db: Session, supplier_id: int, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.SupplierPayment).filter(
+        models.SupplierPayment.supplier_id == supplier_id,
+        models.SupplierPayment.user_id == user_id
+    ).offset(skip).limit(limit).all()

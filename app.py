@@ -1140,6 +1140,29 @@ def get_supplier_inventory(
     return crud.get_supplier_inventory(db=db, supplier_id=supplier_id, user_id=current_user.id)
 
 
+@app.post("/suppliers/{supplier_id}/payments", response_model=schemas.SupplierPaymentResponse, status_code=201)
+def pay_supplier_invoice(
+    supplier_id: int,
+    payment: schemas.SupplierPaymentCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Log a payment made to wholesale distributor."""
+    if payment.supplier_id != supplier_id:
+        raise HTTPException(status_code=400, detail="Supplier ID mismatch.")
+    return crud.create_supplier_payment(db=db, obj_in=payment, user_id=current_user.id)
+
+
+@app.get("/suppliers/{supplier_id}/payments", response_model=List[schemas.SupplierPaymentResponse])
+def get_supplier_payment_history(
+    supplier_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get history of payments made to a wholesale distributor."""
+    return crud.get_supplier_payments(db=db, supplier_id=supplier_id, user_id=current_user.id)
+
+
 # ---------------- PURCHASES ENDPOINTS ---------------- #
 
 @app.post("/purchases", response_model=schemas.PurchaseInvoiceResponse, status_code=201)
@@ -2513,6 +2536,39 @@ def get_customers(
     Get all registered customers for the current shop.
     """
     return crud.get_customers(db, user_id=current_user.id)
+
+
+@app.post("/customers/{customer_id}/payments", response_model=schemas.CustomerPaymentResponse, status_code=201)
+def collect_customer_payment(
+    customer_id: int,
+    payment: schemas.CustomerPaymentCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Log credit payment collection from customer (Khata settlement)."""
+    if payment.customer_id != customer_id:
+        raise HTTPException(status_code=400, detail="Customer ID mismatch.")
+    return crud.create_customer_payment(db=db, obj_in=payment, user_id=current_user.id)
+
+
+@app.get("/customers/{customer_id}/payments", response_model=List[schemas.CustomerPaymentResponse])
+def get_customer_payment_history(
+    customer_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get collection history of credit payments for a customer."""
+    return crud.get_customer_payments(db=db, customer_id=customer_id, user_id=current_user.id)
+
+
+@app.get("/customers/{customer_id}/ledger")
+def get_customer_ledger_summary(
+    customer_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get chronological running ledger of customer credit invoices and collections."""
+    return crud.get_customer_ledger(db=db, customer_id=customer_id, user_id=current_user.id)
 
 
 # ==========================================
