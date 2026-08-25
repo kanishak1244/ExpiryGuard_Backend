@@ -1176,6 +1176,27 @@ def get_purchase(
     return db_invoice
 
 
+@app.post("/purchases/returns", response_model=schemas.PurchaseReturnResponse, status_code=201)
+def create_purchase_return(
+    ret_in: schemas.PurchaseReturnCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Process return of products to wholesale supplier and decrement stock."""
+    return crud.create_purchase_return(db=db, obj_in=ret_in, user_id=current_user.id)
+
+
+@app.get("/purchases/returns", response_model=List[schemas.PurchaseReturnResponse])
+def list_purchase_returns(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Retrieve history of registered purchase returns."""
+    return crud.get_purchase_returns(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
+
 # ---------------- DOCUMENT ENDPOINTS ---------------- #
 
 DOCUMENTS_DIR = BASE_DIR / "uploads" / "documents"

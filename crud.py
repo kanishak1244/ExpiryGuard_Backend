@@ -1253,6 +1253,13 @@ def process_sale_return(db: Session, return_data: schemas.SaleReturnCreate, user
     db.add(sale_return)
 
     sale.return_status = "partially_returned"
+
+    # Adjust customer outstanding credit if applicable
+    if sale.customer_id and sale.payment_method in ["CREDIT", "PENDING"]:
+        customer = db.query(models.Customer).filter(models.Customer.id == sale.customer_id).first()
+        if customer:
+            customer.pending_amount = max(0.0, customer.pending_amount - total_return_amount)
+
     db.commit()
     db.refresh(sale_return)
     invalidate_restock_cache(user_id)
@@ -2786,3 +2793,77 @@ def get_purchase_invoice(db: Session, purchase_id: int, user_id: int):
         models.PurchaseInvoice.id == purchase_id,
         models.PurchaseInvoice.user_id == user_id
     ).first()
+
+
+def create_purchase_return(db: Session, obj_in: schemas.PurchaseReturnCreate, user_id: int):
+    """Processes return of products to wholesale supplier and decrements inventory quantity."""
+    # Check if supplier exists
+    supplier = db.query(models.Supplier).filter(
+        models.Supplier.id == obj_in.supplier_id,
+        models.Supplier.user_id == user_id
+    ).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found or access denied.")
+
+    # Create PurchaseReturn record
+    db_return = models.PurchaseReturn(
+        user_id=user_id,
+        supplier_id=obj_in.supplier_id,
+        purchase_invoice_id=obj_in.purchase_invoice_id,
+        total_returned_value=obj_in.total_returned_value,
+        reason=obj_in.reason
+    )
+    db.add(db_return)
+    db.flush()
+
+    for item in obj_in.items:
+        # Check if product exists in inventory
+        db_product = db.query(models.Product).filter(
+            models.Product.id == item.product_id,
+            models.Product.user_id == user_id
+        ).first()
+
+        if not db_product:
+            raise HTTPException(status_code=404, detail=f"Product with ID {item.product_id} not found.")
+
+        # Deduct quantity from inventory
+        if db_product.quantity < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock for '{db_product.product_name}' to return. Available: {db_product.quantity}, Requested: {item.quantity}"
+            )
+        db_product.quantity -= item.quantity
+
+        # Create PurchaseReturnItem record
+        db_item = models.PurchaseReturnItem(
+            purchase_return_id=db_return.id,
+            product_id=db_product.id,
+            batch_number=item.batch_number,
+            quantity=item.quantity,
+            purchase_price=item.purchase_price
+        )
+        db.add(db_item)
+
+        # Log Inventory Transaction
+        db_txn = models.InventoryTransaction(
+            transaction_id=f"TXN-{datetime.utcnow():%Y%m%d%H%M%S}-{uuid.uuid4().hex[:8].upper()}",
+            shop_id=user_id,
+            product_id=db_product.id,
+            transaction_type="purchase_return",
+            quantity=item.quantity,
+            unit_price=db_product.unit_price,
+            purchase_price=item.purchase_price,
+            total_price=round(item.quantity * item.purchase_price, 2),
+            final_price=round(item.quantity * item.purchase_price, 2)
+        )
+        db.add(db_txn)
+
+    db.commit()
+    db.refresh(db_return)
+    return db_return
+
+
+def get_purchase_returns(db: Session, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.PurchaseReturn).filter(
+        models.PurchaseReturn.user_id == user_id
+    ).offset(skip).limit(limit).all()
