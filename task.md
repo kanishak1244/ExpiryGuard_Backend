@@ -1,4 +1,4 @@
 - [x] Write payment and ledger CRUD operations in crud.py
 - [x] Add payments and ledger endpoints to app.py
 - [x] Create and run verification script test_payments_ledger.py
-- [/] Commit changes to git and push
+- [x] Commit changes to git and push
