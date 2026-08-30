@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Legal Checklist for Launching Your App — Dawaiflow</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/landing.css?v=3.0">
+  
+  <style>
+    /* Custom styles specifically for the Legal Checklist Resource Page */
+    .checklist-page {
+      padding-top: 120px;
+      padding-bottom: 80px;
+      background-color: var(--bg-canvas);
+    }
+    
+    .checklist-hero {
+      max-width: 800px;
+      margin: 0 auto 48px auto;
+      text-align: center;
+      padding: 0 20px;
+    }
+    
+    .checklist-title {
+      font-family: var(--font-heading);
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--dark-slate-900);
+      line-height: 1.2;
+      margin-bottom: 12px;
+      letter-spacing: -0.025em;
+    }
+    
+    .checklist-subtitle {
+      font-size: 1.25rem;
+      color: var(--primary-emerald);
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    
+    .checklist-intro {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .disclaimer-card {
+      background-color: #FFFBEB;
+      border: 1px solid #FEF3C7;
+      border-left: 4px solid #F59E0B;
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin: 32px 0;
+      text-align: left;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    
+    .disclaimer-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+      margin-top: 2px;
+    }
+    
+    .disclaimer-text {
+      font-size: 0.95rem;
+      color: #92400E;
+      line-height: 1.5;
+    }
+    
+    .disclaimer-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .section-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    
+    .legal-section {
+      background-color: var(--bg-pure);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      margin-bottom: 40px;
+      box-shadow: var(--shadow-subtle);
+    }
+    
+    .section-num-heading {
+      font-family: var(--font-heading);
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--dark-slate-900);
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      border-bottom: 2px solid var(--very-light-emerald);
+      padding-bottom: 8px;
+    }
+    
+    .section-description {
+      font-size: 1rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    
+    .checklist-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    
+    @media (max-width: 768px) {
+      .checklist-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+    
+    .step-card {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    
+    .step-card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--dark-slate-900);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .bullet-list {
+      list-style: none;
+    }
+    
+    .bullet-list li {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    
+    .bullet-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--primary-emerald);
+      font-weight: 700;
+    }
+    
+    .publish-list li::before {
+      content: "☐";
+      color: var(--text-light);
+    }
+    
+    .prompt-container {
+      background-color: var(--dark-slate-900);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-top: 28px;
+      position: relative;
+    }
+    
+    .prompt-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      display: block;
+    }
+    
+    .prompt-text-box {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #E5E7EB;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      max-height: 350px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    
+    /* Scrollbar styling for prompt container */
+    .prompt-text-box::-webkit-scrollbar {
+      width: 6px;
+    }
+    .prompt-text-box::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+    .prompt-text-box::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    
+    .btn-copy {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: var(--primary-emerald);
+      color: #FFFFFF;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      transition: background-color var(--transition-fast), transform 0.1s ease;
+    }
+    
+    .btn-copy:hover {
+      background-color: var(--primary-emerald-hover);
+    }
+    
+    .btn-copy:active {
+      transform: scale(0.98);
+    }
+    
+    .btn-copy svg {
+      transition: transform var(--transition-fast);
+    }
+    
+    .btn-copy.copied {
+      background-color: #059669;
+    }
+    
+    .final-section {
+      background-color: var(--very-light-emerald);
+      border: 2px solid var(--primary-emerald);
+      border-radius: var(--radius-lg);
+      padding: 36px;
+      margin-top: 48px;
+      box-shadow: var(--shadow-raised);
+    }
+    
+    .final-title {
+      font-family: var(--font-heading);
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--primary-emerald-dark);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .final-checklist {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    @media (max-width: 768px) {
+      .final-checklist {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+    
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 1rem;
+      color: var(--dark-slate-800);
+      line-height: 1.4;
+    }
+    
+    .checklist-item-checkbox {
+      color: var(--primary-emerald);
+      font-weight: 700;
+      user-select: none;
+      font-size: 1.1rem;
+      line-height: 1;
+      margin-top: 2px;
+    }
+    
+    .final-footer-text {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--border-color);
+      padding-top: 16px;
+      line-height: 1.5;
+    }
+    
+    /* Responsive tweaks */
+    @media (max-width: 480px) {
+      .checklist-page {
+        padding-top: 100px;
+        padding-bottom: 60px;
+      }
+      .checklist-title {
+        font-size: 1.85rem;
+      }
+      .checklist-subtitle {
+        font-size: 1.1rem;
+      }
+      .legal-section {
+        padding: 20px;
+      }
+      .section-num-heading {
+        font-size: 1.4rem;
+      }
+      .prompt-container {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       1. STICKY NAVBAR
+       ========================================================================== -->
+  <header id="main-navbar" class="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M12 4v16m-8-8h16"/>
+          </svg>
+        </div>
+        <div style="display: flex; flex-direction: column; line-height: 1.1;">
+          <span style="font-weight: 800; font-size: 19px; letter-spacing: -0.015em;">DAWAIFLOW</span>
+          <span style="font-size: 8.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px;">Powered by ExpiryGuard</span>
+        </div>
+      </a>
+
+      <nav>
+        <ul id="nav-menu" class="nav-menu">
+          <li><a href="index.html#how-it-works" class="nav-link">How It Works</a></li>
+          <li><a href="index.html#why-expiryguard" class="nav-link">Why Dawaiflow</a></li>
+          <li><a href="index.html#features" class="nav-link">Features</a></li>
+          <li><a href="index.html#pricing" class="nav-link">Pricing</a></li>
+          <li><a href="index.html#pilot" class="nav-link">Pilot</a></li>
+          <li><a href="legal-checklist.html" class="nav-link active">Legal Checklist</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="index.html#pilot-form" class="btn btn-emerald btn-arrow">
+          Join the Pilot
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <button id="mobile-menu-toggle" class="nav-mobile-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       MAIN CONTENT
+       ========================================================================== -->
+  <main class="checklist-page">
+    
+    <div class="checklist-hero">
+      <h1 class="checklist-title">The Legal Checklist for Launching Your App</h1>
+      <p class="checklist-subtitle">The essential legal checks to make before publishing your app.</p>
+      
+      <p class="checklist-intro">
+        AI can help you build an app. But before you launch it, there are a few legal things you should check.
+        This guide will help you prepare your Terms of Use, Privacy Policy, app name, and data declarations. 
+        You can use the prompts below to create your first drafts.
+      </p>
+
+      <!-- Disclaimer box -->
+      <div class="disclaimer-card">
+        <div class="disclaimer-icon">⚠️</div>
+        <div class="disclaimer-text">
+          <div class="disclaimer-title">Important Disclaimer</div>
+          This guide is for general information only. Legal requirements depend on your app, users, and country. Review everything carefully before publishing. AI-generated documents do not replace professional legal advice.
+        </div>
+      </div>
+    </div>
+
+    <div class="section-wrapper">
+      
+      <!-- 1. Terms of Use -->
+      <section class="legal-section">
+        <h2 class="section-num-heading">1. Terms of Use</h2>
+        <p class="section-description">
+          Your Terms of Use explain the rules for using your app. They can cover who can use it, acceptable use, payments and subscriptions, account suspension or deletion, and each party’s responsibilities.
+        </p>
+
+        <div class="checklist-grid">
+          <div class="step-card">
+            <h3 class="step-card-title">Before you create it</h3>
+            <ul class="bullet-list">
+              <li>App name</li>
+              <li>Your name or company name</li>
+              <li>Contact email</li>
+              <li>What the app does</li>
+              <li>Whether users need an account</li>
+              <li>Whether the app is free or paid</li>
+              <li>Subscription and cancellation details</li>
+              <li>Minimum user age</li>
+              <li>Country or state where your business operates</li>
+            </ul>
+          </div>
+
+          <div class="step-card">
+            <h3 class="step-card-title">Check before publishing</h3>
+            <ul class="bullet-list publish-list">
+              <li>Replace every placeholder</li>
+              <li>Make sure the pricing details are correct</li>
+              <li>Make sure cancellation instructions match your app</li>
+              <li>Add a contact email</li>
+              <li>Add the date the terms become effective</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="prompt-container">
+          <span class="prompt-label">Prompt Card: Create Terms of Use</span>
+          <div class="prompt-text-box" id="prompt-terms">Create a simple Terms of Use document for my app.
+
+App name:
+[App name]
+
+Owner or company:
+[Your name or company name]
+
+Contact email:
+[Email]
+
+Country or state:
+[Location]
+
+What the app does:
+[Short description]
+
+Does the app require an account?
+[Yes or no]
+
+Pricing:
+[Free, paid, or subscription]
+
+Subscription and cancellation details:
+[Details]
+
+Minimum user age:
+[Age]
+
+Please include sections for user accounts, acceptable use, payments, subscriptions, intellectual property, account termination, disclaimers, limitation of liability, changes to the terms, and contact information.
+
+Use simple language.
+
+Do not invent missing details. Mark anything I need to review with [CHECK].</div>
+          <button class="btn-copy" onclick="copyPrompt('prompt-terms', this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy Prompt</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Privacy Policy -->
+      <section class="legal-section">
+        <h2 class="section-num-heading">2. Privacy Policy</h2>
+        <p class="section-description">
+          Your Privacy Policy explains what information your app collects and how it is used, including information provided by users, collected automatically, accessed through permissions, or received by third-party services.
+        </p>
+
+        <div class="checklist-grid">
+          <div class="step-card">
+            <h3 class="step-card-title">Before you create it</h3>
+            <ul class="bullet-list">
+              <li>What information users provide</li>
+              <li>What your app collects automatically</li>
+              <li>Why each type of information is needed</li>
+              <li>Where the information is stored</li>
+              <li>Which third-party services receive it</li>
+              <li>How users can delete their account or data</li>
+            </ul>
+          </div>
+
+          <div class="step-card">
+            <h3 class="step-card-title">Check before publishing</h3>
+            <ul class="bullet-list publish-list">
+              <li>Include every analytics and third-party tool</li>
+              <li>Make sure the policy matches what the app actually does</li>
+              <li>Explain how users can delete their data</li>
+              <li>Add a contact email</li>
+              <li>Add an effective date</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="prompt-container">
+          <span class="prompt-label">Prompt Card: Create Privacy Policy</span>
+          <div class="prompt-text-box" id="prompt-privacy">Create a simple Privacy Policy for my app.
+
+App name:
+[App name]
+
+Owner or company:
+[Your name or company name]
+
+Contact email:
+[Email]
+
+Country or state:
+[Location]
+
+What the app does:
+[Short description]
+
+Information users provide:
+[List it]
+
+Information collected automatically:
+[List it]
+
+Permissions used:
+[Camera, microphone, location, photos, etc.]
+
+Third-party services:
+[Supabase, Firebase, PostHog, Stripe, RevenueCat, etc.]
+
+How users can delete their account or data:
+[Explain]
+
+Please explain what information is collected, why it is collected, how it is used, when it is shared, how long it is kept, and how users can request access or deletion.
+
+Use simple language.
+
+Do not invent missing details. Mark anything I need to confirm with [CHECK].</div>
+          <button class="btn-copy" onclick="copyPrompt('prompt-privacy', this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy Prompt</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 3. Check Your App Name -->
+      <section class="legal-section">
+        <h2 class="section-num-heading">3. Check Your App Name</h2>
+        <p class="section-description">
+          Before committing to an app name, check whether another business is already using something similar. Search exact and similar names across search engines, app stores, domains, social platforms, and official trademark databases.
+        </p>
+
+        <div class="checklist-grid">
+          <div class="step-card">
+            <h3 class="step-card-title">Before you create it</h3>
+            <ul class="bullet-list">
+              <li>Similar spellings</li>
+              <li>Similar-sounding names</li>
+              <li>Singular and plural versions</li>
+              <li>Names in the same product category</li>
+              <li>Countries where you plan to operate</li>
+            </ul>
+          </div>
+
+          <div class="step-card">
+            <h3 class="step-card-title">Check before publishing</h3>
+            <ul class="bullet-list publish-list">
+              <li>Search the exact name</li>
+              <li>Search similar names</li>
+              <li>Check the app stores</li>
+              <li>Check domains and usernames</li>
+              <li>Check official trademark databases</li>
+              <li>Get professional advice if you find a similar business</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="prompt-container">
+          <span class="prompt-label">Prompt Card: App Name Search Plan</span>
+          <div class="prompt-text-box" id="prompt-name">Help me create a search plan for my proposed app name.
+
+App name:
+[Name]
+
+What the app does:
+[Description]
+
+Target users:
+[Audience]
+
+Countries where I plan to launch:
+[Countries]
+
+Create a list of:
+1. Exact-name searches
+2. Similar spellings
+3. Similar-sounding names
+4. Singular and plural versions
+5. Search queries combining the name with the product category
+6. Trademark databases I should check
+
+Do not tell me that the name is legally safe. This is only for preliminary research.</div>
+          <button class="btn-copy" onclick="copyPrompt('prompt-name', this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy Prompt</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 4. Declare Data Collects -->
+      <section class="legal-section">
+        <h2 class="section-num-heading">4. Declare the Data Your App Collects</h2>
+        <p class="section-description">
+          Apple and Google may ask what information your app collects, uses, or shares. Include data handled by your own app as well as every third-party tool and SDK.
+        </p>
+
+        <div class="checklist-grid">
+          <div class="step-card">
+            <h3 class="step-card-title">Before you create it</h3>
+            <ul class="bullet-list">
+              <li>Every type of data collected</li>
+              <li>Why it is collected</li>
+              <li>Whether it is linked to a user</li>
+              <li>Whether it is shared with another company</li>
+              <li>Which feature or SDK collects it</li>
+              <li>Whether users can request deletion</li>
+            </ul>
+          </div>
+
+          <div class="step-card">
+            <h3 class="step-card-title">Check before publishing</h3>
+            <ul class="bullet-list publish-list">
+              <li>Include every SDK</li>
+              <li>Review the official documentation for each tool</li>
+              <li>Make sure the answers match your Privacy Policy</li>
+              <li>Update the declarations whenever your app changes</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="prompt-container">
+          <span class="prompt-label">Prompt Card: Data Safety Declaration</span>
+          <div class="prompt-text-box" id="prompt-data">Help me prepare my app’s data declarations.
+
+App description:
+[Description]
+
+Platforms:
+[iOS, Android, or both]
+
+Information collected:
+[List it]
+
+Permissions used:
+[List them]
+
+Third-party tools and SDKs:
+[List them]
+
+For each type of information, create a table showing:
+1. What information is collected
+2. Why it is collected
+3. Whether it is linked to the user
+4. Whether it is shared
+5. Which feature or SDK collects it
+6. Whether users can request deletion
+
+Separate the result into:
+- Apple App Privacy
+- Google Play Data Safety
+
+Mark uncertain answers with [VERIFY].</div>
+          <button class="btn-copy" onclick="copyPrompt('prompt-data', this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span>Copy Prompt</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Final Launch Checklist -->
+      <section class="final-section">
+        <h2 class="final-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-emerald);">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Final launch checklist
+        </h2>
+        
+        <div class="final-checklist">
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Created your Terms of Use</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Created your Privacy Policy</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Checked your app name</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Listed every type of data collected</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Checked every third-party SDK</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Completed your store data declarations</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Added your legal documents to your website and app</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Reviewed every AI-generated document</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Replaced every placeholder</span>
+          </div>
+          <div class="checklist-item">
+            <span class="checklist-item-checkbox">☑</span>
+            <span>Added your contact details and effective dates</span>
+          </div>
+        </div>
+
+        <p class="final-footer-text">
+          AI can help you prepare the documents. But you are still responsible for making sure they match your app.
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ==========================================================================
+       15. FOOTER
+       ========================================================================== -->
+  <footer class="footer-landing">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="brand-logo-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 15px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M12 4v16m-8-8h16"/>
+              </svg>
+            </div>
+            <div style="display: flex; flex-direction: column; line-height: 1.1;">
+              <span style="font-weight: 800; font-size: 19px; color: var(--dark-slate-900); letter-spacing: -0.015em;">DAWAIFLOW</span>
+              <span style="font-size: 8.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px;">Powered by ExpiryGuard</span>
+            </div>
+          </div>
+          <div class="footer-desc mobile-only" style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; max-width: 280px;">
+            AI-powered pharmacy management for a smarter, more efficient pharmacy.
+          </div>
+        </div>
+
+        <ul class="footer-links desktop-only">
+          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#pricing">Pricing</a></li>
+          <li><a href="index.html#pilot">Join Pilot</a></li>
+          <li><a href="legal-checklist.html" style="color: var(--primary-emerald); font-weight: 600;">Legal Checklist</a></li>
+        </ul>
+
+        <ul class="footer-links mobile-only" style="display: flex; flex-direction: column; gap: 10px; list-style: none;">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="index.html#pilot">Pilot</a></li>
+          <li><a href="legal-checklist.html" style="color: var(--primary-emerald); font-weight: 600;">Legal Checklist</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>AI-powered billing for Indian pharmacies.</div>
+        <div>© 2026 Dawaiflow. All rights reserved. • <a href="tel:+919817066533" style="color: var(--text-muted); text-decoration: none;">+91 98170 66533</a> • <a href="mailto:vashistkanishak9@gmail.com" style="color: var(--text-muted); text-decoration: none;">vashistkanishak9@gmail.com</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile Sticky CTA Bar (Visible on scroll on mobile devices) -->
+  <div id="mobile-sticky-cta" class="mobile-sticky-cta-bar">
+    <div class="mobile-sticky-inner">
+      <div>
+        <div class="mobile-sticky-title">Dawaiflow Pilot</div>
+        <div class="mobile-sticky-sub">Limited early access for pharmacies</div>
+      </div>
+      <a href="index.html#pilot-form" class="btn btn-emerald btn-sm">
+        Join the Pilot →
+      </a>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/landing.js?v=1.1"></script>
+  
+  <script>
+    // Copy Prompt functionality
+    function copyPrompt(elementId, button) {
+      const promptText = document.getElementById(elementId).innerText;
+      
+      navigator.clipboard.writeText(promptText).then(() => {
+        // Change button state to indicate success
+        button.classList.add('copied');
+        const originalHtml = button.innerHTML;
+        
+        button.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span>Copied!</span>
+        `;
+        
+        // Restore button state after 2 seconds
+        setTimeout(() => {
+          button.classList.remove('copied');
+          button.innerHTML = originalHtml;
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    }
+  </script>
+</body>
+</html>
