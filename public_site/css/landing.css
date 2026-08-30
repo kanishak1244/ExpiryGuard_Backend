@@ -2271,4 +2271,14 @@ h1, h2, h3, h4, .font-heading {
     padding-right: 16px !important;
     box-sizing: border-box !important;
   }
+  .header-join-btn {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    padding: 6px 16px !important;
+    border-radius: 9999px !important;
+    letter-spacing: -0.01em !important;
+    margin-right: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
 }
