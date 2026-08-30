@@ -32,8 +32,11 @@
   </style>
 </head>
 <body>
-
   <!-- ==========================================================================
+       DESKTOP LANDING WEBSITE (VIEWPORT > 768px ONLY)
+       ========================================================================== -->
+  <div id="desktop-website">
+<!-- ==========================================================================
        1. STICKY NAVBAR
        ========================================================================== -->
   <header id="main-navbar" class="navbar">
@@ -58,9 +61,9 @@
           <li><a href="#features" class="nav-link">Features</a></li>
           <li class="desktop-only"><a href="#pricing" class="nav-link">Pricing</a></li>
           <li><a href="#pilot" class="nav-link">Pilot</a></li>
-          <li class="mobile-only"><a href="terms.html" class="nav-link">Terms of Use</a></li>
-          <li class="mobile-only"><a href="privacy.html" class="nav-link">Privacy Policy</a></li>
-          <li class="mobile-only"><a href="data-policy.html" class="nav-link">Data & App Info</a></li>
+          <li class="mobile-only"><a href="/terms" class="nav-link">Terms of Use</a></li>
+          <li class="mobile-only"><a href="/privacy" class="nav-link">Privacy Policy</a></li>
+          <li class="mobile-only"><a href="/data-policy" class="nav-link">Data & App Info</a></li>
         </ul>
       </nav>
 
@@ -1435,9 +1438,9 @@
           <li><a href="#features">Features</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="#pilot">Join Pilot</a></li>
-          <li><a href="terms.html" style="color: var(--primary-emerald); font-weight: 600;">Terms of Use</a></li>
-          <li><a href="privacy.html" style="color: var(--primary-emerald); font-weight: 600;">Privacy Policy</a></li>
-          <li><a href="data-policy.html" style="color: var(--primary-emerald); font-weight: 600;">Data & App Information</a></li>
+          <li><a href="/terms" style="color: var(--primary-emerald); font-weight: 600;">Terms of Use</a></li>
+          <li><a href="/privacy" style="color: var(--primary-emerald); font-weight: 600;">Privacy Policy</a></li>
+          <li><a href="/data-policy" style="color: var(--primary-emerald); font-weight: 600;">Data & App Information</a></li>
           <li><a href="/web/" style="color: var(--primary-emerald); font-weight: 600;">Pharmacist Portal →</a></li>
         </ul>
 
@@ -1447,9 +1450,9 @@
           <li><a href="#pilot" style="color: var(--text-secondary); font-size: 14.5px; font-weight: 600;">Pilot</a></li>
           <li><a href="index.html?full=true" style="color: var(--text-secondary); font-size: 14.5px; font-weight: 600;">Full site</a></li>
           <li style="margin: 12px 0 4px 0; font-weight: 700; font-size: 12px; color: var(--dark-slate-900); text-transform: uppercase; letter-spacing: 0.05em;">Legal</li>
-          <li><a href="terms.html" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Terms of Use</a></li>
-          <li><a href="privacy.html" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Privacy Policy</a></li>
-          <li><a href="data-policy.html" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Data & App Information</a></li>
+          <li><a href="/terms" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Terms of Use</a></li>
+          <li><a href="/privacy" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Privacy Policy</a></li>
+          <li><a href="/data-policy" style="color: var(--primary-emerald); font-size: 14.5px; font-weight: 600;">Data & App Information</a></li>
         </ul>
       </div>
 
@@ -1475,5 +1478,362 @@
 
   <!-- Scripts -->
   <script src="js/landing.js?v=8.0"></script>
+  </div>
+
+<!-- ==========================================================================
+       MOBILE LANDING PAGE (BREAKPOINT <= 768px ONLY — SCREENSHOT 1 TARGET)
+       ========================================================================== -->
+  <div id="mobile-landing-page">
+    <!-- MOBILE HEADER -->
+    <header class="mobile-header">
+      <a href="#" class="mobile-brand">
+        <div class="mobile-brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="mobile-brand-text">
+          <span class="mobile-brand-title">DAWAIFLOW</span>
+          <span class="mobile-brand-sub">POWERED BY EXPIRYGUARD</span>
+        </div>
+      </a>
+
+      <div class="mobile-header-actions">
+        <button class="mobile-header-btn mobile-open-modal-btn">Join Pilot</button>
+        <button id="mobile-hamburger-toggle" class="mobile-hamburger-btn" aria-label="Toggle navigation menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MOBILE DRAWER MENU -->
+    <div id="mobile-drawer-menu" class="mobile-drawer-menu">
+      <a href="#mobile-problem-section" class="mobile-drawer-link">What it does</a>
+      <a href="javascript:void(0)" class="mobile-drawer-link mobile-open-modal-btn">Join Pilot</a>
+      <a href="/terms" class="mobile-drawer-link">Terms of Use</a>
+      <a href="/privacy" class="mobile-drawer-link">Privacy Policy</a>
+      <a href="/data-policy" class="mobile-drawer-link">Data & App Info</a>
+    </div>
+
+    <!-- MOBILE MAIN CONTENT -->
+    <main class="mobile-main-content">
+      <div class="mobile-early-badge">
+        • EARLY PILOT · INDIAN PHARMACIES
+      </div>
+
+      <h1 class="mobile-hero-title">
+        Smarter pharmacy.<br>Less manual work.
+      </h1>
+
+      <p class="mobile-hero-desc">
+        Dawaiflow uses your phone camera to identify medicines, generate the bill and update inventory — so you never enter the same sale twice.
+      </p>
+
+      <div class="mobile-cta-group">
+        <button class="mobile-btn-primary mobile-open-modal-btn">Join the Pilot →</button>
+        <a href="#mobile-problem-section" class="mobile-btn-secondary">See how it works</a>
+      </div>
+
+      <div class="mobile-trust-list">
+        <span>✓ No hardware required</span>
+        <span>✓ Works alongside Marg</span>
+        <span>✓ Built for Indian counters</span>
+      </div>
+
+      <div id="mobile-problem-section" class="mobile-problem-box">
+        <h2 class="mobile-problem-title">The problem isn't billing. It's doing it twice.</h2>
+        <p class="mobile-problem-desc">
+          At a busy counter, a pharmacist writes the bill by hand, then re-types the same sale into desktop software later. Do that 100 times a day and it becomes hours of repeated work.
+        </p>
+
+        <!-- Mobile steps cards -->
+        <div class="mobile-steps-container" style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
+          <!-- Step 1 -->
+          <div class="mobile-step-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              📸
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 11px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">STEP 01</div>
+              <div style="font-size: 16px; font-weight: 700; color: #0F172A; margin-bottom: 2px;">Take a photo</div>
+              <div style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Place the medicine packs together and capture one photo on your phone.</div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="mobile-step-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              🤖
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 11px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">STEP 02</div>
+              <div style="font-size: 16px; font-weight: 700; color: #0F172A; margin-bottom: 2px;">AI creates the bill</div>
+              <div style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Medicines, batches, MRP and GST are identified and calculated automatically.</div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="mobile-step-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              📦
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div style="font-size: 11px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">STEP 03</div>
+              <div style="font-size: 16px; font-weight: 700; color: #0F172A; margin-bottom: 2px;">Inventory updates</div>
+              <div style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">The sale is recorded and stock is deducted — no second data entry.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE PRODUCT SHOWCASE -->
+      <section class="mobile-section" style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #E2E8F0;">
+        <div class="text-center" style="margin-bottom: 24px;">
+          <span style="display: inline-block; background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px; margin-bottom: 12px; letter-spacing: 0.03em; text-transform: uppercase;">Dawaiflow Mobile</span>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 800; color: #0F172A; margin-bottom: 10px;">The product, on your counter</h2>
+          <p style="font-size: 14.5px; color: #475569; line-height: 1.5; margin: 0;">Scan, bill and stock update — from the phone already in your pocket.</p>
+        </div>
+        
+        <div style="display: flex; justify-content: center; width: 100%; margin-top: 24px;">
+          <div style="width: 260px; border: 8px solid #E2E8F0; border-radius: 32px; padding: 0; background: #FFFFFF; box-shadow: var(--shadow-raised); overflow: hidden; position: relative;">
+            <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 14px; background: #E2E8F0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; z-index: 10;"></div>
+            <img src="assets/product/expiryguard-mobile-app-original.jpg" alt="Dawaiflow Mobile App Screenshot" style="width: 100%; display: block; height: auto; object-fit: contain;" loading="lazy">
+          </div>
+        </div>
+      </section>
+
+      <!-- MOBILE FEATURES -->
+      <section class="mobile-section" style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #E2E8F0;">
+        <div class="text-center" style="margin-bottom: 24px;">
+          <span style="display: inline-block; background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px; margin-bottom: 12px; letter-spacing: 0.03em; text-transform: uppercase;">Features</span>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 800; color: #0F172A; margin-bottom: 10px;">Built for the pharmacy counter</h2>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Feature 1 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              📸
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">AI Camera Billing</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Photograph the medicines on the counter and let AI identify each item instead of typing them in.</p>
+            </div>
+          </div>
+
+          <!-- Feature 2 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              🧾
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">Instant GST Invoice</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Generate and print detailed tax invoices with correct CGST, SGST, and IGST breakdowns instantly.</p>
+            </div>
+          </div>
+
+          <!-- Feature 3 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              📦
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">Live Inventory</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Keep stock counts dynamically connected to every counter sale and return.</p>
+            </div>
+          </div>
+
+          <!-- Feature 4 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              ⏳
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">Batch & Expiry Tracking</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Monitor products by batch number and stay ahead of medicines approaching expiry to prevent losses.</p>
+            </div>
+          </div>
+
+          <!-- Feature 5 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              📱
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">Mobile-First Counter</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Perform all billing directly on the phone already in your pocket, anywhere at the counter.</p>
+            </div>
+          </div>
+
+          <!-- Feature 6 -->
+          <div class="mobile-feature-card" style="display: flex; gap: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 20px; padding: 18px 16px; align-items: flex-start; text-align: left; box-shadow: var(--shadow-subtle);">
+            <div style="width: 48px; height: 48px; background: #ECFDF5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+              🇮🇳
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h4 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0 0 2px 0;">Made for Indian Pharmacies</h4>
+              <p style="font-size: 13.5px; color: #64748B; line-height: 1.5; margin: 0;">Designed for Indian MRP billing rules, loose tablet selling, and GST invoice formats.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MOBILE BENEFITS -->
+      <section class="mobile-section" style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #E2E8F0;">
+        <div class="text-center" style="margin-bottom: 24px;">
+          <span style="display: inline-block; background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px; margin-bottom: 12px; letter-spacing: 0.03em; text-transform: uppercase;">Benefits</span>
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 800; color: #0F172A; margin-bottom: 10px;">How it helps your pharmacy</h2>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">Faster billing at a busy counter</span>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">No re-typing the same sale into desktop software</span>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">Better visibility over stock</span>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">Proactive expiry awareness</span>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">Fewer manual errors</span>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+            <div style="width: 24px; height: 24px; background: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-size: 12px; font-weight: bold; flex-shrink: 0;">✓</div>
+            <span style="font-size: 14.5px; font-weight: 600; color: #1E293B;">Works alongside your current system like Marg</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- MOBILE FINAL CTA -->
+      <section class="mobile-section" style="margin-top: 48px; background: #111827; border-radius: 24px; padding: 32px 20px; text-align: center; color: #FFFFFF;">
+        <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 800; color: #FFFFFF; line-height: 1.25; margin-bottom: 12px;">Ready to make your pharmacy smarter?</h2>
+        <p style="font-size: 14.5px; color: #D1D5DB; line-height: 1.5; margin-bottom: 24px;">
+          We're onboarding a limited cohort of independent pharmacies in India. Share your counter workflow and we'll walk you through the pilot.
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+          <button class="mobile-btn-primary mobile-open-modal-btn" style="width: 100%; border-radius: 9999px;">Join the Pilot →</button>
+          <a href="https://wa.me/919817066533?text=Hi%20Dawaiflow%20team%2C%20I%20have%20questions%20about%20the%20pilot" target="_blank" style="background: transparent; color: #FFFFFF !important; font-size: 15px; font-weight: 600; padding: 13px 20px; border-radius: 9999px; text-decoration: none; text-align: center; display: block; width: 100%; box-sizing: border-box; border: 1px solid #DCFCE7;">
+            Ask a question on WhatsApp
+          </a>
+          <span style="font-size: 13px; color: #9CA3AF; margin-top: 8px; display: inline-block;">
+            Or call <a href="tel:+919817066533" style="color: #FFFFFF; font-weight: 700; text-decoration: underline;">+91 98170 66533</a>
+          </span>
+        </div>
+      </section>
+    </main>
+
+    <!-- MOBILE FOOTER -->
+    <footer class="mobile-footer" style="margin-top: 64px; padding: 32px 16px; border-top: 1px solid #E2E8F0; text-align: center; background: #FFFFFF; width: 100%; box-sizing: border-box;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; background: #16A34A; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.1;">
+            <span style="font-weight: 800; font-size: 16px; color: #0F172A; letter-spacing: -0.015em; font-family: 'Plus Jakarta Sans', sans-serif;">DAWAIFLOW</span>
+            <span style="font-size: 7.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px;">POWERED BY EXPIRYGUARD</span>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: #64748B; line-height: 1.5; margin: 4px 0 0 0; max-width: 280px;">
+          AI-powered pharmacy management for a smarter, more efficient pharmacy.
+        </p>
+      </div>
+
+      <ul style="display: flex; flex-direction: column; gap: 10px; list-style: none; padding: 0; margin: 0 0 24px 0; align-items: center;">
+        <li><a href="#mobile-problem-section" style="color: #334155; font-size: 14.5px; font-weight: 600;">What it does</a></li>
+        <li><a href="javascript:void(0)" class="mobile-open-modal-btn" style="color: #334155; font-size: 14.5px; font-weight: 600;">Join Pilot</a></li>
+        <li style="margin: 8px 0 2px 0; font-weight: 700; font-size: 11px; color: #0F172A; text-transform: uppercase; letter-spacing: 0.05em;">Legal</li>
+        <li><a href="/terms" style="color: #16A34A; font-size: 14.5px; font-weight: 600;">Terms of Use</a></li>
+        <li><a href="/privacy" style="color: #16A34A; font-size: 14.5px; font-weight: 600;">Privacy Policy</a></li>
+        <li><a href="/data-policy" style="color: #16A34A; font-size: 14.5px; font-weight: 600;">Data & App Information</a></li>
+      </ul>
+
+      <div style="font-size: 12px; color: #64748B; line-height: 1.6; border-top: 1px solid #F1F5F9; padding-top: 16px;">
+        <div>AI-powered billing for Indian pharmacies.</div>
+        <div style="margin-top: 4px;">© 2026 Dawaiflow. All rights reserved.</div>
+        <div style="margin-top: 2px;">
+          <a href="tel:+919817066533" style="color: #64748B; text-decoration: none;">+91 98170 66533</a> • <a href="mailto:vashistkanishak9@gmail.com" style="color: #64748B; text-decoration: none;">vashistkanishak9@gmail.com</a>
+        </div>
+      </div>
+    </footer>
+
+    <!-- MOBILE PILOT MODAL OVERLAY -->
+    <div id="mobile-pilot-modal" class="mobile-modal-overlay">
+      <div class="mobile-modal-card">
+        <button id="mobile-modal-close-btn" class="mobile-modal-close">✕</button>
+        <div class="text-center" style="margin-bottom: 24px;">
+          <h3 style="font-size: 22px; font-weight: 800; color: #0F172A; margin-bottom: 6px;">Request Pilot Access</h3>
+          <p style="font-size: 14px; color: #64748B;">Tell us about your counter workflow. We’ll get in touch to walk you through the pilot.</p>
+        </div>
+        
+        <form id="mobile-pilot-lead-form-modal">
+          <div style="display:flex; flex-direction:column; gap: 14px;">
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Full Name *</label>
+              <input type="text" id="m_full_name" class="form-input-landing" placeholder="e.g. Ramesh Patel" required style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Pharmacy Name *</label>
+              <input type="text" id="m_pharmacy_name" class="form-input-landing" placeholder="e.g. Sanjeevani Medicos" required style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">City / Town *</label>
+              <input type="text" id="m_city" class="form-input-landing" placeholder="e.g. Ahmedabad, Surat" required style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Phone Number (WhatsApp) *</label>
+              <input type="tel" id="m_phone" class="form-input-landing" placeholder="e.g. 9876543210" required style="width:100%;">
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Current Billing Software *</label>
+              <select id="m_current_billing_method" class="form-select-landing" required style="width:100%;">
+                <option value="" disabled selected>Select billing software</option>
+                <option value="Paper / Manual">Paper / Manual Billing</option>
+                <option value="Marg ERP">Marg ERP</option>
+                <option value="MargBooks">MargBooks</option>
+                <option value="Other">Other Software</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Approximate Bills Per Day *</label>
+              <select id="m_bills_per_day" class="form-select-landing" required style="width:100%;">
+                <option value="" disabled selected>Select daily bill volume</option>
+                <option value="Under 50">Under 50 bills / day</option>
+                <option value="50–100">50–100 bills / day</option>
+                <option value="100–200">100–200 bills / day</option>
+                <option value="200+">200+ bills / day</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 12px; font-weight: 700; color: #334155; display:block; margin-bottom: 4px;">Number of Pharmacies *</label>
+              <select id="m_num_pharmacies" class="form-select-landing" required style="width:100%;">
+                <option value="" disabled selected>Select number of outlets</option>
+                <option value="1 Outlet">1 Outlet</option>
+                <option value="2-5 Outlets">2-5 Outlets</option>
+                <option value="5+ Outlets">5+ Outlets</option>
+              </select>
+            </div>
+            <button id="m_btn_submit_pilot" type="submit" class="btn btn-emerald btn-lg" style="width: 100%; margin-top: 8px;">
+              Join the Pilot →
+            </button>
+            <div id="m_form_status_box" class="form-status-box"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
