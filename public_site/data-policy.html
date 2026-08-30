@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data & App Information — Dawaiflow</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/landing.css?v=3.0">
+  
+  <style>
+    /* Styling for legal document subpages */
+    .legal-page {
+      padding-top: 120px;
+      padding-bottom: 80px;
+      background-color: var(--bg-canvas);
+    }
+    
+    .legal-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    .legal-header {
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 24px;
+    }
+    
+    .legal-title {
+      font-family: var(--font-heading);
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--dark-slate-900);
+      margin-bottom: 12px;
+      letter-spacing: -0.025em;
+    }
+    
+    .legal-meta {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+    
+    .disclaimer-banner {
+      background-color: var(--bg-pure);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--primary-emerald);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    
+    .category-section {
+      background-color: var(--bg-pure);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-subtle);
+    }
+    
+    .category-title {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--dark-slate-900);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .category-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 12px 24px;
+    }
+    
+    .grid-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding-top: 2px;
+    }
+    
+    .grid-value {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    
+    @media (max-width: 600px) {
+      .category-grid {
+        grid-template-columns: 1fr;
+        gap: 6px 0;
+      }
+      .grid-label {
+        margin-top: 8px;
+      }
+      .grid-label:first-child {
+        margin-top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Navbar -->
+  <header id="main-navbar" class="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="nav-brand">
+        <div class="brand-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M12 4v16m-8-8h16"/>
+          </svg>
+        </div>
+        <div style="display: flex; flex-direction: column; line-height: 1.1;">
+          <span style="font-weight: 800; font-size: 19px; letter-spacing: -0.015em;">DAWAIFLOW</span>
+          <span style="font-size: 8.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px;">Powered by ExpiryGuard</span>
+        </div>
+      </a>
+
+      <nav>
+        <ul id="nav-menu" class="nav-menu">
+          <li><a href="index.html#how-it-works" class="nav-link">How It Works</a></li>
+          <li><a href="index.html#why-expiryguard" class="nav-link">Why Dawaiflow</a></li>
+          <li><a href="index.html#features" class="nav-link">Features</a></li>
+          <li><a href="index.html#pricing" class="nav-link">Pricing</a></li>
+          <li><a href="index.html#pilot" class="nav-link">Pilot</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="index.html#pilot-form" class="btn btn-emerald btn-arrow">
+          Join the Pilot
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <button id="mobile-menu-toggle" class="nav-mobile-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="legal-page">
+    <div class="legal-container">
+      <div class="legal-header">
+        <h1 class="legal-title">Data & App Information</h1>
+        <div class="legal-meta">
+          <strong>Dawaiflow (Powered by ExpiryGuard)</strong><br>
+          Last Updated & Effective Date: August 30, 2026
+        </div>
+      </div>
+      
+      <div class="disclaimer-banner">
+        <strong>Legal Disclaimer:</strong> This information is provided for general informational purposes and does not constitute legal advice. Please consult with a legal professional before finalizing compliance documents for your business operations.
+      </div>
+      
+      <div class="legal-content">
+        <p style="margin-bottom: 32px; font-size: 1.05rem;">
+          To keep our billing process transparent, this page outlines exactly what categories of information Dawaiflow handles, why we collect them, how they are processed, and how you can manage your data.
+        </p>
+        
+        <!-- Category 1: Account -->
+        <div class="category-section">
+          <h2 class="category-title">🔑 1. Pharmacist Account Data</h2>
+          <div class="category-grid">
+            <div class="grid-label">What it is</div>
+            <div class="grid-value">Pharmacist username, secure account password (encrypted using bcrypt), and registered email address.</div>
+            
+            <div class="grid-label">Why needed</div>
+            <div class="grid-value">To authenticate login sessions, secure portal access, and send real-time system alerts.</div>
+            
+            <div class="grid-label">How used</div>
+            <div class="grid-value">Verified during credential entry. Authorizes the device to request inventory data.</div>
+            
+            <div class="grid-label">Shared</div>
+            <div class="grid-value">No. Stored strictly within our secure database.</div>
+            
+            <div class="grid-label">Deletion</div>
+            <div class="grid-value">Emailing deletion request to vashistkanishak9@gmail.com deletes the account record.</div>
+          </div>
+        </div>
+
+        <!-- Category 2: Inventory -->
+        <div class="category-section">
+          <h2 class="category-title">📦 2. Pharmacy Inventory & Catalog</h2>
+          <div class="category-grid">
+            <div class="grid-label">What it is</div>
+            <div class="grid-value">Medicine names, manufacturer details, batch numbers, pack sizes, shelf locations, supplier logs, and current stock counts.</div>
+            
+            <div class="grid-label">Why needed</div>
+            <div class="grid-value">To track active stock, alert you of expiring medicines, and suggest restocking quantities.</div>
+            
+            <div class="grid-label">How used</div>
+            <div class="grid-value">Updated automatically on billing creations, returns, or manual inventory imports.</div>
+            
+            <div class="grid-label">Shared</div>
+            <div class="grid-value">No. Inventory lists are private to each registered pharmacy.</div>
+            
+            <div class="grid-label">Deletion</div>
+            <div class="grid-value">Can be purged by deleting the account or using inventory clear actions in your portal dashboard.</div>
+          </div>
+        </div>
+
+        <!-- Category 3: Sales -->
+        <div class="category-section">
+          <h2 class="category-title">💳 3. Sales & Invoice Transcripts</h2>
+          <div class="category-grid">
+            <div class="grid-label">What it is</div>
+            <div class="grid-value">Invoice numbers, purchase totals, payment modes, GST amounts, item quantities, and transaction timestamps.</div>
+            
+            <div class="grid-label">Why needed</div>
+            <div class="grid-value">To generate printable retail receipts (PDF invoices) and construct dashboard business graphs.</div>
+            
+            <div class="grid-label">How used</div>
+            <div class="grid-value">Aggregated inside your dashboard stats page to show total business values.</div>
+            
+            <div class="grid-label">Shared</div>
+            <div class="grid-value">No. Sales metrics are private to your business.</div>
+            
+            <div class="grid-label">Deletion</div>
+            <div class="grid-value">Associated sales records are purged upon request or account termination.</div>
+          </div>
+        </div>
+
+        <!-- Category 4: Camera -->
+        <div class="category-section">
+          <h2 class="category-title">📸 4. Camera Label Scans</h2>
+          <div class="category-grid">
+            <div class="grid-label">What it is</div>
+            <div class="grid-value">Temporary photos of medicine packaging labels containing textual product detail.</div>
+            
+            <div class="grid-label">Why needed</div>
+            <div class="grid-value">To recognize medicine packaging information, matching brand names, pack sizes, batches, and expiries instantly without manual lookup.</div>
+            
+            <div class="grid-label">How used</div>
+            <div class="grid-value">Processed in memory to extract text information. Images are discarded immediately after recognition analysis.</div>
+            
+            <div class="grid-label">Shared</div>
+            <div class="grid-value">Transmitted securely via secure API to Google Gemini models for text parsing. Photos are not used for public model training.</div>
+            
+            <div class="grid-label">Deletion</div>
+            <div class="grid-value">Not applicable, as images are not stored permanently.</div>
+          </div>
+        </div>
+
+        <!-- Category 5: Customer -->
+        <div class="category-section">
+          <h2 class="category-title">👤 5. Customer & Supplier Contact Details</h2>
+          <div class="category-grid">
+            <div class="grid-label">What it is</div>
+            <div class="grid-value">Customer names, mobile numbers entered during checkout, and supplier contact logs.</div>
+            
+            <div class="grid-label">Why needed</div>
+            <div class="grid-value">To print customer details on invoices (compliant with standard billing formats) and manage supplier lists.</div>
+            
+            <div class="grid-label">How used</div>
+            <div class="grid-value">Appended directly to the specific invoice record and stored in the database.</div>
+            
+            <div class="grid-label">Shared</div>
+            <div class="grid-value">No. Customer databases are strictly private and are not shared with external advertising agents.</div>
+            
+            <div class="grid-label">Deletion</div>
+            <div class="grid-value">Can be modified or deleted directly from your dashboard sales lists.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer-landing">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="brand-logo-wrap" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 15px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <path d="M12 4v16m-8-8h16"/>
+              </svg>
+            </div>
+            <div style="display: flex; flex-direction: column; line-height: 1.1;">
+              <span style="font-weight: 800; font-size: 19px; color: var(--dark-slate-900); letter-spacing: -0.015em;">DAWAIFLOW</span>
+              <span style="font-size: 8.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px;">Powered by ExpiryGuard</span>
+            </div>
+          </div>
+          <div class="footer-desc mobile-only" style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; max-width: 280px;">
+            AI-powered pharmacy management for a smarter, more efficient pharmacy.
+          </div>
+        </div>
+
+        <ul class="footer-links desktop-only">
+          <li><a href="index.html#how-it-works">How It Works</a></li>
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#pricing">Pricing</a></li>
+          <li><a href="index.html#pilot">Join Pilot</a></li>
+          <li><a href="terms.html" style="color: var(--primary-emerald); font-weight: 600;">Terms of Use</a></li>
+          <li><a href="privacy.html" style="color: var(--primary-emerald); font-weight: 600;">Privacy Policy</a></li>
+          <li><a href="data-policy.html" style="color: var(--primary-emerald); font-weight: 600;">Data & App Information</a></li>
+        </ul>
+
+        <ul class="footer-links mobile-only" style="display: flex; flex-direction: column; gap: 10px; list-style: none;">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="terms.html">Terms of Use</a></li>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="data-policy.html">Data & App Information</a></li>
+          <li><a href="tel:+919817066533">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-bottom">
+        <div>AI-powered billing for Indian pharmacies.</div>
+        <div>© 2026 Dawaiflow. All rights reserved. • <a href="tel:+919817066533" style="color: var(--text-muted); text-decoration: none;">+91 98170 66533</a> • <a href="mailto:vashistkanishak9@gmail.com" style="color: var(--text-muted); text-decoration: none;">vashistkanishak9@gmail.com</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/landing.js?v=1.1"></script>
+</body>
+</html>
