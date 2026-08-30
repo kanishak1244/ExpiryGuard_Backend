@@ -248,7 +248,7 @@ function initPilotLeadForm() {
             We’ve received your pilot request for <strong>${escapeHtml(pharmacyName)}</strong> in ${escapeHtml(city)}.
           </p>
           <p style="font-size: 14.5px; color: #16A34A; font-weight: 600; background-color: #F0FDF4; border: 1px solid #86EFAC; padding: 12px 18px; border-radius: 8px; display: inline-block;">
-            Someone from the ExpiryGuard team will get in touch on ${escapeHtml(cleanPhone)} soon.
+            Someone from the Dawaiflow team will get in touch on ${escapeHtml(cleanPhone)} soon.
           </p>
         </div>
       `;
