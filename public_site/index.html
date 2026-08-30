@@ -52,11 +52,16 @@
       </nav>
 
       <div class="nav-actions">
-        <a href="#pilot-form" class="btn btn-emerald btn-arrow">
+        <!-- Desktop Join Pilot CTA -->
+        <a href="#pilot-form" class="btn btn-emerald btn-arrow desktop-only">
           Join the Pilot
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14M12 5l7 7-7 7"/>
           </svg>
+        </a>
+        <!-- Mobile Join Pilot CTA -->
+        <a href="#pilot-form" class="btn btn-emerald btn-sm mobile-only" style="font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 6px; letter-spacing: -0.01em; margin-right: 4px;">
+          Join Pilot
         </a>
         <button id="mobile-menu-toggle" class="nav-mobile-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -100,7 +105,7 @@
         Dawaiflow uses your phone camera to identify medicines, generate the bill, and update inventory — so pharmacists spend less time re-entering the same sale.
       </p>
       <p class="hero-subheadline mobile-only">
-        Dawaiflow helps pharmacies manage billing, inventory and expiry tracking with intelligent automation.
+        Dawaiflow uses your phone camera to identify medicines, generate the bill and update inventory — so you never enter the same sale twice.
       </p>
 
       <!-- CTAs -->
@@ -122,6 +127,13 @@
         <span>•</span>
         <span>✓ Works alongside Marg</span>
         <span>•</span>
+        <span>✓ Built for Indian counters</span>
+      </div>
+
+      <!-- Mobile-only Reassurance -->
+      <div class="mobile-only" style="margin-top: 16px; font-size: 13.5px; font-weight: 500; color: var(--text-muted); display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 24px;">
+        <span>✓ No hardware required</span>
+        <span>✓ Works alongside your current system like Marg</span>
         <span>✓ Built for Indian counters</span>
       </div>
 
@@ -292,20 +304,20 @@
       <div class="text-center">
         <span class="section-tag">The Counter Reality</span>
         <h2 class="section-title desktop-only">The problem isn’t billing. It’s doing it twice.</h2>
-        <h2 class="section-title mobile-only">Running a Pharmacy Shouldn’t Feel This Manual.</h2>
+        <h2 class="section-title mobile-only">The problem isn't billing. It's doing it twice.</h2>
         <p class="section-subtitle mx-auto desktop-only">
           At a busy pharmacy counter, a customer waits while a pharmacist writes a bill by hand. Later, the same information has to be entered again into desktop billing software.
         </p>
         <p class="section-subtitle mx-auto mobile-only">
-          Manual billing, re-entering medicine information, difficult inventory tracking, and human errors steal hours of your time and lead to expiry-related losses.
+          At a busy counter, a pharmacist writes the bill by hand, then re-types the same sale into desktop software later. Do that 100 times a day and it becomes hours of repeated work.
         </p>
         <p style="font-size: 16px; color: var(--text-muted); margin-top: 12px; font-weight: 500;" class="desktop-only">
           Do that 50, 100, or 200 times a day, and a few extra steps quickly become hours of repetitive work.
         </p>
       </div>
 
-      <!-- Visual Workflow Comparison -->
-      <div class="problem-comparison-grid">
+      <!-- Visual Workflow Comparison (Desktop-Only) -->
+      <div class="problem-comparison-grid desktop-only">
         
         <!-- Current Manual Workflow (Gray) -->
         <div class="workflow-card workflow-card-traditional">
@@ -368,13 +380,47 @@
         </div>
 
       </div>
+
+      <!-- Mobile-Only Steps Layout -->
+      <div class="how-it-works-grid mobile-only" style="margin-top: 32px;">
+        <!-- Step 1 -->
+        <div class="step-card-large" style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-subtle);">
+          <span class="step-number-badge" style="background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 100px;">STEP 01</span>
+          <div class="step-icon-wrap" style="font-size: 32px; margin: 16px 0 12px 0;">📸</div>
+          <h3 class="step-title" style="font-size: 18px; font-weight: 700; color: var(--dark-slate-900); margin-bottom: 8px;">Take a photo</h3>
+          <p class="step-desc" style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            Place the medicine packs together and capture one photo on your phone.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step-card-large" style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-subtle);">
+          <span class="step-number-badge" style="background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 100px;">STEP 02</span>
+          <div class="step-icon-wrap" style="font-size: 32px; margin: 16px 0 12px 0;">🤖</div>
+          <h3 class="step-title" style="font-size: 18px; font-weight: 700; color: var(--dark-slate-900); margin-bottom: 8px;">AI creates the bill</h3>
+          <p class="step-desc" style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            Medicines, batches, MRP and GST are identified and calculated automatically.
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step-card-large" style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-subtle);">
+          <span class="step-number-badge" style="background: #ECFDF5; color: #059669; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 100px;">STEP 03</span>
+          <div class="step-icon-wrap" style="font-size: 32px; margin: 16px 0 12px 0;">📦</div>
+          <h3 class="step-title" style="font-size: 18px; font-weight: 700; color: var(--dark-slate-900); margin-bottom: 8px;">Inventory updates</h3>
+          <p class="step-desc" style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+            The sale is recorded and stock is deducted — no second data entry.
+          </p>
+        </div>
+      </div>
+
     </div>
   </section>
 
   <!-- ==========================================================================
        5. HOW IT WORKS (THREE STEPS)
        ========================================================================== -->
-  <section id="how-it-works" class="section-wrapper">
+  <section id="how-it-works" class="section-wrapper desktop-only">
     <div class="container">
       <div class="text-center">
         <span class="section-tag">How It Works</span>
@@ -554,7 +600,7 @@
   <!-- ==========================================================================
        7B. QUALIFICATION SECTION (IS EXPIRYGUARD RIGHT FOR MY PHARMACY?)
        ========================================================================== -->
-  <section class="section-wrapper qualification-section">
+  <section class="section-wrapper qualification-section desktop-only">
     <div class="container text-center">
       <span class="section-tag">Qualification</span>
       <h2 class="section-title">Built for pharmacies that want less repetitive work.</h2>
@@ -601,6 +647,41 @@
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
           </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobile-only Benefits Section -->
+  <section class="section-wrapper qualification-section mobile-only" style="background-color: var(--bg-canvas); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+    <div class="container text-center">
+      <span class="section-tag">Benefits</span>
+      <h2 class="section-title">How it helps your pharmacy</h2>
+      
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px; text-align: left;">
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">Faster billing at a busy counter</span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">No re-typing the same sale into desktop software</span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">Better visibility over stock</span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">Proactive expiry awareness</span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">Fewer manual errors</span>
+        </div>
+        <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-subtle);">
+          <span style="color: var(--primary-emerald); font-weight: 700; font-size: 18px;">✓</span>
+          <span style="font-size: 15px; font-weight: 600; color: var(--dark-slate-800);">Works alongside your current system like Marg</span>
         </div>
       </div>
     </div>
@@ -679,33 +760,33 @@
       <div class="features-grid-mobile mobile-only">
         <div class="feature-bento-card">
           <div class="feature-bento-icon">📸</div>
-          <h4 class="feature-bento-title">AI-Powered Billing</h4>
-          <p class="feature-bento-desc">Make billing faster and reduce repetitive data entry.</p>
+          <h4 class="feature-bento-title">AI Camera Billing</h4>
+          <p class="feature-bento-desc">Photograph the medicines on the counter and let AI identify each item instead of typing them in.</p>
+        </div>
+        <div class="feature-bento-card">
+          <div class="feature-bento-icon">🧾</div>
+          <h4 class="feature-bento-title">Instant GST Invoice</h4>
+          <p class="feature-bento-desc">Generate and print detailed tax invoices with correct CGST, SGST, and IGST breakdowns instantly.</p>
         </div>
         <div class="feature-bento-card">
           <div class="feature-bento-icon">📦</div>
           <h4 class="feature-bento-title">Live Inventory</h4>
-          <p class="feature-bento-desc">Know what’s in stock without relying on manual tracking.</p>
+          <p class="feature-bento-desc">Keep stock counts dynamically connected to every counter sale and return.</p>
         </div>
         <div class="feature-bento-card">
           <div class="feature-bento-icon">⏳</div>
-          <h4 class="feature-bento-title">Expiry Tracking</h4>
-          <p class="feature-bento-desc">Stay ahead of medicines approaching expiry.</p>
+          <h4 class="feature-bento-title">Batch & Expiry Tracking</h4>
+          <p class="feature-bento-desc">Monitor products by batch number and stay ahead of medicines approaching expiry to prevent losses.</p>
         </div>
         <div class="feature-bento-card">
-          <div class="feature-bento-icon">🏷️</div>
-          <h4 class="feature-bento-title">Batch Management</h4>
-          <p class="feature-bento-desc">Keep medicine batches organized and traceable.</p>
+          <div class="feature-bento-icon">📱</div>
+          <h4 class="feature-bento-title">Mobile-First Counter</h4>
+          <p class="feature-bento-desc">Perform all billing directly on the phone already in your pocket, anywhere at the counter.</p>
         </div>
         <div class="feature-bento-card">
-          <div class="feature-bento-icon">🔄</div>
-          <h4 class="feature-bento-title">Smart Restock Suggestions</h4>
-          <p class="feature-bento-desc">Identify products that may need replenishment.</p>
-        </div>
-        <div class="feature-bento-card">
-          <div class="feature-bento-icon">📊</div>
-          <h4 class="feature-bento-title">Pharmacy Analytics</h4>
-          <p class="feature-bento-desc">Understand your pharmacy operations through useful insights.</p>
+          <div class="feature-bento-icon">🇮🇳</div>
+          <h4 class="feature-bento-title">Made for Indian Pharmacies</h4>
+          <p class="feature-bento-desc">Designed for Indian MRP billing rules, loose tablet selling, and GST invoice formats.</p>
         </div>
       </div>
 
@@ -715,7 +796,7 @@
   <!-- ==========================================================================
        8B. REAL ORIGINAL PRODUCT SHOWCASE (WEB & MOBILE APPLICATION)
        ========================================================================== -->
-  <section class="section-wrapper product-showcase-section">
+  <section class="section-wrapper product-showcase-section desktop-only">
     <div class="container">
       <div class="text-center">
         <span class="section-tag">Original Product Interface</span>
@@ -802,6 +883,25 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobile-only Product Showcase Section -->
+  <section class="section-wrapper product-showcase-section mobile-only" style="background-color: #FFFFFF; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+    <div class="container text-center">
+      <span class="section-tag">Dawaiflow Mobile</span>
+      <h2 class="section-title">The product, on your counter</h2>
+      <p class="section-subtitle mx-auto">
+        Scan, bill and stock update — from the phone already in your pocket.
+      </p>
+      
+      <div class="smartphone-mockup-container" style="margin-top: 32px; display: flex; justify-content: center; width: 100%;">
+        <div class="smartphone-mockup-frame" style="width: 280px; border: 12px solid #1E293B; border-radius: 36px; padding: 0; background: #000000; box-shadow: var(--shadow-raised); overflow: hidden; position: relative;">
+          <!-- notch/speaker visual helper -->
+          <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 18px; background: #1E293B; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; z-index: 10;"></div>
+          <img src="assets/product/expiryguard-mobile-app-original.jpg" alt="Dawaiflow Mobile App Screenshot" style="width: 100%; display: block; height: auto; object-fit: contain;" loading="lazy">
+        </div>
       </div>
     </div>
   </section>
@@ -1216,20 +1316,38 @@
        ========================================================================== -->
   <section class="container">
     <div class="final-cta-section">
-      <h2 class="desktop-only">Your counter moves fast.<br>Your software should too.</h2>
-      <h2 class="mobile-only">Ready to Make Your Pharmacy Smarter?</h2>
-      <p class="desktop-only">
-        We’re building Dawaiflow to make pharmacy billing simpler, faster, and less repetitive.
-      </p>
-      <p class="mobile-only">
-        Join the Dawaiflow pilot and help us build the future of pharmacy management.
-      </p>
-      <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow">
-        Join the Pilot
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14M12 5l7 7-7 7"/>
-        </svg>
-      </a>
+      <!-- Desktop CTA -->
+      <div class="desktop-only">
+        <h2>Your counter moves fast.<br>Your software should too.</h2>
+        <p>
+          We’re building Dawaiflow to make pharmacy billing simpler, faster, and less repetitive.
+        </p>
+        <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow">
+          Join the Pilot
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Mobile CTA -->
+      <div class="mobile-only" style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+        <h2>Ready to make your pharmacy smarter?</h2>
+        <p style="font-size: 15px; color: #DCFCE7; max-width: 680px; margin: 0 auto 16px auto; line-height: 1.5;">
+          We're onboarding a limited cohort of independent pharmacies in India. Share your counter workflow and we'll walk you through the pilot.
+        </p>
+        <div style="display: flex; flex-direction: column; width: 100%; gap: 12px; max-width: 320px; margin: 0 auto;">
+          <a href="#pilot-form" class="btn btn-emerald btn-lg btn-arrow" style="justify-content: center; width: 100%;">
+            Join the Pilot
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+          <a href="https://wa.me/919817066533?text=Hi%20Dawaiflow%20team%2C%20I%20have%20questions%20about%20the%20pilot" target="_blank" class="btn btn-secondary btn-lg" style="justify-content: center; width: 100%; border: 1px solid #DCFCE7; background: transparent; color: #FFFFFF;">
+            Ask a question on WhatsApp
+          </a>
+        </div>
+      </div>
     </div>
   </section>
 

@@ -2239,4 +2239,31 @@ h1, h2, h3, h4, .font-heading {
     font-size: 14px !important;
     font-weight: 700 !important;
   }
+
+  .nav-brand {
+    gap: 8px !important;
+  }
+  .brand-icon-box {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.2) !important;
+  }
+  .brand-icon-box svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  html, body {
+    overflow-x: hidden !important;
+    width: 100% !important;
+  }
+  .container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    box-sizing: border-box !important;
+  }
 }
