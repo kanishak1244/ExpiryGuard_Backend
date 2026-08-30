@@ -295,13 +295,33 @@ async def custom_404_handler(request: Request, exc: HTTPException):
     )
 
 @app.get("/")
-def home():
+def home(request: Request):
     """Serve ExpiryGuard Public SaaS Landing Page"""
     from fastapi.responses import FileResponse
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_mobile = any(keyword in user_agent for keyword in ["mobile", "android", "iphone", "ipad", "ipod", "webos", "iemobile", "opera mini"])
+    
+    if is_mobile:
+        mobile_page = PUBLIC_SITE_DIR / "mobile.html"
+        if mobile_page.exists():
+            return FileResponse(mobile_page)
+            
     landing_index = PUBLIC_SITE_DIR / "index.html"
     if landing_index.exists():
          return FileResponse(landing_index)
     return {"message": "ExpiryGuard Backend Running"}
+
+
+@app.get("/index.html")
+def get_index_html():
+    from fastapi.responses import FileResponse
+    return FileResponse(PUBLIC_SITE_DIR / "index.html")
+
+
+@app.get("/mobile.html")
+def get_mobile_html():
+    from fastapi.responses import FileResponse
+    return FileResponse(PUBLIC_SITE_DIR / "mobile.html")
 
 
 @app.get("/terms")

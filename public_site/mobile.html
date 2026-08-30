@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  
+  <!-- Adapt to Desktop if screen is resized -->
+  <script>
+    if (window.innerWidth > 768) {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/index.html', false);
+        xhr.send(null);
+        if (xhr.status === 200) {
+          document.open();
+          document.write(xhr.responseText);
+          document.close();
+        }
+      } catch (e) {
+        window.location.replace("/");
+      }
+    }
+  </script>
+
+  <title>Dawaiflow — AI-Powered Billing for Indian Pharmacies</title>
+  
+  <meta name="description" content="Dawaiflow helps Indian pharmacies reduce repetitive billing work with AI-powered camera billing, inventory updates, and pharmacy-first workflows. Join our early pilot.">
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+
+  <div class="mobile-wrapper">
+    
+    <!-- HEADER -->
+    <header class="mobile-header">
+      <a href="/" class="mobile-brand">
+        <div class="mobile-brand-icon">
+          <!-- SVG Cross Icon matching the Dawaiflow brand -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </div>
+        <div class="mobile-brand-text">
+          <span class="mobile-brand-title">DAWAIFLOW</span>
+          <span class="mobile-brand-sub">POWERED BY EXPIRYGUARD</span>
+        </div>
+      </a>
+      
+      <div class="mobile-header-actions">
+        <!-- Exactly one Join Pilot button on the header -->
+        <a href="#" class="mobile-header-btn mobile-open-modal-btn">Join Pilot</a>
+        
+        <!-- One Hamburger Menu button -->
+        <button id="mobile-hamburger-toggle" class="mobile-hamburger-btn" aria-label="Toggle Navigation Menu">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MOBILE NAVIGATION DRAWER -->
+    <div id="mobile-drawer-menu" class="mobile-drawer-menu">
+      <a href="/" class="mobile-drawer-link">Home</a>
+      <a href="/#how-it-works" class="mobile-drawer-link">How It Works</a>
+      <a href="/#features" class="mobile-drawer-link">Features</a>
+      <a href="/#pricing" class="mobile-drawer-link">Pricing</a>
+      <a href="#" class="mobile-drawer-link mobile-open-modal-btn" style="color: var(--primary-emerald);">Join Pilot</a>
+      <a href="/terms" class="mobile-drawer-link">Terms of Use</a>
+      <a href="/privacy" class="mobile-drawer-link">Privacy Policy</a>
+      <a href="/data-policy" class="mobile-drawer-link">Data & App Information</a>
+    </div>
+
+    <!-- MAIN BODY CONTENT -->
+    <main class="mobile-main-content">
+      
+      <!-- HERO BADGE -->
+      <div class="mobile-early-badge">
+        ● EARLY PILOT · INDIAN PHARMACIES
+      </div>
+
+      <!-- HERO HEADING -->
+      <h1 class="mobile-hero-title">
+        Smarter pharmacy.<br>Less manual work.
+      </h1>
+
+      <!-- HERO DESCRIPTION -->
+      <p class="mobile-hero-desc">
+        Dawaiflow uses your phone camera to identify medicines, generate the bill and update inventory — so you never enter the same sale twice.
+      </p>
+
+      <!-- CTA GROUP -->
+      <div class="mobile-cta-group">
+        <a href="#" class="mobile-btn-primary mobile-open-modal-btn">Join the Pilot →</a>
+        <a href="#mobile-problem-section" class="mobile-btn-secondary">See how it works</a>
+      </div>
+
+      <!-- TRUST POINTS -->
+      <div class="mobile-trust-list">
+        <div class="mobile-trust-item">
+          <span>✓</span> No hardware required
+        </div>
+        <div class="mobile-trust-item">
+          <span>✓</span> Works alongside Marg
+        </div>
+        <div class="mobile-trust-item">
+          <span>✓</span> Built for Indian counters
+        </div>
+      </div>
+
+      <!-- PROBLEM SECTION -->
+      <section id="mobile-problem-section" class="mobile-problem-section">
+        <h2 class="mobile-problem-title">
+          The problem isn't billing. It's doing it twice.
+        </h2>
+        <p class="mobile-problem-desc">
+          At a busy counter, a pharmacist writes the bill by hand, then re-types the same sale into desktop software later. Do that 100 times a day and it becomes hours of repeated work.
+        </p>
+      </section>
+
+    </main>
+
+    <!-- MOBILE PILOT MODAL OVERLAY -->
+    <div id="mobile-pilot-modal" class="mobile-modal-overlay">
+      <div class="mobile-modal-card">
+        <button id="mobile-modal-close-btn" class="mobile-modal-close">✕</button>
+        <h3 class="mobile-modal-title">Request Pilot Access</h3>
+        <p class="mobile-modal-desc">Tell us about your counter workflow. We’ll get in touch to walk you through the pilot.</p>
+        
+        <form id="mobile-pilot-lead-form">
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_full_name">Full Name *</label>
+            <input type="text" id="m_full_name" class="mobile-form-input" placeholder="e.g. Ramesh Patel" required>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_pharmacy_name">Pharmacy Name *</label>
+            <input type="text" id="m_pharmacy_name" class="mobile-form-input" placeholder="e.g. Sanjeevani Medicos" required>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_city">City / Town *</label>
+            <input type="text" id="m_city" class="mobile-form-input" placeholder="e.g. Ahmedabad" required>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_phone">Phone Number (WhatsApp) *</label>
+            <input type="tel" id="m_phone" class="mobile-form-input" placeholder="e.g. 98170 66533" required>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_current_billing_method">Current Billing Software *</label>
+            <select id="m_current_billing_method" class="mobile-form-select" required>
+              <option value="" disabled selected>Select billing software</option>
+              <option value="Paper / Manual">Paper / Manual Billing</option>
+              <option value="Marg ERP">Marg ERP</option>
+              <option value="MargBooks">MargBooks</option>
+              <option value="Other">Other Software</option>
+            </select>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_bills_per_day">Approximate Bills Per Day *</label>
+            <select id="m_bills_per_day" class="mobile-form-select" required>
+              <option value="" disabled selected>Select daily bill volume</option>
+              <option value="Under 50">Under 50 bills / day</option>
+              <option value="50–100">50–100 bills / day</option>
+              <option value="100–200">100–200 bills / day</option>
+              <option value="200+">200+ bills / day</option>
+            </select>
+          </div>
+          
+          <div class="mobile-form-group">
+            <label class="mobile-form-label" for="m_num_pharmacies">Number of Pharmacies *</label>
+            <select id="m_num_pharmacies" class="mobile-form-select" required>
+              <option value="" disabled selected>Select number of outlets</option>
+              <option value="1 Outlet">1 Outlet</option>
+              <option value="2-5 Outlets">2-5 Outlets</option>
+              <option value="5+ Outlets">5+ Outlets</option>
+            </select>
+          </div>
+          
+          <button id="m_btn_submit_pilot" type="submit" class="mobile-btn-primary" style="margin-top: 10px;">
+            Join the Pilot →
+          </button>
+          
+          <div id="m_form_status_box" class="mobile-form-status"></div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/mobile.js"></script>
+</body>
+</html>
