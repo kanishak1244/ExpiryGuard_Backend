@@ -1866,12 +1866,17 @@ h1, h2, h3, h4, .font-heading {
   }
 
   .nav-mobile-toggle {
-    display: block !important;
-    background: none !important;
-    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    border: 1px solid #E2E8F0 !important;
+    background: #FFFFFF !important;
+    color: #1E293B !important;
+    padding: 0 !important;
     cursor: pointer !important;
-    padding: 8px !important;
-    color: #0F172A !important;
   }
 
   /* -------------------------------------------------------------
@@ -2247,7 +2252,7 @@ h1, h2, h3, h4, .font-heading {
     width: 30px !important;
     height: 30px !important;
     font-size: 14px !important;
-    border-radius: 8px !important;
+    border-radius: 50% !important;
     box-shadow: 0 2px 6px rgba(22, 163, 74, 0.2) !important;
   }
   .brand-icon-box svg {
