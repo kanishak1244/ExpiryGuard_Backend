@@ -418,12 +418,35 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("CRITICAL: SECRET_KEY is missing. Configure SECRET_KEY in the environment or .env file.")
+
+KNOWN_SECRET_PLACEHOLDERS = {
+    "generate_a_secure_random_64_character_hex_key_here",
+    "your_secret_key_here",
+    "changeme",
+    "secret",
+    "replace_me",
+    "test_secret_key",
+}
+if SECRET_KEY.lower() in KNOWN_SECRET_PLACEHOLDERS or any(p in SECRET_KEY.lower() for p in ["your_secret", "replace_me"]):
+    if is_production:
+        raise ValueError("CRITICAL: SECRET_KEY in production is configured with an insecure placeholder value. Set a real random 256-bit key.")
+
 if is_production and len(SECRET_KEY) < 32:
     raise ValueError("CRITICAL: In production, SECRET_KEY must be at least 32 characters long for cryptographic security.")
 
 # Audit CORS in production: Disallow wildcard '*' origin
 if is_production and "*" in ALLOWED_ORIGINS:
     raise ValueError("CRITICAL: Wildcard CORS origin '*' is strictly prohibited in production when credentials are supported.")
+
+# Validate AI configuration if present
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    gemini_key_lower = gemini_key.strip().lower()
+    if any(p in gemini_key_lower for p in ["your_google_ai", "your_key", "placeholder", "_here"]):
+        if is_production:
+            logger.warning("[Startup Warning] GEMINI_API_KEY is configured with an example placeholder value. AI scan endpoints will fail until a valid Google AI Studio key is provided.")
+        else:
+            logger.info("[Startup Info] Local dev using placeholder GEMINI_API_KEY.")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
