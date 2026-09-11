@@ -163,7 +163,7 @@ def validate_file_content_and_magic(file_bytes: bytes, ext: str):
 # Parse allowed CORS origins from environment or default to environment-specific origins
 is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
 default_origins = (
-    "https://expiryguard.com,https://app.expiryguard.com"
+    "https://dawaiflow.com,https://app.dawaiflow.com,https://api.dawaiflow.com,https://expiryguard.com,https://app.expiryguard.com,https://api.expiryguard.com"
     if is_production
     else "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500"
 )
@@ -260,10 +260,24 @@ app = FastAPI(title="ExpiryGuard API", version="1.0.0")
 @app.on_event("startup")
 def warmup_database():
     try:
-        from database import SessionLocal
+        from database import SessionLocal, Base, engine
         from sqlalchemy import text
         import crud
         import models
+        from scheduler import start_scheduler
+        
+        # Ensure schema tables exist on application startup
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as schema_err:
+            logger.warning(f"[Startup] Schema creation notice: {schema_err}")
+
+        # Start background schedulers (expiry notifications, automated backups)
+        try:
+            start_scheduler()
+        except Exception as sched_err:
+            logger.warning(f"[Startup] Scheduler start notice: {sched_err}")
+
         db = SessionLocal()
         db.execute(text("SELECT 1"))
         print("[Startup] Database connection pool pre-warmed.")
@@ -400,20 +414,47 @@ app.add_middleware(SlowAPIMiddleware)
 security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# Cryptographic Security Configuration & Startup Validation
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    raise ValueError("SECRET_KEY is missing. Add it to the .env file.")
+    raise ValueError("CRITICAL: SECRET_KEY is missing. Configure SECRET_KEY in the environment or .env file.")
+if is_production and len(SECRET_KEY) < 32:
+    raise ValueError("CRITICAL: In production, SECRET_KEY must be at least 32 characters long for cryptographic security.")
+
+# Audit CORS in production: Disallow wildcard '*' origin
+if is_production and "*" in ALLOWED_ORIGINS:
+    raise ValueError("CRITICAL: Wildcard CORS origin '*' is strictly prohibited in production when credentials are supported.")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
-# Firebase Setup
+# Firebase Setup: Supports FIREBASE_CREDENTIALS_JSON (raw JSON or base64) or FIREBASE_CREDENTIALS_PATH
 if not firebase_admin._apps:
     try:
-        cred = credentials.Certificate("credentials/firebase_key.json")
-        firebase_admin.initialize_app(cred)
+        firebase_cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+        firebase_cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "credentials/firebase_key.json")
+        
+        if firebase_cred_json:
+            import base64
+            # Handle potential base64 encoding
+            raw_str = firebase_cred_json.strip()
+            if not raw_str.startswith("{"):
+                try:
+                    raw_str = base64.b64decode(raw_str).decode("utf-8")
+                except Exception:
+                    pass
+            cred_dict = json.loads(raw_str)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            logger.info("[Startup] Firebase initialized successfully via FIREBASE_CREDENTIALS_JSON.")
+        elif os.path.exists(firebase_cred_path):
+            cred = credentials.Certificate(firebase_cred_path)
+            firebase_admin.initialize_app(cred)
+            logger.info(f"[Startup] Firebase initialized successfully from file path.")
+        else:
+            logger.warning("[Startup Notice] No Firebase credentials provided (FIREBASE_CREDENTIALS_JSON or credentials file not found). FCM notifications will be skipped.")
     except Exception as e:
-        print(f"[Startup Warning] Firebase init notice: {e}")
+        logger.warning(f"[Startup Notice] Firebase initialization bypassed: {e}")
 
 # Upload Storage Directory Setup (Public static mount removed for tenant privacy & security)
 UPLOADS_BASE_DIR = (BASE_DIR / "uploads").resolve()
@@ -422,10 +463,7 @@ os.makedirs(UPLOADS_BASE_DIR, exist_ok=True)
 os.makedirs(DOCUMENTS_DIR, exist_ok=True)
 
 
-# Database Tables & Scheduler
-Base.metadata.create_all(bind=engine)
-# GST & Soft-delete migrations already executed in database; start scheduler directly
-start_scheduler()
+# Database Tables & Scheduler are started cleanly during the FastAPI startup event below
 
 
 # ==========================================
