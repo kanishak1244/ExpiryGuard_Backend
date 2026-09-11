@@ -198,7 +198,7 @@ class _KhataScreenState extends State<KhataScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Khata Book (Credit Ledgers)')),
+      appBar: null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null

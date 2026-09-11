@@ -319,3 +319,220 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
             "error": str(e),
             "help": "Ensure your 16-character Gmail App Password is correct without spaces, 2-Step Verification is enabled on your Google account, and your server can reach smtp.gmail.com:587."
         }
+
+
+def send_ca_report_email(
+    ca_email: str,
+    sender_email: str,
+    pharmacy_name: str,
+    owner_name: str,
+    gstin: Optional[str],
+    date_range_label: str,
+    reports_shared_labels: list,
+    summary_dict: dict,
+    csv_attachments: Optional[dict] = None,
+    custom_message: Optional[str] = None
+) -> dict:
+    """
+    Sends pharmacy financial & GST reports directly to the Chartered Accountant.
+    Sets Reply-To to the authenticated shopkeeper's email identity.
+    Attaches CSV report files (Sales Register, Purchase Register, GST Summary, HSN Summary).
+    """
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    cfg = get_smtp_config()
+    if not cfg["is_configured"]:
+        return {
+            "success": False,
+            "error": "SMTP server is not configured. Please set SMTP_USER and SMTP_PASS environment variables."
+        }
+
+    formatted_time = datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC")
+    reports_html = "".join([f"<li style='margin-bottom: 4px;'>📊 <strong>{r}</strong></li>" for r in reports_shared_labels])
+
+    custom_msg_section = ""
+    if custom_message and custom_message.strip():
+        custom_msg_section = f"""
+        <div style="background-color: #F1F5F9; border-left: 4px solid #3B82F6; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px;">
+          <strong style="color: #1E293B; font-size: 13px;">Note from Pharmacy Owner:</strong>
+          <p style="margin: 4px 0 0 0; color: #334155; font-size: 13.5px; font-style: italic;">"{custom_message.strip()}"</p>
+        </div>
+        """
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ExpiryGuard - Pharmacy GST & Financial Reports</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); padding: 24px 30px; text-align: left;">
+              <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
+                🛡️ Expiry<span style="color: #10B981;">Guard</span> ERP
+              </div>
+              <p style="margin: 6px 0 0 0; color: #94A3B8; font-size: 13px; font-weight: 500;">CA Connect — Official Financial & GST Data Package</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 30px;">
+              <div style="background-color: #ECFDF5; border-left: 4px solid #10B981; padding: 12px 16px; border-radius: 4px; margin-bottom: 24px;">
+                <span style="color: #065F46; font-weight: 700; font-size: 14.5px;">📈 Pharmacy Reports Shared with CA</span>
+                <p style="margin: 4px 0 0 0; color: #047857; font-size: 13px;">Sent by <strong>{owner_name}</strong> ({sender_email}) for <strong>{pharmacy_name}</strong>.</p>
+              </div>
+
+              <!-- Authenticated Sender Identity Block -->
+              <div style="background-color: #F0F9FF; border-left: 4px solid #0284C7; padding: 14px 18px; border-radius: 6px; margin-bottom: 24px;">
+                <span style="color: #0369A1; font-weight: 700; font-size: 13.5px;">👤 Authenticated Sender Identity</span>
+                <table role="presentation" width="100%" style="margin-top: 6px; font-size: 13px; color: #1E293B;">
+                  <tr>
+                    <td style="padding: 2px 0; width: 130px; font-weight: 600; color: #64748B;">Sender Email:</td>
+                    <td style="padding: 2px 0; font-weight: 700; color: #0284C7;">{sender_email}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 2px 0; font-weight: 600; color: #64748B;">Pharmacy Name:</td>
+                    <td style="padding: 2px 0; font-weight: 700;">{pharmacy_name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 2px 0; font-weight: 600; color: #64748B;">Target CA:</td>
+                    <td style="padding: 2px 0; font-weight: 700; color: #059669;">{ca_email}</td>
+                  </tr>
+                </table>
+              </div>
+
+              {custom_msg_section}
+
+              <!-- Summary Metadata -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 24px;">
+                <tr style="background-color: #F8FAFC;">
+                  <td style="padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 12px; border-bottom: 1px solid #E2E8F0;">Pharmacy Name</td>
+                  <td style="padding: 10px 16px; font-weight: 700; color: #0F172A; font-size: 13px; border-bottom: 1px solid #E2E8F0;">{pharmacy_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 12px; border-bottom: 1px solid #E2E8F0;">GSTIN</td>
+                  <td style="padding: 10px 16px; font-weight: 700; color: #0F172A; font-size: 13px; border-bottom: 1px solid #E2E8F0;">{gstin or 'N/A'}</td>
+                </tr>
+                <tr style="background-color: #F8FAFC;">
+                  <td style="padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 12px; border-bottom: 1px solid #E2E8F0;">Reporting Period</td>
+                  <td style="padding: 10px 16px; font-weight: 700; color: #2563EB; font-size: 13px; border-bottom: 1px solid #E2E8F0;">{date_range_label}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px 16px; font-weight: 600; color: #64748B; font-size: 12px;">Generated Date</td>
+                  <td style="padding: 10px 16px; color: #475569; font-size: 12.5px;">{formatted_time}</td>
+                </tr>
+              </table>
+
+              <!-- Key Metrics Card -->
+              <div style="border: 1px solid #CBD5E1; border-radius: 8px; padding: 16px; margin-bottom: 24px; background-color: #FFFFFF;">
+                <div style="font-weight: 700; font-size: 14px; color: #0F172A; margin-bottom: 12px;">Financial Overview ({date_range_label})</div>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748B; font-size: 13px;">Total Sales Volume:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #166534; font-size: 13.5px; text-align: right;">₹{summary_dict.get('total_sales', 0.0):,.2f} ({summary_dict.get('total_bills', 0)} bills)</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748B; font-size: 13px;">Total Purchases:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #1E40AF; font-size: 13.5px; text-align: right;">₹{summary_dict.get('total_purchases', 0.0):,.2f}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748B; font-size: 13px;">Output GST Collected:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #D97706; font-size: 13.5px; text-align: right;">₹{summary_dict.get('total_output_gst', 0.0):,.2f}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748B; font-size: 13px;">Input GST Paid:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #059669; font-size: 13.5px; text-align: right;">₹{summary_dict.get('total_input_gst', 0.0):,.2f}</td>
+                  </tr>
+                  <tr style="border-top: 1px dashed #CBD5E1;">
+                    <td style="padding: 8px 0 0 0; font-weight: 700; color: #0F172A; font-size: 13.5px;">Net Tax Liability:</td>
+                    <td style="padding: 8px 0 0 0; font-weight: 800; color: #B91C1C; font-size: 14px; text-align: right;">₹{summary_dict.get('net_gst_payable', 0.0):,.2f}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Reports Included -->
+              <div style="font-weight: 700; font-size: 14px; color: #0F172A; margin-bottom: 8px;">Attached Reports ({len(reports_shared_labels)}):</div>
+              <ul style="margin: 0 0 24px 0; padding-left: 20px; color: #334155; font-size: 13.5px;">
+                {reports_html}
+              </ul>
+
+              <p style="color: #64748B; font-size: 12.5px; line-height: 1.5;">
+                This package contains formatted spreadsheet report files attached directly to this email. You can import these CSV files directly into Tally, Zoho Books, Busy, or GST return filing software.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F1F5F9; padding: 20px 30px; text-align: center; border-top: 1px solid #E2E8F0;">
+              <p style="margin: 0; color: #94A3B8; font-size: 12px;">
+                Generated securely by <strong>ExpiryGuard AI Pharmacy ERP System</strong>.<br>
+                This automated email was triggered directly by {owner_name} ({sender_email}).
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+    try:
+        msg = MIMEMultipart("mixed")
+        msg["Subject"] = f"📑 ExpiryGuard — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})"
+        
+        # SENDER IDENTITY: Display Shopkeeper Name & Pharmacy Name, set Reply-To to Shopkeeper's Email
+        sender_display_name = f"{owner_name} ({pharmacy_name}) via ExpiryGuard"
+        msg["From"] = f"{sender_display_name} <{cfg['user']}>"
+        msg["Reply-To"] = f"{owner_name} <{sender_email}>"
+        msg["To"] = ca_email
+
+        msg_body = MIMEMultipart("alternative")
+        msg_body.attach(MIMEText(f"Pharmacy GST & Financial Reports shared by {pharmacy_name} ({date_range_label}).", "plain", "utf-8"))
+        msg_body.attach(MIMEText(html_content, "html", "utf-8"))
+        msg.attach(msg_body)
+
+        # Attach CSV files if provided
+        if csv_attachments:
+            for filename, content_str in csv_attachments.items():
+                attachment = MIMEBase("text", "csv")
+                attachment.set_payload(content_str.encode("utf-8"))
+                encoders.encode_base64(attachment)
+                attachment.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+                msg.attach(attachment)
+
+        if cfg["port"] == 465:
+            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
+                server.login(cfg["user"], cfg["password"])
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(cfg["user"], cfg["password"])
+                server.send_message(msg)
+
+        return {
+            "success": True,
+            "message": f"Reports successfully emailed to {ca_email}.",
+            "ca_email": ca_email,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+

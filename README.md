@@ -7,7 +7,7 @@ ExpiryGuard is a pharmacy intelligence platform designed to prevent medicine exp
 ## 🛠️ Technology Stack
 - **Backend**: Python 3.11 with FastAPI (Asynchronous Web Framework)
 - **Database**: PostgreSQL (SQLAlchemy ORM + migration capabilities)
-- **AI Engine**: Google Gemini API (gemini-flash-latest) for OCR invoice and packaging scans
+- **AI Engine**: Google Gemini API (gemini-3.1-flash-lite) for OCR invoice and packaging scans
 - **Push Engine**: Firebase Cloud Messaging (FCM)
 - **Frontend Dashboard**: Native HTML5, CSS3, and modern ES6 Javascript (located in `/web` and `/public_site`)
 - **Task Scheduling**: APScheduler (Interval tasks for notifications & data cleanup)

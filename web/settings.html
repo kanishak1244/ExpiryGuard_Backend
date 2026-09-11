@@ -4,6 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings & Bills — ExpiryGuard ERP</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
   <link rel="stylesheet" href="css/styles.css?v=9.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,6 +119,200 @@
       background: #FFF; color: #000; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto;
       padding: 30px; border-radius: var(--radius-md); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
     }
+
+    /* Migration System Styling */
+    .migration-hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .migration-hub-card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md, 8px);
+      padding: 16px;
+      background: var(--card-bg, #FFF);
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .migration-hub-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px -4px rgba(0,0,0,0.08);
+      border-color: var(--primary-green, #10B981);
+    }
+    .migration-hub-card.active-module {
+      border-color: var(--primary-green, #10B981);
+      background: rgba(16, 185, 129, 0.04);
+    }
+    .migration-dropzone {
+      border: 2px dashed #CBD5E1;
+      border-radius: var(--radius-md, 10px);
+      padding: 36px 20px;
+      text-align: center;
+      background: var(--bg-secondary, #F8FAFC);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .migration-dropzone:hover, .migration-dropzone.drag-active {
+      border-color: var(--primary-green, #10B981);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .migration-stat-card {
+      background: var(--card-bg, #FFF);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px 18px;
+      flex: 1;
+      min-width: 140px;
+    }
+    .migration-stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-color, #0F172A);
+      margin-top: 4px;
+    }
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #059669; }
+    .badge-warning { background: rgba(245, 158, 11, 0.15); color: #D97706; }
+    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #DC2626; }
+    .badge-info { background: rgba(59, 130, 246, 0.15); color: #2563EB; }
+    .badge-neutral { background: rgba(100, 116, 139, 0.15); color: #475569; }
+    @keyframes progress-indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* DAWAI FLOW AI Processing Modal */
+    .df-ai-modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .df-ai-modal-overlay.active {
+      display: flex;
+    }
+    .df-ai-modal-content {
+      background: var(--card-bg, #FFFFFF);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      width: 100%;
+      max-width: 680px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--border-color, #E2E8F0);
+      position: relative;
+    }
+    .df-ai-scanner-container {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .df-ai-scanner-glow {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.4) 0%, rgba(16, 185, 129, 0) 70%);
+      animation: df-pulse-glow 2s infinite ease-in-out;
+    }
+    .df-ai-scanner-ring {
+      position: absolute;
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      border: 2px dashed #10B981;
+      animation: df-spin-ring 8s linear infinite;
+    }
+    .df-ai-scanner-icon {
+      font-size: 36px;
+      z-index: 2;
+    }
+    @keyframes df-pulse-glow {
+      0%, 100% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+    @keyframes df-spin-ring {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .df-stage-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 20px 0;
+      background: var(--bg-secondary, #F8FAFC);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color, #E2E8F0);
+    }
+    .df-stage-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13.5px;
+      color: #64748B;
+      transition: all 0.2s;
+    }
+    .df-stage-item.completed {
+      color: #059669;
+      font-weight: 500;
+    }
+    .df-stage-item.active {
+      color: #0F172A;
+      font-weight: 600;
+    }
+    .df-stage-icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .df-stage-item.completed .df-stage-icon {
+      background: #DCFCE7;
+      color: #059669;
+    }
+    .df-stage-item.active .df-stage-icon {
+      background: #DBEAFE;
+      color: #2563EB;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+      animation: df-pulse-active 1.5s infinite;
+    }
+    .df-stage-item.future .df-stage-icon {
+      background: #E2E8F0;
+      color: #94A3B8;
+    }
+    @keyframes df-pulse-active {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+    .df-live-bar-track {
+      height: 10px;
+      background: #E2E8F0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 12px 0 8px 0;
+    }
+    .df-live-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10B981, #059669);
+      border-radius: 6px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
   </style>
 </head>
 <body>
@@ -121,17 +342,9 @@
           <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           <span class="nav-text">Billing / Live Sales</span>
         </a>
-        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
-          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          <span class="nav-text">AI Camera Billing</span>
-        </a>
         <a href="inventory.html" class="nav-item" data-nav-id="inventory">
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
           <span class="nav-text">Live Inventory</span>
-        </a>
-        <a href="restock.html" class="nav-item" data-nav-id="restock">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          <span class="nav-text">Restock Suggestions</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -144,6 +357,10 @@
         <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
         </a>
         <a href="returns.html" class="nav-item" data-nav-id="returns">
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
@@ -199,13 +416,14 @@
             <button class="settings-nav-btn" onclick="switchTab('bills-docs')">📄 Bills Archive</button>
             <button class="settings-nav-btn" onclick="switchTab('deleted-stock')">♻️ Recently Deleted</button>
             <button class="settings-nav-btn" onclick="switchTab('data')">💾 Data & Backup</button>
+            <button class="settings-nav-btn" onclick="switchTab('migration')">📦 Data Migration</button>
           </div>
 
           <!-- Settings Content Panels -->
           <div class="settings-content">
             
             <!-- 1. ACCOUNT & SECURITY PANEL -->
-            <div id="panel-account" class="settings-panel active">
+            <div id="panel-account" class="settings-panel">
               <div class="card">
                 <div class="card-header">
                   <h3 class="panel-title">👤 Account & Security</h3>
@@ -253,7 +471,7 @@
             </div>
 
             <!-- 2. PHARMACY INFORMATION PANEL -->
-            <div id="panel-pharmacy" class="settings-panel">
+            <div id="panel-pharmacy" class="settings-panel active">
               <div class="card">
                 <div class="card-header">
                   <h3 class="panel-title">🏪 Pharmacy / Business Information</h3>
@@ -377,7 +595,7 @@
                     <h3 class="panel-title" data-i18n="billsTitle">📄 Bills & Documents</h3>
                     <p style="font-size: 13px; color: var(--muted-text);" data-i18n="billsSubtitle">Stored transaction bills, PDF invoices & audit history.</p>
                   </div>
-                  <a href="ai_billing.html" class="btn btn-primary">+ Create New Bill</a>
+                  <a href="billing.html" class="btn btn-primary">+ Create New Bill</a>
                 </div>
                 <div class="card-body">
                   <!-- Search & Filters -->
@@ -428,8 +646,8 @@
                   <div id="bills-empty-state" style="display: none; text-align: center; padding: 40px 20px;">
                     <div style="font-size: 48px; margin-bottom: 12px;">📄</div>
                     <h4 data-i18n="noBills">No bills generated yet</h4>
-                    <p style="font-size: 14px; color: var(--muted-text); margin-bottom: 16px;">Create your first AI bill to view stored invoices and PDF records.</p>
-                    <a href="ai_billing.html" class="btn btn-primary" data-i18n="createBillNow">Create New Bill</a>
+                    <p style="font-size: 14px; color: var(--muted-text); margin-bottom: 16px;">Create your first bill to view stored invoices and PDF records.</p>
+                    <a href="billing.html" class="btn btn-primary" data-i18n="createBillNow">Create New Bill</a>
                   </div>
                 </div>
               </div>
@@ -452,6 +670,11 @@
                       <div style="font-size: 32px;">🌙</div>
                       <strong data-i18n="darkMode">Dark Mode</strong>
                       <p style="font-size: 12px; color: var(--muted-text);">High contrast emerald dark theme for night billing.</p>
+                    </div>
+                    <div class="theme-card" onclick="setTheme('system')" style="border: 2px solid var(--border-color); padding: 16px; border-radius: var(--radius-md); cursor: pointer; text-align: center;">
+                      <div style="font-size: 32px;">💻</div>
+                      <strong>System Auto</strong>
+                      <p style="font-size: 12px; color: var(--muted-text);">Automatically match device system theme.</p>
                     </div>
                   </div>
                 </div>
@@ -581,21 +804,344 @@
 
             <!-- 9. DATA & BACKUP PANEL -->
             <div id="panel-data" class="settings-panel">
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="panel-title">💾 Data Export & Backup</h3>
+              <div class="card" style="margin-bottom: 20px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <h3 class="panel-title">💾 Relational System Backup & Restore (.dfbk)</h3>
+                    <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+                      Create encrypted database snapshots or restore historical states with automatic safety rollback.
+                    </p>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="file" id="backup-file-upload-input" accept=".dfbk" style="display: none;" onchange="handleBackupFileSelected(event)">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('backup-file-upload-input').click()" style="display: flex; align-items: center; gap: 6px;">
+                      <span>↑ Upload .dfbk</span>
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-create-backup-now" onclick="openCreateBackupDialog()" style="display: flex; align-items: center; gap: 6px;">
+                      <span>+ Create Backup Now</span>
+                    </button>
+                  </div>
                 </div>
                 <div class="card-body">
-                  <p style="font-size: 14px; margin-bottom: 16px;">Export your complete pharmacy sales transactions, active inventory, or reference catalog to CSV/Excel format.</p>
+                  <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; font-size: 12.5px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">🛡️</span>
+                    <div>
+                      <strong>Automated Safety Guarantee:</strong> Whenever you restore a backup, an automatic safety snapshot of your current database state is captured beforehand. Restores are atomic and rollback on error.
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Backup Snapshot</th>
+                          <th>Type</th>
+                          <th>File Size</th>
+                          <th>Records Breakdown</th>
+                          <th>Created Date</th>
+                          <th>Checksum</th>
+                          <th style="text-align: right;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="backup-history-body">
+                        <tr>
+                          <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">
+                            Loading backup history...
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CSV Data Export Card -->
+              <div class="card">
+                <div class="card-header">
+                  <h3 class="panel-title">📊 Raw CSV Data Exports</h3>
+                </div>
+                <div class="card-body">
+                  <p style="font-size: 13.5px; margin-bottom: 16px; color: var(--color-text-secondary);">
+                    Export transactions or inventory valuation spreadsheets for external accounting review.
+                  </p>
                   <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                    <a href="/reports/export/sales" target="_blank" class="btn btn-primary">📊 Export Sales CSV</a>
-                    <a href="/reports/export/inventory" target="_blank" class="btn btn-secondary">📦 Export Inventory CSV</a>
+                    <button onclick="api.exportSalesCsv(false).then(r => alert(r.count > 0 ? `Exported ${r.count} bill(s). Live feed updated.` : 'No unexported bills.')).catch(e => alert(e.message))" class="btn btn-secondary" style="cursor: pointer;">📊 Export Sales Register CSV</button>
+                    <a href="/reports/export/inventory" target="_blank" class="btn btn-secondary">📦 Export Inventory Valuation CSV</a>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 9. ABOUT PANEL -->
+            <!-- 10. DATA MIGRATION PANEL -->
+            <div id="panel-migration" class="settings-panel">
+              <!-- Page Header -->
+              <div class="card" style="margin-bottom: 20px;">
+                <div class="card-header">
+                  <div>
+                    <h3 class="panel-title">📦 Data Migration & Legacy Software Import</h3>
+                    <p style="font-size: 13.5px; color: var(--color-text-muted); margin-top: 4px;">
+                      Migrate historical sales bills, product catalogs, and master records from your previous pharmacy software (Marg ERP, MargBooks, Vyapar, Tally, etc.) into ExpiryGuard without altering active inventory balances.
+                    </p>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🛡️</span>
+                    <div>
+                      <strong>Zero Stock Deduction Guarantee:</strong> Historical bills are strictly archived as past sales records (<code>is_historical = True</code>). Importing old bills will <em>never</em> alter current stock quantities, batch balances, or trigger false expiry alerts.
+                    </div>
+                  </div>
+
+                  <!-- Import Existing Data Hub (5 modules) -->
+                  <h4 style="margin-bottom: 14px; font-size: 15px;">Import Existing Data</h4>
+                  <div class="migration-hub-grid">
+                    <!-- Module 1: Old Bills (Active) -->
+                    <div class="migration-hub-card active-module" onclick="document.getElementById('migration-bills-module').scrollIntoView({ behavior: 'smooth' })">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">🧾</span>
+                        <span class="badge badge-success" style="font-size: 11px;">Active</span>
+                      </div>
+                      <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Import Old Bills</div>
+                      <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+                        Upload historical sales invoices & receipts from PDF, CSV, or Excel with duplicate detection.
+                      </p>
+                    </div>
+
+                    <!-- Module 2: Medicines -->
+                    <div class="migration-hub-card" onclick="location.href='inventory.html#import'">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">💊</span>
+                        <span class="badge badge-info" style="font-size: 11px;">Available</span>
+                      </div>
+                      <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Import Medicines</div>
+                      <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+                        Bulk import medicine catalog with composition, brand, MRP, and HSN codes from spreadsheet.
+                      </p>
+                    </div>
+
+                    <!-- Module 3: Suppliers -->
+                    <div class="migration-hub-card" style="opacity: 0.85;" onclick="showMigrationAlert('Supplier directory migration will be available in the upcoming release. Contact support if urgent.', 'info')">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">🏢</span>
+                        <span class="badge badge-neutral" style="font-size: 11px;">Planned</span>
+                      </div>
+                      <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Import Suppliers</div>
+                      <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+                        Import distributors, wholesale contacts, GSTIN, and credit terms from previous software.
+                      </p>
+                    </div>
+
+                    <!-- Module 4: Customers -->
+                    <div class="migration-hub-card" style="opacity: 0.85;" onclick="showMigrationAlert('Customer contact ledger migration will be available in the upcoming release.', 'info')">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">👥</span>
+                        <span class="badge badge-neutral" style="font-size: 11px;">Planned</span>
+                      </div>
+                      <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Import Customers</div>
+                      <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+                        Migrate patient contacts, doctor prescriptions, and opening credit balances.
+                      </p>
+                    </div>
+
+                    <!-- Module 5: Inventory -->
+                    <div class="migration-hub-card" style="opacity: 0.85;" onclick="showMigrationAlert('Opening stock balance migration is available via Inventory -> Import Stock.', 'info')">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">📦</span>
+                        <span class="badge badge-neutral" style="font-size: 11px;">Planned</span>
+                      </div>
+                      <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">Import Inventory</div>
+                      <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+                        Initialize opening stock, active batch numbers, purchase rates, and expiry dates.
+                      </p>
+                    </div>
+                  </div>
+
+                  <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 24px 0;">
+
+                  <!-- Old Bills Migration Upload Area -->
+                  <!-- Old Bills Migration Module Rebuilt Cleanly -->
+                  <div id="migration-bills-module" style="background: var(--bg-card, #FFFFFF); border: 1px solid var(--border-color, #E2E8F0); border-radius: 12px; padding: 24px; margin-top: 16px;">
+                    
+                    <!-- 1. INITIAL SCREEN -->
+                    <div id="m-view-initial">
+                      <h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 700; color: var(--text-color, #0F172A); letter-spacing: 0.5px;">
+                        IMPORT OLD BILLS
+                      </h3>
+                      <p style="margin: 0 0 12px 0; font-size: 14px; color: var(--color-text-muted, #64748B);">
+                        Import historical sales bills from your previous pharmacy software.
+                      </p>
+                      <div style="font-size: 13px; color: #059669; font-weight: 600; margin-bottom: 20px;">
+                        Supported formats: PDF • CSV • Excel
+                      </div>
+
+                      <input type="file" id="migration-file-input" accept=".pdf,.csv,.xlsx,.xls" style="display: none;" onchange="onMigrationFileSelected(this.files)">
+                      
+                      <div class="migration-dropzone" id="migration-dropzone" onclick="document.getElementById('migration-file-input').click()" style="border: 2px dashed #CBD5E1; border-radius: 10px; padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+                        <div style="font-size: 44px; margin-bottom: 12px;">📁</div>
+                        <button type="button" class="btn btn-primary" style="padding: 10px 24px; font-size: 14px; font-weight: 600; pointer-events: none;">
+                          Upload Historical Bills
+                        </button>
+                        <p style="margin: 12px 0 0 0; font-size: 13px; color: var(--color-text-muted, #64748B);">
+                          or drag & drop your PDF, CSV, or Excel file here (up to 50MB)
+                        </p>
+                      </div>
+                    </div>
+
+                    <!-- 2. AFTER FILE SELECTION SCREEN -->
+                    <div id="m-view-selected" style="display: none; text-align: center; padding: 24px 16px;">
+                      <div style="width: 48px; height: 48px; border-radius: 50%; background: #DCFCE7; color: #059669; font-size: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-weight: bold;">
+                        ✓
+                      </div>
+                      <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 700; color: #059669;">
+                        File added
+                      </h4>
+                      <div style="background: var(--bg-secondary, #F8FAFC); border: 1px solid var(--border-color, #E2E8F0); border-radius: 8px; padding: 14px; max-width: 360px; margin: 0 auto 20px auto; text-align: left; font-size: 13.5px;">
+                        <div style="margin-bottom: 6px;"><strong>Filename:</strong> <span id="m-selected-name">-</span></div>
+                        <div><strong>Size:</strong> <span id="m-selected-size">-</span></div>
+                      </div>
+                      <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button type="button" class="btn btn-secondary" onclick="resetMigrationToInitial()">
+                          Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" id="m-btn-start-import" onclick="startMigrationUpload()">
+                          Start Import
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 3. PROCESSING SCREEN -->
+                    <div id="m-view-processing" style="display: none; text-align: center; padding: 36px 16px;">
+                      <!-- Clean Animated Spinner -->
+                      <div style="margin: 0 auto 20px auto; width: 60px; height: 60px; position: relative; display: flex; align-items: center; justify-content: center;">
+                        <div class="spinner" style="width: 56px; height: 56px; border-width: 4px; border-color: rgba(16, 185, 129, 0.2); border-top-color: #10B981;"></div>
+                        <div style="position: absolute; font-size: 22px;">🧾</div>
+                      </div>
+
+                      <h3 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 700; color: var(--text-color, #0F172A);">
+                        Processing your historical bills
+                      </h3>
+
+                      <!-- Single dynamic status message -->
+                      <div id="m-status-message" style="font-size: 15px; font-weight: 600; color: #2563EB; margin-bottom: 20px; min-height: 24px;">
+                        Reading file...
+                      </div>
+
+                      <!-- Progress counter & bar -->
+                      <div style="background: var(--bg-secondary, #F8FAFC); border: 1px solid var(--border-color, #E2E8F0); border-radius: 12px; padding: 16px; max-width: 440px; margin: 0 auto 20px auto; text-align: left;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; margin-bottom: 8px;">
+                          <span id="m-progress-counter" style="color: #475569; font-weight: 600;">0 / 1,000 bills</span>
+                          <span id="m-progress-percentage" style="color: #059669; font-weight: 700;">0%</span>
+                        </div>
+                        <div style="height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden;">
+                          <div id="m-progress-bar" style="height: 100%; width: 0%; background: #10B981; transition: width 0.3s ease; border-radius: 4px;"></div>
+                        </div>
+                      </div>
+
+                      <p style="margin: 0; font-size: 13px; color: var(--color-text-muted, #64748B);">
+                        Please keep this window open while we process your historical bills.
+                      </p>
+                    </div>
+
+                    <!-- 4. COMPLETION SCREEN -->
+                    <div id="m-view-completed" style="display: none; text-align: center; padding: 36px 16px;">
+                      <div style="width: 60px; height: 60px; border-radius: 50%; background: #DCFCE7; color: #059669; font-size: 32px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-weight: bold;">
+                        ✓
+                      </div>
+                      <h3 style="margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: #059669;">
+                        Historical Bills Imported
+                      </h3>
+                      <p style="margin: 0 0 20px 0; font-size: 14.5px; color: var(--color-text-muted, #64748B);">
+                        Your historical bills have been successfully imported.
+                      </p>
+
+                      <div style="background: var(--bg-secondary, #F8FAFC); border: 1px solid var(--border-color, #E2E8F0); border-radius: 12px; padding: 18px 24px; max-width: 440px; margin: 0 auto 24px auto; text-align: left; font-size: 14px; line-height: 1.8;">
+                        <div style="font-weight: 700; font-size: 15px; color: #0F172A; margin-bottom: 8px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px;">
+                          <span id="m-comp-total">0</span> bills processed
+                        </div>
+                        <div style="color: #059669;">✓ <span id="m-comp-imported" style="font-weight: 700;">0</span> imported</div>
+                        <div style="color: #D97706;">⚠️ <span id="m-comp-review" style="font-weight: 700;">0</span> need review</div>
+                        <div style="color: #64748B;">ℹ️ <span id="m-comp-duplicates" style="font-weight: 700;">0</span> duplicates skipped</div>
+                      </div>
+
+                      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary" onclick="window.location.href='sales.html?source=historical'">
+                          View Imported Bills
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="resetMigrationToInitial()">
+                          Done
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 5. FAILURE SCREEN -->
+                    <div id="m-view-failed" style="display: none; text-align: center; padding: 36px 16px;">
+                      <div style="width: 60px; height: 60px; border-radius: 50%; background: #FEE2E2; color: #DC2626; font-size: 32px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-weight: bold;">
+                        ⚠️
+                      </div>
+                      <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #DC2626;">
+                        Unable to import historical bills
+                      </h3>
+                      <p id="m-fail-reason" style="margin: 0 0 16px 0; font-size: 14px; color: #64748B; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                        An error occurred while processing your file.
+                      </p>
+                      <div id="m-fail-partial" style="display: none; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 10px 14px; max-width: 360px; margin: 0 auto 20px auto; font-size: 13px; color: #1E40AF;">
+                        0 / 0 bills processed
+                      </div>
+                      <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button type="button" class="btn btn-secondary" onclick="resetMigrationToInitial()">
+                          Cancel
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="retryMigrationUpload()">
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- Migration History Card -->
+              <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <h3 class="panel-title">📜 Migration History & Rollback Logs</h3>
+                    <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+                      Complete audit trail of all previous data imports. Rollback any historical migration with 1 click without affecting live transactions.
+                    </p>
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="loadMigrationHistory()">
+                    ↻ Refresh
+                  </button>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Migration Batch</th>
+                          <th>File Details</th>
+                          <th>Imported Records</th>
+                          <th>Total Amount</th>
+                          <th>Status</th>
+                          <th>Import Date</th>
+                          <th style="text-align: right;">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="migration-history-tbody">
+                        <tr>
+                          <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">
+                            Loading migration history...
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 11. ABOUT PANEL -->
             <div id="panel-about" class="settings-panel">
               <div class="card">
                 <div class="card-header">
@@ -605,7 +1151,7 @@
                   <h4>ExpiryGuard ERP v2.0.0 (Production Build)</h4>
                   <p style="font-size: 14px; color: var(--muted-text); margin-top: 8px;">
                     AI-Powered Billing, Inventory & Expiry Prevention SaaS for Indian Pharmacies.<br>
-                    Integrated with Gemini AI Multimodal Vision for Instant Medicine & Invoice Scanning.
+                    Integrated with Dawaiflow AI for Instant Medicine & Invoice Scanning.
                   </p>
                 </div>
               </div>
@@ -682,10 +1228,50 @@
     document.addEventListener('DOMContentLoaded', async () => {
       applySavedTheme();
       loadUserProfile();
-      loadBills();
       
       if (window.location.hash === '#deleted-stock') {
         switchTab('deleted-stock');
+      } else if (window.location.hash === '#data' || window.location.hash === '#backup') {
+        switchTab('data');
+      } else if (window.location.hash === '#migration' || window.location.hash === '#import') {
+        switchTab('migration');
+      }
+
+      const profForm = document.getElementById('pharmacy-profile-form');
+      if (profForm) {
+        profForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const submitBtn = profForm.querySelector('button[type="submit"]');
+          const origText = submitBtn ? submitBtn.textContent : '';
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
+
+          const payload = {
+            shop_name: document.getElementById('prof-shop-name')?.value?.trim() || '',
+            owner_name: document.getElementById('prof-owner-name')?.value?.trim() || '',
+            gstin: document.getElementById('prof-gstin')?.value?.trim() || null,
+            drug_license_no: document.getElementById('prof-drug-license')?.value?.trim() || null,
+            phone: document.getElementById('prof-phone')?.value?.trim() || null,
+            email: document.getElementById('prof-email')?.value?.trim() || null,
+            address: document.getElementById('prof-address')?.value?.trim() || null,
+            terms_and_conditions: document.getElementById('prof-terms')?.value?.trim() || null
+          };
+
+          try {
+            const updatedUser = await api.updateUserProfile(payload);
+            localStorage.setItem('expiryguard_cached_user_profile', JSON.stringify(updatedUser));
+            renderUserProfile(updatedUser);
+            if (window.showToastNotification) {
+              showToastNotification('Pharmacy details updated successfully!', true);
+            } else {
+              alert('Pharmacy details updated successfully!');
+            }
+          } catch (err) {
+            console.error('Failed to update pharmacy profile:', err);
+            alert('Failed to save pharmacy info: ' + (err.message || 'Unknown error'));
+          } finally {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origText; }
+          }
+        });
       }
     });
 
@@ -701,6 +1287,181 @@
 
       if (tabId === 'deleted-stock') {
         loadDeletedStock();
+      } else if (tabId === 'bills-docs') {
+        loadBills();
+      } else if (tabId === 'data') {
+        loadBackupHistory();
+      } else if (tabId === 'migration') {
+        if (typeof loadMigrationHistory === 'function') {
+          loadMigrationHistory();
+        }
+      }
+    }
+
+    async function loadBackupHistory() {
+      const tbody = document.getElementById('backup-history-body');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading backup history...</td></tr>`;
+      }
+
+      try {
+        const res = await api.getBackupHistory(50);
+        const backups = res && res.backups ? res.backups : (Array.isArray(res) ? res : []);
+        renderBackupHistory(backups);
+      } catch (err) {
+        console.error("Failed to load backup history:", err);
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--status-danger, #EF4444); padding: 24px;">Failed to load backup history: ${escapeHtml(err.message || 'Access restricted to shop owner')}</td></tr>`;
+        }
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function renderBackupHistory(backups) {
+      const tbody = document.getElementById('backup-history-body');
+      if (!tbody) return;
+
+      if (!backups || backups.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">No backups found. Click "+ Create Backup Now" to make your first snapshot.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = backups.map(b => {
+        const typeBadge = b.backup_type === 'SAFETY_SNAPSHOT'
+          ? `<span style="background: rgba(139, 92, 246, 0.15); color: #8B5CF6; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">🛡️ Safety</span>`
+          : (b.backup_type === 'AUTOMATIC'
+            ? `<span style="background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">⚙️ Auto</span>`
+            : `<span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">💾 Manual</span>`);
+
+        let recordsSummary = '—';
+        if (b.record_counts && typeof b.record_counts === 'object') {
+          const parts = [];
+          if (b.record_counts.products) parts.push(`${b.record_counts.products} prods`);
+          if (b.record_counts.sales) parts.push(`${b.record_counts.sales} sales`);
+          if (b.record_counts.purchase_invoices) parts.push(`${b.record_counts.purchase_invoices} purchases`);
+          if (b.record_counts.customers) parts.push(`${b.record_counts.customers} khata`);
+          recordsSummary = parts.join(', ') || '0 records';
+        }
+
+        const dateFormatted = b.created_at
+          ? new Date(b.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '—';
+
+        const checksumSnippet = b.checksum_sha256
+          ? `<code style="font-size: 11px; font-family: 'JetBrains Mono', monospace; background: var(--color-surface-bg); padding: 2px 4px; border-radius: 3px;">${escapeHtml(b.checksum_sha256.substring(0, 10))}...</code>`
+          : '—';
+
+        const downloadUrl = api.getBackupDownloadUrl(b.backup_id);
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 600; color: var(--color-text-primary);">${escapeHtml(b.filename || b.backup_id)}</div>
+              ${b.notes ? `<div style="font-size: 11.5px; color: var(--color-text-muted); margin-top: 2px;">Note: ${escapeHtml(b.notes)}</div>` : ''}
+            </td>
+            <td>${typeBadge}</td>
+            <td style="font-size: 12.5px;" class="num-tabular">${formatBytes(b.file_size_bytes)}</td>
+            <td style="font-size: 12px; color: var(--color-text-secondary);">${recordsSummary}</td>
+            <td style="font-size: 12px;" class="num-date">${dateFormatted}</td>
+            <td>${checksumSnippet}</td>
+            <td style="text-align: right;">
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                <a href="${downloadUrl}" class="btn-xs" style="text-decoration: none;" download="${escapeHtml(b.filename)}" title="Download .dfbk archive">
+                  ⬇️ Download
+                </a>
+                <button class="btn-xs" style="color: #3B82F6;" title="Restore Database" onclick="confirmRestoreBackup('${escapeHtml(b.backup_id)}', '${escapeHtml(b.filename)}')">
+                  🔄 Restore
+                </button>
+                <button class="btn-xs" style="color: var(--status-danger, #EF4444);" title="Delete Backup" onclick="confirmDeleteBackup('${escapeHtml(b.backup_id)}', '${escapeHtml(b.filename)}')">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function openCreateBackupDialog() {
+      const notes = prompt("Enter optional notes for this system backup snapshot:", "Manual backup");
+      if (notes === null) return;
+
+      const btn = document.getElementById('btn-create-backup-now');
+      const orig = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span>Creating backup...</span>'; }
+
+      try {
+        const res = await api.createBackup(notes);
+        alert(res.message || "Backup created successfully!");
+        await loadBackupHistory();
+      } catch (err) {
+        console.error("Create backup error:", err);
+        alert("Failed to create backup: " + (err.message || "Unknown error"));
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      }
+    }
+
+    async function handleBackupFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      if (!file.name.endsWith('.dfbk')) {
+        alert("Invalid file format. Please select an encrypted ExpiryGuard .dfbk backup archive.");
+        event.target.value = '';
+        return;
+      }
+
+      const confirmed = confirm(`WARNING: Are you sure you want to restore from uploaded backup file '${file.name}'?\n\nThis will restore all products, sales, customers, khata, and settings from the backup.\n\nAn automatic safety snapshot of your current database will be captured before restoring.`);
+      if (!confirmed) {
+        event.target.value = '';
+        return;
+      }
+
+      try {
+        const res = await api.uploadAndRestoreBackup(file);
+        alert(res.message || "Database restored successfully! Page will now reload.");
+        window.location.reload();
+      } catch (err) {
+        console.error("Restore upload error:", err);
+        alert("Restoration failed: " + (err.message || "Unknown error"));
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    async function confirmRestoreBackup(backupId, filename) {
+      const confirmed = confirm(`SAFETY CONFIRMATION:\n\nAre you sure you want to restore snapshot '${filename}'?\n\n- Active pharmacy data will be restored to this snapshot's state.\n- An automatic safety backup will be taken before restoring so you can revert anytime.\n\nClick OK to proceed with atomic restore.`);
+      if (!confirmed) return;
+
+      try {
+        const res = await api.restoreBackup(backupId);
+        alert(res.message || "Backup restored successfully! The page will now reload.");
+        window.location.reload();
+      } catch (err) {
+        console.error("Restore error:", err);
+        alert("Failed to restore backup: " + (err.message || "Unknown error"));
+      }
+    }
+
+    async function confirmDeleteBackup(backupId, filename) {
+      const confirmed = confirm(`Are you sure you want to permanently delete backup archive '${filename}'?`);
+      if (!confirmed) return;
+
+      try {
+        await api.deleteBackup(backupId);
+        alert("Backup deleted successfully.");
+        await loadBackupHistory();
+      } catch (err) {
+        console.error("Delete backup error:", err);
+        alert("Failed to delete backup: " + (err.message || "Unknown error"));
       }
     }
 
@@ -887,29 +1648,65 @@
       }
     }
 
+    const renderUserProfile = (user) => {
+      if (!user) return;
+      const shopEl = document.getElementById('sidebar-shop-name');
+      if (shopEl) shopEl.textContent = user.shop_name || 'Pharmacy';
+
+      const emailEl = document.getElementById('sidebar-user-email');
+      if (emailEl) emailEl.textContent = user.email || '';
+
+      const avatarEl = document.getElementById('sidebar-user-avatar');
+      if (avatarEl) avatarEl.textContent = (user.shop_name || 'P')[0].toUpperCase();
+
+      const headerShop = document.getElementById('shop-name-header');
+      if (headerShop) headerShop.textContent = user.shop_name || 'AI Pharmacy';
+
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val !== null && val !== undefined ? val : '';
+      };
+
+      setVal('acc-owner-name', user.owner_name);
+      setVal('acc-email', user.email);
+
+      setVal('prof-shop-name', user.shop_name);
+      setVal('prof-owner-name', user.owner_name);
+      setVal('prof-gstin', user.gstin);
+      setVal('prof-drug-license', user.drug_license_no);
+      setVal('prof-phone', user.phone);
+      setVal('prof-email', user.email);
+      setVal('prof-address', user.address);
+      setVal('prof-terms', user.terms_and_conditions);
+
+      setVal('pref-payment-method', user.default_payment_method || 'CASH');
+      setVal('pref-inv-prefix', user.invoice_prefix || 'INV');
+
+      if (user.preferred_theme && !localStorage.getItem('expiryguard_theme')) {
+        try { localStorage.setItem('expiryguard_theme', user.preferred_theme); } catch (_) {}
+      }
+      if (window.ExpiryTheme) {
+        window.ExpiryTheme.init();
+      }
+    };
+
     async function loadUserProfile() {
+      // Load cached profile immediately for 0ms visual delay
+      try {
+        const cached = localStorage.getItem('expiryguard_cached_user_profile');
+        if (cached) {
+          renderUserProfile(JSON.parse(cached));
+        }
+      } catch (e) {
+        console.warn('Failed to parse cached user profile:', e);
+      }
+
       try {
         const user = await api.getUserProfile();
-        document.getElementById('sidebar-shop-name').textContent = user.shop_name || 'Pharmacy';
-        document.getElementById('sidebar-user-email').textContent = user.email || '';
-        document.getElementById('sidebar-user-avatar').textContent = (user.shop_name || 'P')[0].toUpperCase();
-
-        document.getElementById('acc-owner-name').value = user.owner_name || '';
-        document.getElementById('acc-email').value = user.email || '';
-
-        document.getElementById('prof-shop-name').value = user.shop_name || '';
-        document.getElementById('prof-owner-name').value = user.owner_name || '';
-        document.getElementById('prof-gstin').value = user.gstin || '';
-        document.getElementById('prof-drug-license').value = user.drug_license_no || '';
-        document.getElementById('prof-phone').value = user.phone || '';
-        document.getElementById('prof-email').value = user.email || '';
-        document.getElementById('prof-address').value = user.address || '';
-        document.getElementById('prof-terms').value = user.terms_and_conditions || '';
-
-        document.getElementById('pref-payment-method').value = user.default_payment_method || 'CASH';
-        document.getElementById('pref-inv-prefix').value = user.invoice_prefix || 'INV';
-        const activeTheme = window.ExpiryTheme ? window.ExpiryTheme.getTheme() : (localStorage.getItem('expiryguard_theme') || 'light');
-        if (window.ExpiryTheme) window.ExpiryTheme.setTheme(activeTheme, false);
+        if (user) {
+          localStorage.setItem('expiryguard_cached_user_profile', JSON.stringify(user));
+          renderUserProfile(user);
+        }
       } catch (err) {
         console.error("Failed to load user profile:", err);
       }
@@ -1077,11 +1874,14 @@
       }
     }
   </script>
-      <script src="js/api.js?v=9.0"></script>
+
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
   <script src="js/nav.js?v=9.0"></script>
   <script src="js/confirm_modal.js?v=9.0"></script>
   <script src="js/app.js?v=9.0"></script>
   <script src="js/add_inventory_flow.js?v=9.0"></script>
   <script src="js/billing_flow.js?v=9.0"></script>
+  <script src="js/migration.js?v=9.0"></script>
 </body>
 </html>

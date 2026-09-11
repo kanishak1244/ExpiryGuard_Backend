@@ -4,6 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Create New Bill — ExpiryGuard</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
   <link rel="stylesheet" href="css/styles.css?v=9.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,17 +64,9 @@
           <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           <span class="nav-text">Billing / Live Sales</span>
         </a>
-        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
-          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          <span class="nav-text">AI Camera Billing</span>
-        </a>
         <a href="inventory.html" class="nav-item" data-nav-id="inventory">
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
           <span class="nav-text">Live Inventory</span>
-        </a>
-        <a href="restock.html" class="nav-item" data-nav-id="restock">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          <span class="nav-text">Restock Suggestions</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -60,6 +79,10 @@
         <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
         </a>
         <a href="returns.html" class="nav-item" data-nav-id="returns">
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
@@ -98,6 +121,9 @@
           </p>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-warning" id="view-held-bills-btn" onclick="openHeldBillsModal()" style="display: flex; align-items: center; gap: 6px; background: #ea580c; color: white; border: none; font-weight: 600;">
+            <span>⏸️ Held Bills (<span id="held-bills-badge-count">0</span>)</span>
+          </button>
           <button class="btn btn-secondary" onclick="openAddNewCustomerModal()" style="display: flex; align-items: center; gap: 6px;">
             <span>+ Add New Party</span>
           </button>
@@ -108,6 +134,15 @@
       </header>
 
       <main class="content-body">
+
+        <!-- Resumed Held Bill Banner -->
+        <div id="resumed-held-banner" style="display: none; align-items: center; justify-content: space-between; background: #fff7ed; border: 1px solid #fdba74; padding: 10px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #c2410c;">
+            <span>⏸️ Resumed Held Bill:</span>
+            <span id="resumed-held-number" style="font-family: monospace; font-size: 14px; background: #ffedd5; padding: 2px 8px; border-radius: 4px;"></span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="clearResumedHeldBill()" style="font-size: 12px; padding: 4px 10px;">✕ Unlink</button>
+        </div>
         
         <!-- Section 1: Billing Header Controls -->
         <div class="billing-grid-header">
@@ -135,8 +170,14 @@
             <div style="display: flex; gap: 6px;">
               <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')" style="flex: 1; padding: 7px 0; font-size: 12px;">💵 Cash</button>
               <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')" style="flex: 1; padding: 7px 0; font-size: 12px;">📱 UPI</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')" style="flex: 1; padding: 7px 0; font-size: 12px;">📋 Credit</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="PENDING" onclick="handlePaymentModeChange('PENDING')" style="flex: 1; padding: 7px 0; font-size: 12px;">⏳ Pending</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CARD" onclick="handlePaymentModeChange('CARD')" style="flex: 1; padding: 7px 0; font-size: 12px;">💳 Card</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')" style="flex: 1; padding: 7px 0; font-size: 12px;">📒 Credit</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" id="pay-mode-split-btn" data-mode="SPLIT" onclick="openSplitPaymentModal()" style="flex: 1.2; padding: 7px 0; font-size: 12px;">✂️ Split</button>
+            </div>
+            <!-- Split Payment Summary Badge -->
+            <div id="split-payment-summary-strip" style="display: none; margin-top: 8px; padding: 6px 12px; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: var(--radius-md); font-size: 12px; color: #3730A3; justify-content: space-between; align-items: center;">
+              <span id="split-payment-summary-text" style="font-weight: 600;">Split: ₹0</span>
+              <button type="button" onclick="openSplitPaymentModal()" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; height: auto;">Edit Split</button>
             </div>
             <!-- Inline Pending Customer Prompt -->
             <div id="pending-customer-prompt" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warning); border-radius: var(--radius-md);">
@@ -146,13 +187,81 @@
           </div>
         </div>
 
-        <!-- Section 2: Search Medicine Autocomplete Input -->
-        <div class="billing-search-box">
-          <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 16px; border-radius: var(--radius-md);"
-                 placeholder="🔎 Type medicine name, brand, or salt (e.g. Augmentin, Dolo 650, Pan 40, Azithral)... [Press Enter to pick]"
-                 oninput="handleMedicineSearchInput(this.value)" autocomplete="off" autofocus>
-          <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
+        <!-- Section 2: Search Medicine Autocomplete Input & Voice Billing -->
+        <div class="billing-search-box" style="position: relative;">
+          <!-- Search Mode Selector -->
+          <div class="billing-search-mode-bar">
+            <button type="button" class="search-mode-tab active" id="search-mode-name-btn" onclick="setBillingSearchMode('name')">
+              🔎 Search by Medicine Name
+            </button>
+            <button type="button" class="search-mode-tab" id="search-mode-code-btn" onclick="setBillingSearchMode('code')">
+              🏷️ Search by Medicine Code
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="position: relative; flex: 1;">
+              <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 64px 12px 16px; border-radius: var(--radius-md); width: 100%; box-sizing: border-box;"
+                     placeholder="Type medicine name…"
+                     oninput="handleMedicineSearchInput(this.value)" autocomplete="off" autofocus>
+              <button type="button" id="bill-search-clear-btn" class="search-clear-btn" onclick="clearMedicineSearch()" title="Clear search" style="display: none;">&times;</button>
+              <div id="bill-search-loading-spinner" class="search-spinner-inline" style="display: none;"></div>
+              <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
+            </div>
+            <!-- Voice Billing Mic Button (Web Speech API) -->
+            <button type="button" id="voice-billing-mic-btn" class="btn btn-secondary" onclick="toggleVoiceBilling()"
+                    title="Speak medicine name or HSN code"
+                    style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border-radius: var(--radius-md); transition: all 0.2s ease; cursor: pointer; flex-shrink: 0;">
+              <svg id="voice-mic-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color: #2563EB;">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Voice Listening Status Bar / Toast -->
+          <div id="voice-status-bar" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; align-items: center; justify-content: space-between; background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="voice-pulse-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #EF4444; animation: voicePulse 1s infinite alternate;"></span>
+              <span id="voice-status-text" style="font-weight: 500;">Listening... Speak medicine name or HSN code</span>
+            </div>
+            <button type="button" onclick="dismissVoiceStatus()" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #64748B; padding: 0 4px;">✕</button>
+          </div>
+
+          <!-- Voice Command Confirmation Strip (Shows Heard: {qty} {unit} of {item} with Edit / Dismiss) -->
+          <div id="voice-confirmation-strip" style="display: none; margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; align-items: center; justify-content: space-between; background: #F0FDF4; border: 1px solid #86EFAC; color: #166534;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="#16A34A" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span id="voice-confirmation-text" style="font-weight: 600;">Heard: 2 strips of Paracetamol</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button type="button" class="btn btn-secondary" onclick="editLastVoiceItem()" style="padding: 3px 8px; font-size: 11.5px; border-color: #86EFAC; color: #15803D; background: #DCFCE7;">Edit</button>
+              <button type="button" onclick="dismissVoiceConfirmation()" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #64748B; padding: 0 4px;">✕</button>
+            </div>
+          </div>
+
+          <!-- Top Voice Candidate Confirmation Chips -->
+          <div id="voice-candidate-chips" style="display: none; margin-top: 8px; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <span style="font-size: 12px; font-weight: 600; color: var(--color-text-muted);">Confirm Voice Match:</span>
+            <div id="voice-candidate-chips-list" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+          </div>
         </div>
+
+        <style>
+          @keyframes voicePulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            100% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 8px rgba(239, 68, 68, 0.7); }
+          }
+          .voice-listening-active {
+            border-color: #EF4444 !important;
+            background: #FEF2F2 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+          }
+        </style>
 
         <!-- Section 3: Full Desktop Width Running Items Table -->
         <div class="panel" style="margin-bottom: 20px;">
@@ -231,7 +340,10 @@
             </div>
 
             <!-- Action Buttons -->
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+              <button type="button" class="btn btn-warning" style="background: #ea580c; color: white; border: none; padding: 11px 20px; font-weight: 700; font-size: 13.5px;" onclick="holdCurrentBill()">
+                ⏸️ Hold Bill
+              </button>
               <button type="button" class="btn btn-secondary" style="padding: 11px 22px; font-weight: 600; font-size: 13.5px;" onclick="commitBillTransaction(false, true)">
                 Save & New Bill
               </button>
@@ -246,11 +358,107 @@
     </div>
   </div>
 
-      <script src="js/api.js?v=9.0"></script>
-  <script src="js/nav.js?v=9.0"></script>
-  <script src="js/confirm_modal.js?v=9.0"></script>
-  <script src="js/app.js?v=9.0"></script>
-  <script src="js/add_inventory_flow.js?v=9.0"></script>
-  <script src="js/billing_flow.js?v=9.0"></script>
+  <!-- Held Bills Management Modal -->
+  <div id="held-bills-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--color-surface, #fff); border-radius: 12px; width: 90%; max-width: 720px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--color-border, #e5e7eb); display: flex; justify-content: space-between; align-items: center; background: #fff7ed;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 22px;">⏸️</span>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #9a3412;">Held Bills (Parked Sales)</h3>
+        </div>
+        <button type="button" class="btn-close" onclick="closeHeldBillsModal()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9a3412;">✕</button>
+      </div>
+
+      <div style="padding: 12px 20px; border-bottom: 1px solid var(--color-border, #e5e7eb); background: #fafafa;">
+        <input type="text" id="held-bills-search-input" class="form-input" style="width: 100%; box-sizing: border-box; font-size: 13.5px; padding: 8px 12px;"
+               placeholder="🔎 Search by customer name, phone, or bill #..." oninput="handleHeldBillsSearch(this.value)">
+      </div>
+
+      <div id="held-bills-modal-list" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+        <div style="text-align: center; color: #888; padding: 30px;">Loading held bills...</div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--color-border, #e5e7eb); display: flex; justify-content: flex-end; background: #fafafa;">
+        <button type="button" class="btn btn-secondary" onclick="closeHeldBillsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split Payment Configuration Modal -->
+  <div id="split-payment-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--color-surface, #fff); border-radius: 12px; width: 90%; max-width: 540px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--color-border, #e5e7eb); display: flex; justify-content: space-between; align-items: center; background: #EEF2FF;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 22px;">✂️</span>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #3730A3;">Split Payment</h3>
+        </div>
+        <button type="button" class="btn-close" onclick="closeSplitPaymentModal()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #4F46E5;">✕</button>
+      </div>
+
+      <!-- Live Calculation Bar -->
+      <div style="padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid var(--color-border, #e5e7eb); display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+        <div>
+          <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Total Bill</div>
+          <div id="split-modal-total-bill" style="font-size: 16px; font-weight: 800; color: #0F172A;">₹0.00</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Allocated</div>
+          <div id="split-modal-allocated" style="font-size: 16px; font-weight: 800; color: #16A34A;">₹0.00</div>
+        </div>
+        <div>
+          <div style="font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase;">Remaining</div>
+          <div id="split-modal-remaining" style="font-size: 16px; font-weight: 800; color: #DC2626;">₹0.00</div>
+        </div>
+      </div>
+
+      <!-- Allocations List -->
+      <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+        <label style="font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; display: block;">Current Payment Breakdown:</label>
+        <div id="split-allocations-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Add Payment Row -->
+        <div style="background: #F1F5F9; border: 1px dashed #CBD5E1; border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 8px;">Add Payment Component:</div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="split-add-method" class="form-input" style="flex: 1; font-size: 13px; padding: 7px 10px;">
+              <option value="CASH">💵 Cash</option>
+              <option value="UPI">📱 UPI</option>
+              <option value="CARD">💳 Card</option>
+              <option value="CREDIT">📒 Credit (Khata)</option>
+            </select>
+            <div style="position: relative; flex: 1;">
+              <span style="position: absolute; left: 10px; top: 7px; color: #64748B; font-weight: 600;">₹</span>
+              <input type="number" id="split-add-amount" class="form-input" style="padding-left: 24px; font-size: 13px; padding-top: 7px; padding-bottom: 7px; width: 100%; box-sizing: border-box;" placeholder="0.00" step="0.01" min="0.01">
+            </div>
+            <button type="button" class="btn btn-primary" onclick="handleAddSplitAllocation()" style="padding: 7px 14px; font-size: 13px; white-space: nowrap;">+ Add</button>
+          </div>
+          <div id="split-credit-customer-warning" style="display: none; margin-top: 8px; font-size: 11.5px; color: #B45309;">
+            ⚠️ Credit requires a selected customer account or name for ledger tracking.
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--color-border, #e5e7eb); display: flex; justify-content: space-between; align-items: center; background: #fafafa;">
+        <button type="button" class="btn btn-secondary" onclick="handleClearSplitPayments()" style="color: #DC2626; border-color: #FECACA;">Reset to Single</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="closeSplitPaymentModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="split-apply-btn" onclick="applySplitPayments()" style="padding: 8px 18px; font-weight: 700;">Confirm Split</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="js/api.js?v=9.3"></script>
+  <script src="js/app_preloader.js?v=9.3"></script>
+  <script src="js/nav.js?v=9.3"></script>
+  <script src="js/confirm_modal.js?v=9.3"></script>
+  <script src="js/app.js?v=9.3"></script>
+  <script src="js/add_inventory_flow.js?v=9.3"></script>
+  <script src="js/voice_command_parser.js?v=9.3"></script>
+  <script src="js/billing_flow.js?v=9.3"></script>
 </body>
 </html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backup & Restore — ExpiryGuard</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 11.5px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .btn-xs:hover {
+      background: var(--color-surface-card);
+      border-color: var(--color-brand-deep);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="backup-page">
+    <!-- Canonical Sidebar -->
+    <aside class="sidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Backup & Restore Hub</h1>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+            Secure, encrypted relational database snapshots (.dfbk), atomic restores, and safety rollbacks (Owner only).
+          </p>
+        </div>
+        <div class="topbar-right">
+          <input type="file" id="standalone-backup-upload-input" accept=".dfbk" style="display: none;" onchange="handleStandaloneFileSelected(event)">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('standalone-backup-upload-input').click()" style="display: flex; align-items: center; gap: 6px;">
+            <span>↑ Upload .dfbk</span>
+          </button>
+          <button type="button" class="btn btn-primary" id="btn-standalone-create-backup" onclick="openStandaloneCreateBackup()" style="display: flex; align-items: center; gap: 6px;">
+            <span>+ Create Backup Now</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        <!-- Safety Alert -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 22px;">🛡️</span>
+          <div>
+            <strong style="color: var(--color-text-primary);">Zero Data Loss Guarantee:</strong> Whenever you restore a backup archive, the system automatically captures a pre-restoration safety snapshot. If you ever need to rollback, simply restore the safety snapshot.
+          </div>
+        </div>
+
+        <!-- Backup History Panel -->
+        <div class="panel">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="panel-title">Available Database Snapshots</h2>
+            <button class="btn-xs" onclick="loadStandaloneBackups()">🔄 Refresh</button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Backup Snapshot</th>
+                  <th>Type</th>
+                  <th>File Size</th>
+                  <th>Records Breakdown</th>
+                  <th>Created Date</th>
+                  <th>Checksum</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="standalone-backup-history-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">
+                    Loading backup history...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Raw CSV Exports Card -->
+        <div class="card" style="margin-top: 24px;">
+          <div class="card-header">
+            <h3 class="panel-title">📊 Raw CSV Data Exports</h3>
+          </div>
+          <div class="card-body">
+            <p style="font-size: 13.5px; margin-bottom: 16px; color: var(--color-text-secondary);">
+              Download spreadsheet exports of your sales register and inventory valuation for offline accounting.
+            </p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <button onclick="api.exportSalesCsv(false).then(r => alert(r.count > 0 ? `Exported ${r.count} bill(s). Live feed updated.` : 'No unexported bills.')).catch(e => alert(e.message))" class="btn btn-secondary" style="cursor: pointer;">📊 Export Sales Register CSV</button>
+              <a href="/reports/export/inventory" target="_blank" class="btn btn-secondary">📦 Export Inventory Valuation CSV</a>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadStandaloneBackups();
+    });
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async function loadStandaloneBackups() {
+      const tbody = document.getElementById('standalone-backup-history-body');
+      
+      // 0ms instant cached render from memory/sessionStorage before network
+      const cached = window.api && typeof window.api.getCached === 'function' ? window.api.getCached('/backup/history?limit=50') : null;
+      const cachedBackups = cached && cached.backups ? cached.backups : (Array.isArray(cached) ? cached : null);
+      if (Array.isArray(cachedBackups) && cachedBackups.length > 0) {
+        renderStandaloneBackups(cachedBackups);
+      } else if (tbody && !tbody.children.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">Loading backup history...</td></tr>`;
+      }
+
+      try {
+        const res = await api.getBackupHistory(50);
+        const backups = res && res.backups ? res.backups : (Array.isArray(res) ? res : []);
+        renderStandaloneBackups(backups);
+      } catch (err) {
+        console.error("Failed to load backups:", err);
+        if (tbody && (!cachedBackups || cachedBackups.length === 0)) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--status-danger, #EF4444); padding: 36px;">Failed to load backup history: ${escapeHtml(err.message || 'Access restricted to shop owner')}</td></tr>`;
+        }
+      }
+    }
+
+    function renderStandaloneBackups(backups) {
+      const tbody = document.getElementById('standalone-backup-history-body');
+      if (!tbody) return;
+
+      if (!backups || backups.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">No backups found. Click "+ Create Backup Now" to make your first snapshot.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = backups.map(b => {
+        const typeBadge = b.backup_type === 'SAFETY_SNAPSHOT'
+          ? `<span style="background: rgba(139, 92, 246, 0.15); color: #8B5CF6; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">🛡️ Safety</span>`
+          : (b.backup_type === 'AUTOMATIC'
+            ? `<span style="background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">⚙️ Auto</span>`
+            : `<span style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 700;">💾 Manual</span>`);
+
+        let recordsSummary = '—';
+        if (b.record_counts && typeof b.record_counts === 'object') {
+          const parts = [];
+          if (b.record_counts.products) parts.push(`${b.record_counts.products} prods`);
+          if (b.record_counts.sales) parts.push(`${b.record_counts.sales} sales`);
+          if (b.record_counts.purchase_invoices) parts.push(`${b.record_counts.purchase_invoices} purchases`);
+          if (b.record_counts.customers) parts.push(`${b.record_counts.customers} khata`);
+          recordsSummary = parts.join(', ') || '0 records';
+        }
+
+        const dateFormatted = b.created_at
+          ? new Date(b.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '—';
+
+        const checksumSnippet = b.checksum_sha256
+          ? `<code style="font-size: 11px; font-family: 'JetBrains Mono', monospace; background: var(--color-surface-bg); padding: 2px 4px; border-radius: 3px;">${escapeHtml(b.checksum_sha256.substring(0, 10))}...</code>`
+          : '—';
+
+        const downloadUrl = api.getBackupDownloadUrl(b.backup_id);
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 600; color: var(--color-text-primary);">${escapeHtml(b.filename || b.backup_id)}</div>
+              ${b.notes ? `<div style="font-size: 11.5px; color: var(--color-text-muted); margin-top: 2px;">Note: ${escapeHtml(b.notes)}</div>` : ''}
+            </td>
+            <td>${typeBadge}</td>
+            <td style="font-size: 12.5px;" class="num-tabular">${formatBytes(b.file_size_bytes)}</td>
+            <td style="font-size: 12px; color: var(--color-text-secondary);">${recordsSummary}</td>
+            <td style="font-size: 12px;" class="num-date">${dateFormatted}</td>
+            <td>${checksumSnippet}</td>
+            <td style="text-align: right;">
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                <a href="${downloadUrl}" class="btn-xs" style="text-decoration: none;" download="${escapeHtml(b.filename)}" title="Download .dfbk archive">
+                  ⬇️ Download
+                </a>
+                <button class="btn-xs" style="color: #3B82F6;" title="Restore Database" onclick="confirmStandaloneRestore('${escapeHtml(b.backup_id)}', '${escapeHtml(b.filename)}')">
+                  🔄 Restore
+                </button>
+                <button class="btn-xs" style="color: var(--status-danger, #EF4444);" title="Delete Backup" onclick="confirmStandaloneDelete('${escapeHtml(b.backup_id)}', '${escapeHtml(b.filename)}')">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function openStandaloneCreateBackup() {
+      const notes = prompt("Enter optional notes for this system backup snapshot:", "Manual backup");
+      if (notes === null) return;
+
+      const btn = document.getElementById('btn-standalone-create-backup');
+      const orig = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span>Creating backup...</span>'; }
+
+      try {
+        const res = await api.createBackup(notes);
+        alert(res.message || "Backup created successfully!");
+        await loadStandaloneBackups();
+      } catch (err) {
+        console.error("Create backup error:", err);
+        alert("Failed to create backup: " + (err.message || "Unknown error"));
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      }
+    }
+
+    async function handleStandaloneFileSelected(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      if (!file.name.endsWith('.dfbk')) {
+        alert("Invalid file format. Please select an encrypted ExpiryGuard .dfbk backup archive.");
+        event.target.value = '';
+        return;
+      }
+
+      const confirmed = confirm(`WARNING: Are you sure you want to restore from uploaded backup file '${file.name}'?\n\nThis will restore all products, sales, customers, khata, and settings from the backup.\n\nAn automatic safety snapshot of your current database will be captured before restoring.`);
+      if (!confirmed) {
+        event.target.value = '';
+        return;
+      }
+
+      try {
+        const res = await api.uploadAndRestoreBackup(file);
+        alert(res.message || "Database restored successfully! Page will now reload.");
+        window.location.reload();
+      } catch (err) {
+        console.error("Restore upload error:", err);
+        alert("Restoration failed: " + (err.message || "Unknown error"));
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    async function confirmStandaloneRestore(backupId, filename) {
+      const confirmed = confirm(`SAFETY CONFIRMATION:\n\nAre you sure you want to restore snapshot '${filename}'?\n\n- Active pharmacy data will be restored to this snapshot's state.\n- An automatic safety backup will be taken before restoring so you can revert anytime.\n\nClick OK to proceed with atomic restore.`);
+      if (!confirmed) return;
+
+      try {
+        const res = await api.restoreBackup(backupId);
+        alert(res.message || "Backup restored successfully! The page will now reload.");
+        window.location.reload();
+      } catch (err) {
+        console.error("Restore error:", err);
+        alert("Failed to restore backup: " + (err.message || "Unknown error"));
+      }
+    }
+
+    async function confirmStandaloneDelete(backupId, filename) {
+      const confirmed = confirm(`Are you sure you want to permanently delete backup archive '${filename}'?`);
+      if (!confirmed) return;
+
+      try {
+        await api.deleteBackup(backupId);
+        alert("Backup deleted successfully.");
+        await loadStandaloneBackups();
+      } catch (err) {
+        console.error("Delete backup error:", err);
+        alert("Failed to delete backup: " + (err.message || "Unknown error"));
+      }
+    }
+  </script>
+</body>
+</html>

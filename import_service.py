@@ -129,23 +129,37 @@ def read_file_to_dataframe(file_bytes: bytes, filename: str) -> pd.DataFrame:
 
 def parse_date_flexible(val: Any) -> Tuple[Optional[date], Optional[str]]:
     """
-    Parses various date strings (ISO, DD/MM/YYYY, MM/YY, MM/YYYY, Excel serials).
+    Fast-path date parsing for ISO, YYYY-MM-DD, DD/MM/YYYY, and datetime objects.
     Returns (parsed_date: date | None, warning_message: str | None).
     """
-    if pd.isna(val) or val is None or str(val).strip() in ['', 'nan', 'NaT', 'None']:
-        # Default expiry: 1 year from today if missing
+    if pd.isna(val) or val is None:
         default_exp = date.today() + timedelta(days=365)
         return default_exp, "Expiry date missing; defaulted to 1 year from today."
 
-    val_str = str(val).strip()
-
-    # Handle pandas / python datetime objects directly
-    if isinstance(val, (datetime.datetime, datetime.date, pd.Timestamp)):
-        if isinstance(val, pd.Timestamp):
-            return val.date(), None
-        if isinstance(val, datetime.datetime):
+    # Fast path for python date / datetime / Timestamp
+    if isinstance(val, (datetime.date, datetime.datetime, pd.Timestamp)):
+        if hasattr(val, "date"):
             return val.date(), None
         return val, None
+
+    val_str = str(val).strip()
+    if not val_str or val_str.lower() in ['', 'nan', 'nat', 'none']:
+        default_exp = date.today() + timedelta(days=365)
+        return default_exp, "Expiry date missing; defaulted to 1 year from today."
+
+    # Fast path for YYYY-MM-DD (most common format)
+    if len(val_str) == 10 and val_str[4] == '-' and val_str[7] == '-':
+        try:
+            return datetime.date(int(val_str[:4]), int(val_str[5:7]), int(val_str[8:10])), None
+        except ValueError:
+            pass
+
+    # Fast path for DD/MM/YYYY
+    if len(val_str) == 10 and val_str[2] == '/' and val_str[5] == '/':
+        try:
+            return datetime.date(int(val_str[6:10]), int(val_str[3:5]), int(val_str[:2])), None
+        except ValueError:
+            pass
 
     # Handle numeric Excel serial dates (e.g. 45657)
     if val_str.isdigit() and len(val_str) in [4, 5]:
@@ -166,9 +180,7 @@ def parse_date_flexible(val: Any) -> Tuple[Optional[date], Optional[str]]:
     for fmt in date_formats:
         try:
             dt = datetime.datetime.strptime(val_str, fmt).date()
-            # If format was MM/YYYY or MM/YY, pick the end of month
             if fmt in ["%m/%Y", "%m-%Y", "%b-%Y", "%b %Y", "%B %Y", "%m/%y", "%m-%y", "%b-%y"]:
-                # Jump to next month 1st day then minus 1 day
                 year = dt.year
                 month = dt.month
                 if month == 12:
@@ -180,27 +192,27 @@ def parse_date_flexible(val: Any) -> Tuple[Optional[date], Optional[str]]:
         except ValueError:
             continue
 
-    # Fallback default
     default_exp = date.today() + timedelta(days=365)
     return default_exp, f"Could not parse expiry date '{val_str}'; defaulted to 1 year from today."
 
 def validate_and_normalize_row(
-    row: pd.Series,
+    row: Any,
     mapping: Dict[str, str],
     row_index: int
 ) -> Tuple[Optional[Dict[str, Any]], List[str], Optional[str]]:
     """
-    Validates a single row against mapping.
+    Validates a single row against mapping (supports pd.Series or dict).
     Returns (cleaned_dict, warnings_list, error_reason).
     """
     warnings: List[str] = []
 
     # 1. Product Name (REQUIRED)
     name_col = mapping.get("product_name")
-    if not name_col or name_col not in row or pd.isna(row[name_col]):
+    val_name = row.get(name_col) if isinstance(row, dict) else (row[name_col] if name_col in row else None)
+    if not name_col or val_name is None or pd.isna(val_name):
         return None, [], f"Row {row_index}: Missing required field 'product_name'."
     
-    product_name = str(row[name_col]).strip()
+    product_name = str(val_name).strip()
     if not product_name or product_name.lower() == 'nan':
         return None, [], f"Row {row_index}: Empty product name."
 

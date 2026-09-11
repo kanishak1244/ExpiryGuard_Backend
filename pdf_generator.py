@@ -170,7 +170,17 @@ def generate_invoice_pdf(sale_data: dict, shop_data: dict) -> bytes:
         date_str = date_str.strftime("%d-%m-%Y %H:%M")
     cust_name = sale_data.get("customer_name") or "Cash Customer"
     cust_phone = sale_data.get("customer_phone") or "-"
-    payment_mode = sale_data.get("payment_method") or "CASH"
+    raw_payments = sale_data.get("payments") or []
+    if len(raw_payments) > 1:
+        parts = []
+        for p in raw_payments:
+            pm = p.get("payment_method", "").upper() if isinstance(p, dict) else getattr(p, "payment_method", "").upper()
+            pa = float(p.get("amount", 0.0) if isinstance(p, dict) else getattr(p, "amount", 0.0))
+            parts.append(f"{pm}: ₹{pa:.2f}")
+        payment_mode = "SPLIT (" + ", ".join(parts) + ")"
+    else:
+        payment_mode = sale_data.get("payment_method") or "CASH"
+
     doc_name = sale_data.get("doctor_name") or "-"
     doc_reg = sale_data.get("doctor_reg_no")
     doc_display = f"Dr. {doc_name}" if doc_name != "-" else "-"

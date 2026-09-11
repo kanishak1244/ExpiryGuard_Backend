@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CA Connect — Chartered Accountant Compliance Hub | Dawaiflow</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .ca-hero-card {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg, 12px);
+      padding: 24px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      box-shadow: var(--shadow-subtle);
+    }
+    .ca-profile-details {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .ca-avatar-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--primary-green, #10B981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .status-chip.connected {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-chip.disconnected {
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .ca-actions-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ca-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .report-selection-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .report-check-card {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .report-check-card:hover {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.04);
+    }
+    .report-check-card input[type="checkbox"] {
+      margin-top: 3px;
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary-green, #10B981);
+    }
+    .report-check-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .report-check-desc {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      line-height: 1.3;
+    }
+    .history-status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .history-status-badge.sent {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .history-status-badge.composed {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3B82F6;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .date-preset-selector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--color-surface-card);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+    }
+    .pill-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      background: var(--color-surface-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      font-size: 11px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+      color: var(--color-text-primary);
+    }
+    .gmail-chip {
+      font-size: 11px;
+      color: var(--color-text-muted, #94A3B8);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .tab-header-btn {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      color: var(--color-text-muted, #94A3B8);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-header-btn.active {
+      color: var(--primary-green, #10B981);
+      border-bottom-color: var(--primary-green, #10B981);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="ca-connect-page">
+
+    <!-- Canonical Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+      <nav class="sidebar-menu">
+        <!-- Rendered dynamically by nav.js -->
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">CA Connect — Compliance & Tax Hub</h1>
+          <p style="font-size: 13px; color: var(--color-text-muted);">Seamlessly share GST registers, sales books, purchase invoices & P&L filings with your Chartered Accountant.</p>
+        </div>
+        
+        <div class="topbar-right">
+          <button class="btn btn-secondary" onclick="loadAllCaData()" title="Refresh live tax and dispatch data" style="display: flex; align-items: center; gap: 6px;">
+            <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            <span>Refresh</span>
+          </button>
+          <button class="btn btn-secondary owner-only-btn" id="btn-top-configure-ca" onclick="openConfigureCaModal()" style="display: flex; align-items: center; gap: 6px;">
+            <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
+            <span>Configure CA</span>
+          </button>
+          <button class="btn btn-primary" onclick="openShareModal()" style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <span>Share with CA</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content-body">
+
+        <!-- 1. Connected CA Profile Card -->
+        <div class="ca-hero-card" id="ca-hero-card">
+          <div class="ca-profile-details">
+            <div class="ca-avatar-icon">⚖️</div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: var(--color-text-primary);" id="ca-display-name">No Chartered Accountant Connected</h2>
+                <span class="status-chip disconnected" id="ca-status-badge">
+                  <span>●</span> Not Connected
+                </span>
+              </div>
+              <div style="font-size: 13px; color: var(--color-text-muted); display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+                <span id="ca-display-email">📧 Configure your CA's email to enable 1-click sharing</span>
+                <span id="ca-display-phone" style="display: none;">📞 <span id="ca-phone-val"></span></span>
+                <span id="ca-last-shared-container" style="display: none; color: #10B981;">⏱️ Last shared: <strong id="ca-last-shared-time">Never</strong></span>
+              </div>
+              <div class="gmail-chip" id="gmail-status-chip">
+                <span>🔒 Email dispatch via: <strong>Direct Pharmacy Mail Gateway</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ca-actions-group">
+            <button type="button" class="btn btn-secondary owner-only-btn" id="btn-edit-ca" onclick="openConfigureCaModal()" style="display: flex; align-items: center; gap: 6px;">
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              <span>Edit CA</span>
+            </button>
+            <button type="button" class="btn btn-danger owner-only-btn" id="btn-disconnect-ca" onclick="confirmDisconnectCa()" style="display: none; align-items: center; gap: 6px;">
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              <span>Disconnect</span>
+            </button>
+            <button type="button" class="btn btn-primary" onclick="openShareModal()" style="display: flex; align-items: center; gap: 6px;">
+              <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              <span>1-Click Share</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section Navigation Tabs -->
+        <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--color-border); margin-bottom: 24px;">
+          <button class="tab-header-btn active" id="tab-btn-dashboard" onclick="switchCaTab('dashboard')">📊 GST & Financial Summary</button>
+          <button class="tab-header-btn" id="tab-btn-history" onclick="switchCaTab('history')">📜 Dispatch History & Audit Log</button>
+        </div>
+
+        <!-- TAB 1: GST & Financial Compliance Dashboard -->
+        <div id="ca-tab-dashboard" class="tab-pane">
+          <!-- Filter Controls -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: 700; margin: 0; color: var(--color-text-primary);">GST & Tax Liability Summary</h3>
+              <p style="font-size: 12px; color: var(--color-text-muted); margin: 2px 0 0 0;" id="gst-report-period-label">Period: This Month</p>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <label for="gst-preset-select" style="font-size: 13px; color: var(--color-text-muted);">Period Range:</label>
+              <select id="gst-preset-select" class="form-input" style="width: 180px; padding: 6px 10px;" onchange="loadGstFinancialSummary()">
+                <option value="this_month" selected>This Month</option>
+                <option value="previous_month">Previous Month</option>
+                <option value="this_quarter">This Quarter</option>
+                <option value="this_week">This Week</option>
+                <option value="financial_year">Current Financial Year</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="ca-kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-title">Total Sales (Turnover)</span>
+              <div class="kpi-num" id="kpi-sales" style="color: #10B981;">₹0.00</div>
+              <div class="kpi-desc" id="kpi-bills-count">0 counter bills</div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Output GST Collected</span>
+              <div class="kpi-num" id="kpi-output-gst" style="color: #38BDF8;">₹0.00</div>
+              <div class="kpi-desc">GSTR-1 Tax liability</div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Total Purchases</span>
+              <div class="kpi-num" id="kpi-purchases">₹0.00</div>
+              <div class="kpi-desc" id="kpi-purchases-count">0 vendor invoices</div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Input GST Claimable</span>
+              <div class="kpi-num" id="kpi-input-gst" style="color: #A78BFA;">₹0.00</div>
+              <div class="kpi-desc">ITC on purchased stock</div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-title">Net GST Payable</span>
+              <div class="kpi-num" id="kpi-net-gst" style="color: #F59E0B;">₹0.00</div>
+              <div class="kpi-desc">Output GST - Input GST</div>
+            </div>
+          </div>
+
+          <!-- HSN Code Breakdown Table -->
+          <div class="card" style="margin-top: 24px;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 class="panel-title">HSN-wise Medicine Tax Distribution</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">Itemized HSN breakdown ready for GSTR-1 Table 12 compliance.</p>
+              </div>
+              <span class="pill-tag" id="hsn-count-badge">0 HSN Codes</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>HSN Code</th>
+                    <th style="text-align: right;">Taxable Value (₹)</th>
+                    <th style="text-align: right;">CGST (₹)</th>
+                    <th style="text-align: right;">SGST (₹)</th>
+                    <th style="text-align: right;">IGST (₹)</th>
+                    <th style="text-align: right;">Total Tax (₹)</th>
+                    <th style="text-align: right;">Total Invoice (₹)</th>
+                  </tr>
+                </thead>
+                <tbody id="hsn-table-body">
+                  <tr>
+                    <td colspan="7" style="text-align: center; padding: 24px; color: var(--color-text-muted);">Loading HSN tax records...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Dispatch History & Audit Log -->
+        <div id="ca-tab-history" class="tab-pane" style="display: none;">
+          <div class="card">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 class="panel-title">CA Report Dispatch History</h3>
+                <p style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">Permanent chronological audit log of all tax packages shared with your CA.</p>
+              </div>
+              <input type="text" id="history-search-input" class="form-input" placeholder="🔍 Search recipient email or period..." style="width: 260px;" oninput="filterHistoryTable()">
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Dispatched On</th>
+                    <th>Recipient CA</th>
+                    <th>Date Range Label</th>
+                    <th>Reports Attached</th>
+                    <th style="text-align: center;">Delivery Status</th>
+                    <th>Sender / Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="history-table-body">
+                  <tr>
+                    <td colspan="6" style="text-align: center; padding: 24px; color: var(--color-text-muted);">Loading dispatch history...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CONFIGURE / EDIT CA PROFILE        -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="configure-ca-modal">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="ca-modal-title">Configure Chartered Accountant (CA)</h3>
+        <button type="button" class="modal-close" onclick="closeConfigureCaModal()">&times;</button>
+      </div>
+      <form id="ca-config-form" onsubmit="handleSaveCaProfile(event)">
+        <div class="modal-body">
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 16px;">
+            Enter your Chartered Accountant's firm contact information. Reports will be packaged as CSV files and delivered directly to this email address.
+          </p>
+          
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="ca-input-email" class="form-label" style="font-weight: 600;">CA Email Address <span style="color: #EF4444;">*</span></label>
+            <input type="email" id="ca-input-email" class="form-input" placeholder="e.g. ca.sharma@taxadvisory.in" required>
+            <small style="font-size: 11px; color: var(--color-text-muted);">The primary email address where tax registers and P&L packages will be sent.</small>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="ca-input-name" class="form-label">Firm or CA Name (Optional)</label>
+            <input type="text" id="ca-input-name" class="form-input" placeholder="e.g. Sharma & Associates CA">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="ca-input-phone" class="form-label">Phone / WhatsApp Number (Optional)</label>
+            <input type="text" id="ca-input-phone" class="form-input" placeholder="e.g. +91 98765 43210">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeConfigureCaModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-ca-submit" style="font-weight: 700;">Save CA Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: 1-CLICK SHARE REPORTS WITH CA      -->
+  <!-- ========================================== -->
+  <div class="modal-overlay" id="share-report-modal">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title">1-Click Share Reports with CA</h3>
+        <button type="button" class="modal-close" onclick="closeShareModal()">&times;</button>
+      </div>
+      <form id="share-ca-form" onsubmit="handleDispatchReportsToCa(event)">
+        <div class="modal-body">
+          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #10B981;">Sending Reports To:</span>
+              <div style="font-size: 14px; font-weight: 700; color: var(--color-text-primary);" id="share-target-email-display">Loading CA email...</div>
+            </div>
+            <button type="button" class="btn btn-secondary owner-only-btn" style="padding: 4px 10px; font-size: 12px;" onclick="closeShareModal(); openConfigureCaModal();">Change CA</button>
+          </div>
+
+          <!-- Date Range Selector -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="font-weight: 600;">Filing Period / Date Range</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <select id="share-date-preset" class="form-input" onchange="handleSharePresetChange()">
+                <option value="this_month" selected>This Month (Default)</option>
+                <option value="previous_month">Previous Month</option>
+                <option value="this_quarter">This Quarter</option>
+                <option value="this_week">This Week</option>
+                <option value="financial_year">Current Financial Year</option>
+                <option value="today">Today</option>
+                <option value="custom">Custom Date Range...</option>
+              </select>
+            </div>
+
+            <!-- Custom date fields -->
+            <div id="share-custom-dates-row" style="display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+              <div>
+                <label style="font-size: 11px; color: var(--color-text-muted);">Start Date</label>
+                <input type="date" id="share-start-date" class="form-input">
+              </div>
+              <div>
+                <label style="font-size: 11px; color: var(--color-text-muted);">End Date</label>
+                <input type="date" id="share-end-date" class="form-input">
+              </div>
+            </div>
+          </div>
+
+          <!-- Report Selection Checklist -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" style="font-weight: 600;">Select Reports to Attach (CSV Packages)</label>
+              <div style="display: flex; gap: 10px;">
+                <a href="javascript:void(0)" onclick="toggleAllReports(true)" style="font-size: 11px; color: var(--primary-green, #10B981); text-decoration: none; font-weight: 600;">Select All</a>
+                <span style="color: var(--border-color); font-size: 11px;">|</span>
+                <a href="javascript:void(0)" onclick="toggleAllReports(false)" style="font-size: 11px; color: var(--color-text-muted); text-decoration: none;">Deselect All</a>
+              </div>
+            </div>
+
+            <div class="report-selection-grid">
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="gst_summary" checked>
+                <div>
+                  <span class="report-check-title">GSTR-1 & GST Tax Summary</span>
+                  <span class="report-check-desc">Tax liability, CGST, SGST, IGST output calculations</span>
+                </div>
+              </label>
+
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="sales_register" checked>
+                <div>
+                  <span class="report-check-title">Sales Register</span>
+                  <span class="report-check-desc">Itemized patient invoices, payment modes, and discounts</span>
+                </div>
+              </label>
+
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="purchase_register" checked>
+                <div>
+                  <span class="report-check-title">Purchase Register</span>
+                  <span class="report-check-desc">Wholesaler invoices, input GST credit, and purchase costs</span>
+                </div>
+              </label>
+
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="hsn_summary" checked>
+                <div>
+                  <span class="report-check-title">HSN-wise Medicine Summary</span>
+                  <span class="report-check-desc">Mandatory Table 12 HSN code taxable value breakdown</span>
+                </div>
+              </label>
+
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="input_output_gst" checked>
+                <div>
+                  <span class="report-check-title">Input vs Output GST</span>
+                  <span class="report-check-desc">Net GST liability calculation for GSTR-3B return filing</span>
+                </div>
+              </label>
+
+              <label class="report-check-card">
+                <input type="checkbox" name="share_report" value="pnl_summary" checked>
+                <div>
+                  <span class="report-check-title">Pharmacy P&L Summary</span>
+                  <span class="report-check-desc">Turnover, Cost of Goods Sold, and Gross Profit estimate</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Custom Message -->
+          <div class="form-group">
+            <label for="share-custom-note" class="form-label" style="font-weight: 600;">Custom Message or Note to CA (Optional)</label>
+            <textarea id="share-custom-note" class="form-input" rows="3" placeholder="e.g. Dear CA Sir, please find attached our pharmacy GST & sales registers for return filing..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeShareModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-share-dispatch-submit" style="font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <span id="share-submit-text">Send Reports via Email</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+
+  <script>
+    let currentCaProfile = null;
+    let allShareHistory = [];
+    let isUserOwner = false;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Authenticate & Verify Permissions
+      try {
+        let user = null;
+        const cached = localStorage.getItem('expiryguard_cached_user_profile');
+        if (cached) {
+          user = JSON.parse(cached);
+        }
+        if (!user && api.getToken()) {
+          user = await api.getUserProfile();
+        }
+
+        if (user) {
+          const role = (user.role || 'OWNER').toUpperCase();
+          const perms = user.permissions || [];
+          isUserOwner = user.is_owner || role === 'OWNER' || role === 'ADMIN';
+
+          // Block roles without REPORT_VIEW or GST_VIEW
+          const hasAccess = isUserOwner || perms.includes('REPORT_VIEW') || perms.includes('GST_VIEW') || perms.includes('ACCOUNTING_VIEW') || perms.includes('*');
+          if (!hasAccess) {
+            alert('Access Denied: Your staff account does not have permission to view CA Connect.');
+            window.location.href = 'index.html';
+            return;
+          }
+
+          // Adjust UI for non-owner roles (e.g. Accountants cannot edit/disconnect CA profile)
+          if (!isUserOwner) {
+            document.querySelectorAll('.owner-only-btn').forEach(btn => {
+              btn.style.display = 'none';
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('User profile verification:', e);
+      }
+
+      // 2. Load all CA Connect data
+      await loadAllCaData();
+    });
+
+    async function loadAllCaData() {
+      // 0ms instant cached render from AppDataPreloader / memory cache before network
+      try {
+        const cachedProf = (window.AppDataPreloader ? window.AppDataPreloader.get('/ca/profile') : null)
+          || (window.api && typeof window.api.getCached === 'function' ? window.api.getCached('/ca/profile') : null);
+        if (cachedProf) {
+          currentCaProfile = cachedProf;
+          renderCaProfileCard(cachedProf);
+        }
+        const preset = document.getElementById('gst-preset-select')?.value || 'current_month';
+        const endpointGst = `/ca/financial-summary?preset=${preset}`;
+        const cachedGst = (window.AppDataPreloader ? window.AppDataPreloader.get(endpointGst) : null)
+          || (window.api && typeof window.api.getCached === 'function' ? window.api.getCached(endpointGst) : null);
+        if (cachedGst) {
+          renderGstDashboard(cachedGst);
+        }
+        const cachedHist = (window.AppDataPreloader ? window.AppDataPreloader.get('/ca/share-history?limit=50') : null)
+          || (window.api && typeof window.api.getCached === 'function' ? window.api.getCached('/ca/share-history?limit=50') : null);
+        if (Array.isArray(cachedHist) && cachedHist.length > 0) {
+          allShareHistory = cachedHist;
+          renderShareHistoryTable(allShareHistory);
+        }
+      } catch (e) {
+        console.warn('CA Connect cache read error:', e);
+      }
+
+      await Promise.allSettled([
+        loadCaProfile(),
+        loadGstFinancialSummary(),
+        loadShareHistory(),
+        loadGmailStatus()
+      ]);
+    }
+
+    // ==========================================
+    // CA PROFILE MANAGEMENT
+    // ==========================================
+
+    async function loadCaProfile() {
+      try {
+        currentCaProfile = await api.getCaProfile();
+        renderCaProfileCard(currentCaProfile);
+      } catch (err) {
+        console.error('Failed to load CA profile:', err);
+      }
+    }
+
+    function renderCaProfileCard(prof) {
+      const nameEl = document.getElementById('ca-display-name');
+      const emailEl = document.getElementById('ca-display-email');
+      const phoneEl = document.getElementById('ca-display-phone');
+      const phoneValEl = document.getElementById('ca-phone-val');
+      const badgeEl = document.getElementById('ca-status-badge');
+      const lastSharedContainer = document.getElementById('ca-last-shared-container');
+      const lastSharedTimeEl = document.getElementById('ca-last-shared-time');
+      const disconnectBtn = document.getElementById('btn-disconnect-ca');
+      const targetDisplay = document.getElementById('share-target-email-display');
+
+      if (prof && prof.ca_email) {
+        nameEl.textContent = prof.ca_name || 'Connected Chartered Accountant';
+        emailEl.innerHTML = `📧 <strong>${escapeHtml(prof.ca_email)}</strong>`;
+        
+        badgeEl.className = 'status-chip connected';
+        badgeEl.innerHTML = '<span>✓</span> Connected to CA';
+
+        if (prof.ca_phone) {
+          phoneEl.style.display = 'inline';
+          phoneValEl.textContent = prof.ca_phone;
+        } else {
+          phoneEl.style.display = 'none';
+        }
+
+        if (prof.last_shared_at) {
+          lastSharedContainer.style.display = 'inline';
+          lastSharedTimeEl.textContent = new Date(prof.last_shared_at).toLocaleString();
+        } else {
+          lastSharedContainer.style.display = 'none';
+        }
+
+        if (isUserOwner) {
+          disconnectBtn.style.display = 'inline-flex';
+        }
+        targetDisplay.textContent = prof.ca_email;
+      } else {
+        nameEl.textContent = 'No Chartered Accountant Connected';
+        emailEl.innerHTML = '📧 Configure your CA\'s email to enable 1-click sharing';
+        badgeEl.className = 'status-chip disconnected';
+        badgeEl.innerHTML = '<span>●</span> Not Connected';
+        phoneEl.style.display = 'none';
+        lastSharedContainer.style.display = 'none';
+        disconnectBtn.style.display = 'none';
+        targetDisplay.textContent = 'None configured (Please configure CA first)';
+      }
+    }
+
+    function openConfigureCaModal() {
+      const modal = document.getElementById('configure-ca-modal');
+      const titleEl = document.getElementById('ca-modal-title');
+      const emailInput = document.getElementById('ca-input-email');
+      const nameInput = document.getElementById('ca-input-name');
+      const phoneInput = document.getElementById('ca-input-phone');
+
+      if (currentCaProfile) {
+        titleEl.textContent = 'Edit Chartered Accountant (CA)';
+        emailInput.value = currentCaProfile.ca_email || '';
+        nameInput.value = currentCaProfile.ca_name || '';
+        phoneInput.value = currentCaProfile.ca_phone || '';
+      } else {
+        titleEl.textContent = 'Configure Chartered Accountant (CA)';
+        document.getElementById('ca-config-form').reset();
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeConfigureCaModal() {
+      document.getElementById('configure-ca-modal').classList.remove('active');
+    }
+
+    async function handleSaveCaProfile(e) {
+      e.preventDefault();
+      const email = document.getElementById('ca-input-email').value.trim();
+      const name = document.getElementById('ca-input-name').value.trim();
+      const phone = document.getElementById('ca-input-phone').value.trim();
+
+      const btn = document.getElementById('btn-save-ca-submit');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      try {
+        const payload = {
+          ca_email: email,
+          ca_name: name || null,
+          ca_phone: phone || null
+        };
+        const updated = await api.saveCaProfile(payload);
+        currentCaProfile = updated;
+        renderCaProfileCard(updated);
+        closeConfigureCaModal();
+        alert('CA details saved successfully!');
+      } catch (err) {
+        alert('Failed to save CA profile: ' + (err.detail || err.message || err));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save CA Profile';
+      }
+    }
+
+    async function confirmDisconnectCa() {
+      if (!confirm('Are you sure you want to disconnect this Chartered Accountant? Automatic report sharing will be paused until reconnected.')) {
+        return;
+      }
+      try {
+        await api.deleteCaProfile();
+        currentCaProfile = null;
+        renderCaProfileCard(null);
+        alert('CA profile disconnected.');
+      } catch (err) {
+        alert('Failed to disconnect CA: ' + (err.detail || err.message || err));
+      }
+    }
+
+    async function loadGmailStatus() {
+      try {
+        const res = await api.getGmailStatus();
+        const chip = document.getElementById('gmail-status-chip');
+        if (res && res.connected) {
+          chip.innerHTML = `<span>🟢 Connected via Gmail: <strong>${escapeHtml(res.google_email)}</strong></span>`;
+        } else {
+          chip.innerHTML = `<span>🔒 Email dispatch via: <strong>Direct Pharmacy Mail Gateway</strong></span>`;
+        }
+      } catch (e) {
+        // Fallback gracefully
+      }
+    }
+
+    // ==========================================
+    // GST & FINANCIAL REPORT SUMMARY
+    // ==========================================
+
+    async function loadGstFinancialSummary() {
+      const preset = document.getElementById('gst-preset-select').value;
+      const periodLabel = document.getElementById('gst-report-period-label');
+      const selectedOption = document.getElementById('gst-preset-select').selectedOptions[0];
+      if (selectedOption) {
+        periodLabel.textContent = `Period: ${selectedOption.textContent}`;
+      }
+
+      try {
+        const rep = await api.getGstFinancialSummary(preset);
+        renderGstDashboard(rep);
+      } catch (err) {
+        console.error('Failed to load GST financial summary:', err);
+      }
+    }
+
+    function renderGstDashboard(rep) {
+      document.getElementById('kpi-sales').textContent = `₹${(rep.total_sales || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      document.getElementById('kpi-bills-count').textContent = `${rep.total_bills || 0} patient bills`;
+
+      document.getElementById('kpi-output-gst').textContent = `₹${(rep.total_output_gst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      
+      document.getElementById('kpi-purchases').textContent = `₹${(rep.total_purchases || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      document.getElementById('kpi-purchases-count').textContent = `${rep.total_purchase_invoices || 0} vendor invoices`;
+
+      document.getElementById('kpi-input-gst').textContent = `₹${(rep.total_input_gst || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const netGst = rep.net_gst_payable || 0;
+      const netGstEl = document.getElementById('kpi-net-gst');
+      netGstEl.textContent = `₹${netGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (netGst <= 0) {
+        netGstEl.style.color = '#10B981';
+      } else {
+        netGstEl.style.color = '#F59E0B';
+      }
+
+      // Render HSN Table
+      const hsnList = rep.hsn_summary || [];
+      document.getElementById('hsn-count-badge').textContent = `${hsnList.length} HSN Codes`;
+      const tbody = document.getElementById('hsn-table-body');
+
+      if (hsnList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--color-text-muted);">No sales with itemized HSN codes recorded for this period.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = hsnList.map(item => `
+        <tr>
+          <td><strong style="font-family: monospace; color: #38BDF8;">${escapeHtml(item.hsn_code || 'N/A')}</strong></td>
+          <td style="text-align: right; font-family: monospace;">₹${(item.taxable_amount || 0).toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: var(--color-text-muted);">₹${(item.cgst_amount || 0).toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: var(--color-text-muted);">₹${(item.sgst_amount || 0).toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: var(--color-text-muted);">₹${(item.igst_amount || 0).toFixed(2)}</td>
+          <td style="text-align: right; font-weight: 700; font-family: monospace; color: #F59E0B;">₹${(item.total_tax || 0).toFixed(2)}</td>
+          <td style="text-align: right; font-weight: 700; font-family: monospace; color: #10B981;">₹${(item.total_amount || 0).toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ==========================================
+    // 1-CLICK REPORT SHARING
+    // ==========================================
+
+    function openShareModal() {
+      if (!currentCaProfile || !currentCaProfile.ca_email) {
+        if (isUserOwner) {
+          alert('Please configure your Chartered Accountant\'s email first before sharing reports.');
+          openConfigureCaModal();
+          return;
+        } else {
+          alert('No Chartered Accountant configured. Please ask the pharmacy owner to set up the CA contact details.');
+          return;
+        }
+      }
+
+      document.getElementById('share-target-email-display').textContent = currentCaProfile.ca_email;
+      document.getElementById('share-date-preset').value = 'this_month';
+      handleSharePresetChange();
+      toggleAllReports(true);
+      document.getElementById('share-report-modal').classList.add('active');
+    }
+
+    function closeShareModal() {
+      document.getElementById('share-report-modal').classList.remove('active');
+    }
+
+    function handleSharePresetChange() {
+      const preset = document.getElementById('share-date-preset').value;
+      const customRow = document.getElementById('share-custom-dates-row');
+      if (preset === 'custom') {
+        customRow.style.display = 'grid';
+      } else {
+        customRow.style.display = 'none';
+      }
+    }
+
+    function toggleAllReports(select) {
+      document.querySelectorAll('input[name="share_report"]').forEach(cb => {
+        cb.checked = select;
+      });
+    }
+
+    async function handleDispatchReportsToCa(e) {
+      e.preventDefault();
+
+      const selectedReports = Array.from(document.querySelectorAll('input[name="share_report"]:checked')).map(cb => cb.value);
+      if (selectedReports.length === 0) {
+        alert('Please select at least one report to share with your CA.');
+        return;
+      }
+
+      const preset = document.getElementById('share-date-preset').value;
+      let startDate = null;
+      let endDate = null;
+
+      if (preset === 'custom') {
+        startDate = document.getElementById('share-start-date').value;
+        endDate = document.getElementById('share-end-date').value;
+        if (!startDate || !endDate) {
+          alert('Please specify both Start Date and End Date for custom date range.');
+          return;
+        }
+      }
+
+      const customNote = document.getElementById('share-custom-note').value.trim();
+
+      const submitBtn = document.getElementById('btn-share-dispatch-submit');
+      const submitText = document.getElementById('share-submit-text');
+      submitBtn.disabled = true;
+      submitText.textContent = 'Compiling & Sending...';
+
+      try {
+        const payload = {
+          reports: selectedReports,
+          date_range_preset: preset,
+          start_date: startDate,
+          end_date: endDate,
+          custom_message: customNote || null
+        };
+
+        const res = await api.shareReportsWithCa(payload);
+        closeShareModal();
+        alert(`Success: ${res.message || 'Reports shared with CA successfully!'}`);
+
+        // Refresh profile to show last shared timestamp and reload history
+        await loadCaProfile();
+        await loadShareHistory();
+      } catch (err) {
+        alert('Failed to dispatch reports: ' + (err.detail || err.message || err));
+      } finally {
+        submitBtn.disabled = false;
+        submitText.textContent = 'Send Reports via Email';
+      }
+    }
+
+    // ==========================================
+    // DISPATCH HISTORY & AUDIT LOG
+    // ==========================================
+
+    async function loadShareHistory() {
+      try {
+        allShareHistory = await api.getCaShareHistory();
+        renderHistoryTable(allShareHistory);
+      } catch (err) {
+        console.error('Failed to load sharing history:', err);
+      }
+    }
+
+    function renderHistoryTable(list) {
+      const tbody = document.getElementById('history-table-body');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--color-text-muted);">No reports have been shared with your CA yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => {
+        const statusClass = (item.status || '').toLowerCase() === 'sent' ? 'sent' : 'composed';
+        const dateStr = item.sent_at ? new Date(item.sent_at).toLocaleString() : 'N/A';
+        const reports = Array.isArray(item.reports_shared) ? item.reports_shared : [item.reports_shared];
+
+        return `
+          <tr>
+            <td style="white-space: nowrap; font-size: 13px;">${dateStr}</td>
+            <td><strong>${escapeHtml(item.ca_email)}</strong></td>
+            <td><span class="pill-tag">${escapeHtml(item.date_range_label || 'Period')}</span></td>
+            <td>
+              ${reports.map(r => `<span class="pill-tag" style="background: rgba(16, 185, 129, 0.1); color: #34D399; border-color: rgba(16, 185, 129, 0.2);">${escapeHtml(r)}</span>`).join(' ')}
+            </td>
+            <td style="text-align: center;">
+              <span class="history-status-badge ${statusClass}">${escapeHtml(item.status || 'COMPOSED')}</span>
+            </td>
+            <td style="font-size: 12px; color: var(--color-text-muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${escapeHtml(item.notes || 'Dispatched via system gateway')}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterHistoryTable() {
+      const q = document.getElementById('history-search-input').value.toLowerCase().trim();
+      if (!q) {
+        renderHistoryTable(allShareHistory);
+        return;
+      }
+      const filtered = allShareHistory.filter(item => {
+        const emailMatch = (item.ca_email || '').toLowerCase().includes(q);
+        const labelMatch = (item.date_range_label || '').toLowerCase().includes(q);
+        const notesMatch = (item.notes || '').toLowerCase().includes(q);
+        return emailMatch || labelMatch || notesMatch;
+      });
+      renderHistoryTable(filtered);
+    }
+
+    // ==========================================
+    // TAB NAVIGATION
+    // ==========================================
+
+    function switchCaTab(tabName) {
+      document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.tab-header-btn').forEach(b => b.classList.remove('active'));
+
+      if (tabName === 'history') {
+        document.getElementById('ca-tab-history').style.display = 'block';
+        document.getElementById('tab-btn-history').classList.add('active');
+      } else {
+        document.getElementById('ca-tab-dashboard').style.display = 'block';
+        document.getElementById('tab-btn-dashboard').classList.add('active');
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

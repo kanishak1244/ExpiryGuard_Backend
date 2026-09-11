@@ -15,6 +15,9 @@ Extract ALL of the following fields in strict valid JSON:
 {
   "supplier_name": "Supplier or Distributor Name (string or empty)",
   "supplier_gstin": "Supplier GSTIN number if present (string or empty)",
+  "supplier_phone": "Supplier phone number if present (string or empty)",
+  "supplier_email": "Supplier email address if present (string or empty)",
+  "supplier_address": "Supplier physical address if present (string or empty)",
   "invoice_number": "Invoice / Bill Number (e.g. CA006418, INV-2048) (string or empty)",
   "invoice_date": "Invoice date formatted strictly as YYYY-MM-DD (e.g. 2026-07-29). If only DD-MM-YYYY or DD/MM/YYYY is shown, convert it to YYYY-MM-DD.",
   "total_amount": 0.0,

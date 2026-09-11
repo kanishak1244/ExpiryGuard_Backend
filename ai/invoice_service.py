@@ -8,10 +8,15 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google import genai
 from google.genai import types
 
 from ai.prompts.invoice_prompt import INVOICE_PROMPT
+from ai.gemini_service import (
+    client,
+    GEMINI_PRIMARY_MODEL,
+    log_ai_metrics,
+    optimize_image,
+)
 
 logger = logging.getLogger("expiryguard.ocr")
 if not logger.handlers:
@@ -20,20 +25,11 @@ if not logger.handlers:
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-API_KEY = os.getenv("GEMINI_API_KEY")
-INVOICE_MODEL = os.getenv("GEMINI_INVOICE_MODEL", "gemini-3.6-flash")
-
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in .env")
-
-client = genai.Client(api_key=API_KEY)
-
 
 def _safe_float(value, default: float = 0.0) -> float:
     try:
         if value in ("", None):
             return default
-        # Remove currency symbols or commas if present
         clean_val = re.sub(r"[^\d.-]", "", str(value))
         return float(clean_val) if clean_val else default
     except Exception:
@@ -53,35 +49,25 @@ def _safe_int(value, default: int = 1) -> int:
 def _normalize_date(date_str: str) -> str:
     """
     Normalizes various date formats to ISO YYYY-MM-DD.
-    Examples:
-      - '2026-07-29' -> '2026-07-29'
-      - '29-07-2026' or '29/07/2026' -> '2026-07-29'
-      - '3/28' or '03/28' -> '2028-03-01'
-      - '09/2028' -> '2028-09-01'
     """
     if not date_str or not isinstance(date_str, str):
         return ""
     
     clean = date_str.strip()
-    
-    # 1. Already YYYY-MM-DD
     if re.match(r"^\d{4}-\d{2}-\d{2}$", clean):
         return clean
     
-    # 2. DD-MM-YYYY or DD/MM/YYYY
     m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", clean)
     if m:
         day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
         return f"{year:04d}-{month:02d}-{day:02d}"
     
-    # 3. MM/YY or MM-YY (e.g., 3/28 -> 2028-03-01)
     m = re.match(r"^(\d{1,2})[-/](\d{2})$", clean)
     if m:
         month, short_year = int(m.group(1)), int(m.group(2))
         full_year = 2000 + short_year
         return f"{full_year:04d}-{month:02d}-01"
     
-    # 4. MM/YYYY or MM-YYYY (e.g., 09/2028 -> 2028-09-01)
     m = re.match(r"^(\d{1,2})[-/](\d{4})$", clean)
     if m:
         month, year = int(m.group(1)), int(m.group(2))
@@ -123,25 +109,32 @@ def _normalize_item(item: dict) -> dict:
     }
 
 
+def validate_invoice_data(data: dict) -> bool:
+    """
+    Validates parsed invoice JSON structures.
+    Requires at least one item row to pass.
+    """
+    if not isinstance(data, dict):
+        return False
+    items = data.get("items")
+    if not isinstance(items, list) or len(items) == 0:
+        return False
+    first_item = items[0]
+    if not isinstance(first_item, dict) or not first_item.get("product_name"):
+        return False
+    return True
+
+
 def scan_invoice(image_path: str) -> dict:
     """
     Scan supplier invoice using Gemini Vision.
-    Returns:
-    {
-        "success": bool,
-        "data": {
-            "supplier_name": str,
-            "supplier_gstin": str,
-            "invoice_number": str,
-            "invoice_date": str,
-            "total_amount": float,
-            "subtotal": float,
-            "tax_amount": float,
-            "items": list[dict]
-        },
-        "error": str | None
-    }
+    Features image optimization, schema validation, and retry logic.
     """
+    start_time = time.time()
+    
+    # 1. Optimize Image (Resize & Compress)
+    optimize_image(image_path)
+
     image_file = Path(image_path)
     if not image_file.exists():
         logger.error(f"[OCR] File not found: {image_path}")
@@ -153,24 +146,21 @@ def scan_invoice(image_path: str) -> dict:
 
     mime_type, _ = mimetypes.guess_type(image_file)
     if mime_type is None:
-        if image_file.suffix.lower() == ".pdf":
-            mime_type = "application/pdf"
-        else:
-            mime_type = "image/jpeg"
+        mime_type = "application/pdf" if image_file.suffix.lower() == ".pdf" else "image/jpeg"
 
     image_bytes = image_file.read_bytes()
-    logger.info(f"[OCR:START] Scanning invoice document: {image_path} ({len(image_bytes)} bytes, mime: {mime_type}) using {INVOICE_MODEL}")
+    logger.info(f"[OCR:START] Scanning invoice document: {image_path} ({len(image_bytes)} bytes, mime: {mime_type})")
 
-    for attempt in range(3):
+    last_error = None
+    target_model = GEMINI_PRIMARY_MODEL
+
+    for attempt in range(2):
         try:
             response = client.models.generate_content(
-                model=INVOICE_MODEL,
+                model=target_model,
                 contents=[
                     INVOICE_PROMPT,
-                    types.Part.from_bytes(
-                        data=image_bytes,
-                        mime_type=mime_type,
-                    ),
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 ],
                 config=types.GenerateContentConfig(
                     temperature=0.0,
@@ -181,13 +171,16 @@ def scan_invoice(image_path: str) -> dict:
             raw_text = response.text or "{}"
             logger.info(f"[OCR:RAW_RESPONSE]\n{raw_text}")
 
-            # Clean potential code block fences if any slipped through
             cleaned_text = raw_text.strip()
             if cleaned_text.startswith("```"):
-                cleaned_text = re.sub(r"^```(?:json)?\s*", "", cleaned_text)
+                cleaned_text = re.sub(r"^```(?:json)?\s*", "", cleaned_text, flags=re.IGNORECASE)
                 cleaned_text = re.sub(r"\s*```$", "", cleaned_text)
 
             result = json.loads(cleaned_text)
+
+            # Validate invoice structure
+            if not validate_invoice_data(result):
+                raise ValueError("Extracted invoice JSON failed schema validation (no items found).")
 
             # Extract header metadata
             raw_inv_date = result.get("invoice_date", "")
@@ -198,18 +191,18 @@ def scan_invoice(image_path: str) -> dict:
             raw_tax = _safe_float(result.get("tax_amount"))
 
             raw_items = result.get("items", [])
-            if not isinstance(raw_items, list):
-                raw_items = []
-
             normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
 
-            # If total_amount wasn't detected but items have prices, compute sum
+            # Compute total if missing
             if raw_total == 0.0 and normalized_items:
                 raw_total = round(sum(it["total_price"] for it in normalized_items), 2)
 
             invoice = {
                 "supplier_name": str(result.get("supplier_name") or "").strip(),
                 "supplier_gstin": str(result.get("supplier_gstin") or "").strip(),
+                "supplier_phone": str(result.get("supplier_phone") or "").strip(),
+                "supplier_email": str(result.get("supplier_email") or "").strip(),
+                "supplier_address": str(result.get("supplier_address") or "").strip(),
                 "invoice_number": str(result.get("invoice_number") or "").strip(),
                 "invoice_date": norm_inv_date,
                 "total_amount": raw_total,
@@ -223,6 +216,12 @@ def scan_invoice(image_path: str) -> dict:
                 f"Supplier: '{invoice['supplier_name']}' | Total: ₹{invoice['total_amount']} | Line Items: {len(normalized_items)}"
             )
 
+            latency = time.time() - start_time
+            in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+            out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+            
+            log_ai_metrics("/documents/{id}/ocr", "invoice", target_model, True, False, latency, in_tokens, out_tokens)
+
             return {
                 "success": True,
                 "data": invoice,
@@ -230,15 +229,19 @@ def scan_invoice(image_path: str) -> dict:
             }
 
         except Exception as e:
-            error_msg = str(e)
-            logger.warning(f"[OCR:ATTEMPT_{attempt+1}_FAILED] {error_msg}")
-            if "429" in error_msg and attempt < 2:
-                time.sleep(2 ** attempt)
-                continue
+            last_error = str(e)
+            logger.warning(f"[OCR_WARNING] Model {target_model} attempt {attempt+1} failed: {e}")
+            
+            is_transient = any(code in last_error for code in ("429", "503", "500", "UNAVAILABLE"))
+            if not is_transient:
+                break
+            time.sleep(0.5 * (2 ** attempt))
 
-            logger.error(f"[OCR:FINAL_ERROR] Failed to extract invoice: {error_msg}")
-            return {
-                "success": False,
-                "data": None,
-                "error": error_msg
-            }
+    # All attempts failed
+    latency = time.time() - start_time
+    log_ai_metrics("/documents/{id}/ocr", "invoice", GEMINI_PRIMARY_MODEL, False, False, latency, error=last_error)
+    return {
+        "success": False,
+        "data": None,
+        "error": "Dawaiflow AI was unable to parse this invoice. Please ensure the image is clear or upload an Excel/CSV file."
+    }

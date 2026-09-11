@@ -4,6 +4,33 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Inventory — ExpiryGuard Web App</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
   <link rel="stylesheet" href="css/styles.css?v=9.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,17 +64,9 @@
           <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           <span class="nav-text">Billing / Live Sales</span>
         </a>
-        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
-          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          <span class="nav-text">AI Camera Billing</span>
-        </a>
         <a href="inventory.html" class="nav-item active" data-nav-id="inventory">
           <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
           <span class="nav-text">Live Inventory</span>
-        </a>
-        <a href="restock.html" class="nav-item" data-nav-id="restock">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          <span class="nav-text">Restock Suggestions</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -60,6 +79,10 @@
         <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
           <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
           <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
         </a>
         <a href="returns.html" class="nav-item" data-nav-id="returns">
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
@@ -94,6 +117,9 @@
           <p style="font-size: 13px; color: var(--muted-text);">Manage active medicine stock, batch numbers, FEFO expiry tracking, and loose tablet pricing.</p>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
+          <a href="smart_restock.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: #0D9488; color: #0D9488; font-weight: 600;" title="Open Smart Restock / Inventory Decision Engine">
+            <span>🧠 Smart Restock</span>
+          </a>
           <a href="/api/inventory/import-template" download="ExpiryGuard_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Standardized Excel Import Template">
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Template (.xlsx)</span>
@@ -112,6 +138,42 @@
 
       <main class="content-body">
         
+        <!-- Smart KPI Summary Cards -->
+        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('all')">
+            <span class="stat-label" style="font-size: 11px;">Total Products</span>
+            <div class="stat-value" id="kpi-total-products" style="font-size: 20px;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('all')">
+            <span class="stat-label" style="font-size: 11px;">Stock Capital</span>
+            <div class="stat-value" id="kpi-stock-value" style="font-size: 20px; color: #0D9488;">₹0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('expiring')">
+            <span class="stat-label" style="font-size: 11px;">Expiring 30d</span>
+            <div class="stat-value" id="kpi-expiring-soon" style="font-size: 20px; color: #D97706;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('expired')">
+            <span class="stat-label" style="font-size: 11px;">Expired</span>
+            <div class="stat-value" id="kpi-expired" style="font-size: 20px; color: #DC2626;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('lowstock')">
+            <span class="stat-label" style="font-size: 11px;">Low Stock</span>
+            <div class="stat-value" id="kpi-low-stock" style="font-size: 20px; color: #B45309;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('deadstock')">
+            <span class="stat-label" style="font-size: 11px;">Dead Stock</span>
+            <div class="stat-value" id="kpi-dead-stock" style="font-size: 20px; color: #4F46E5;">0</div>
+          </div>
+        </div>
+
+        <!-- Inventory Needs Attention Action Center -->
+        <div id="inventory-attention-banner" style="display: none; margin-bottom: 16px; padding: 12px 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warning); border-radius: var(--radius-md);">
+          <div style="font-weight: 700; font-size: 13px; color: var(--color-text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>⚡ Inventory Needs Attention</span>
+          </div>
+          <div id="inventory-attention-chips" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+        </div>
+
         <div class="panel">
           
           <!-- Search & Filter Controls -->
@@ -161,6 +223,25 @@
                 <tr><td colspan="8" style="text-align: center; color: var(--muted-text); padding: 24px;">Loading inventory items...</td></tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination Control Bar -->
+          <div id="inventory-pagination-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color, #E2E8F0); flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+            <div style="font-size: 13px; color: var(--color-text-muted, #64748B);">
+              Showing <strong id="pagination-range-info" style="color: var(--color-text-primary, #0F172A);">0-0</strong> of <strong id="pagination-total-count" style="color: var(--color-text-primary, #0F172A);">0</strong> items
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button id="btn-page-prev" class="btn btn-secondary" style="padding: 5px 12px; font-size: 12.5px;" onclick="changeInventoryPage(-1)" disabled>« Previous</button>
+              <span style="font-size: 13px; font-weight: 600; color: var(--color-text-primary, #0F172A);">
+                Page <span id="pagination-current-page">1</span> of <span id="pagination-total-pages">1</span>
+              </span>
+              <button id="btn-page-next" class="btn btn-secondary" style="padding: 5px 12px; font-size: 12.5px;" onclick="changeInventoryPage(1)" disabled>Next »</button>
+              <select id="pagination-limit-select" class="form-input" style="padding: 4px 8px; font-size: 12.5px; width: auto;" onchange="changeInventoryPageSize(this.value)">
+                <option value="50" selected>50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="200">200 per page</option>
+              </select>
+            </div>
           </div>
 
         </div>
@@ -216,6 +297,7 @@
   </div>
 
       <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
   <script src="js/nav.js?v=9.0"></script>
   <script src="js/confirm_modal.js?v=9.0"></script>
   <script src="js/app.js?v=9.0"></script>

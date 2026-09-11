@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Restock — ExpiryGuard Web App</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-critical { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+    .badge-soon { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+    .badge-expiry { background: #FFF7ED; color: #C2410C; border: 1px solid #FFEDD5; }
+    .badge-slow { background: #EEF2FF; color: #3730A3; border: 1px solid #C7D2FE; }
+    .badge-dead { background: #F1F5F9; color: #475569; border: 1px solid #CBD5E1; }
+    .badge-overstock { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+    .badge-healthy { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+
+    .score-circle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-weight: 800;
+      font-size: 15px;
+      background: var(--bg-card);
+      border: 3px solid var(--border-color);
+    }
+    .score-critical { color: #DC2626; border-color: #FCA5A5; }
+    .score-warning { color: #D97706; border-color: #FCD34D; }
+    .score-info { color: #2563EB; border-color: #93C5FD; }
+    .score-safe { color: #059669; border-color: #6EE7B7; }
+
+    .rec-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 14px;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    .rec-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary-green);
+    }
+
+    .metrics-pill-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      background: var(--bg-main);
+      padding: 12px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+    .metric-pill-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .metric-pill-label {
+      font-size: 11px;
+      color: var(--muted-text);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .metric-pill-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="smart-restock-page">
+    
+    <!-- Canonical Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <!-- Rendered dynamically by nav.js -->
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">🧠 Smart Restock & Inventory Intelligence</h1>
+          <p style="font-size: 13px; color: var(--muted-text);">Know what to restock, what to clear, and what to return before stockouts or capital loss occur.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <a href="inventory.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+            <span>📦 Live Inventory</span>
+          </a>
+          <button class="btn btn-primary" onclick="createSupplierPurchaseDraft()">+ Create Purchase Draft</button>
+          <div class="live-indicator">
+            <div class="pulse-dot"></div>
+            <span>DECISION ENGINE ACTIVE</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="content-body">
+        
+        <!-- Summary KPI Cards -->
+        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #DC2626;" onclick="filterPriority('CRITICAL_RESTOCK')">
+            <span class="stat-label" style="font-size: 11px;">Critical Restock</span>
+            <div class="stat-value" id="kpi-critical" style="font-size: 20px; color: #DC2626;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #D97706;" onclick="filterPriority('RESTOCK_SOON')">
+            <span class="stat-label" style="font-size: 11px;">Restock Soon</span>
+            <div class="stat-value" id="kpi-soon" style="font-size: 20px; color: #D97706;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #C2410C;" onclick="filterPriority('EXPIRY_RISK')">
+            <span class="stat-label" style="font-size: 11px;">Expiry Risk</span>
+            <div class="stat-value" id="kpi-expiry-risk" style="font-size: 20px; color: #C2410C;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #3730A3;" onclick="filterPriority('SLOW_MOVING')">
+            <span class="stat-label" style="font-size: 11px;">Slow Moving</span>
+            <div class="stat-value" id="kpi-slow" style="font-size: 20px; color: #3730A3;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #475569;" onclick="filterPriority('DEAD_STOCK')">
+            <span class="stat-label" style="font-size: 11px;">Dead Stock</span>
+            <div class="stat-value" id="kpi-dead" style="font-size: 20px; color: #475569;">0</div>
+          </div>
+          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #059669;" onclick="filterPriority('OVERSTOCK')">
+            <span class="stat-label" style="font-size: 11px;">Overstock</span>
+            <div class="stat-value" id="kpi-overstock" style="font-size: 20px; color: #059669;">0</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="panel" style="margin-bottom: 16px; padding: 14px 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <input type="text" id="restock-search" class="form-input" style="max-width: 260px;" placeholder="🔍 Search medicine or brand...">
+              
+              <select id="filter-priority" class="form-input" style="width: auto;" onchange="applyFilters()">
+                <option value="ALL">All Priority Levels</option>
+                <option value="CRITICAL_RESTOCK">🔴 Critical Restock</option>
+                <option value="RESTOCK_SOON">🟡 Restock Soon</option>
+                <option value="EXPIRY_RISK">🟠 Expiry Risk</option>
+                <option value="SLOW_MOVING">🔵 Slow Moving</option>
+                <option value="DEAD_STOCK">⚪ Dead Stock</option>
+                <option value="OVERSTOCK">🟢 Overstock</option>
+              </select>
+
+              <select id="filter-supplier" class="form-input" style="width: auto;" onchange="applyFilters()">
+                <option value="">All Suppliers</option>
+              </select>
+
+              <select id="filter-sort" class="form-input" style="width: auto;" onchange="applyFilters()">
+                <option value="priority">Ranked Priority (Recommended)</option>
+                <option value="urgency">Highest Urgency Score</option>
+                <option value="at_risk_value">Highest Value at Risk (₹)</option>
+                <option value="suggested_qty">Highest Suggested Order Qty</option>
+                <option value="demand">Fastest Moving (Highest Demand)</option>
+              </select>
+            </div>
+
+            <div style="font-size: 13px; color: var(--muted-text);">
+              Showing <strong id="rec-count-display">0</strong> decisions
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations Container -->
+        <div id="recommendations-container">
+          <div style="text-align: center; padding: 40px; color: var(--muted-text);">
+            <div style="font-size: 36px; margin-bottom: 10px;">🧠</div>
+            <div>Analyzing sales velocity, current stock & supplier lead times...</div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/add_inventory_flow.js?v=9.0"></script>
+
+  <script>
+    let allRecommendations = [];
+    let suppliersList = [];
+
+    function populateSuppliersFilter(suppliers) {
+      if (!Array.isArray(suppliers)) return;
+      suppliersList = suppliers;
+      const sel = document.getElementById('filter-supplier');
+      if (sel) {
+        sel.innerHTML = '<option value="">All Suppliers</option>' +
+          suppliersList.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 0ms instant cached render from memory/sessionStorage/localStorage
+      try {
+        const cachedSuppliers = (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/suppliers')) ||
+          (localStorage.getItem('expiryguard_cached_suppliers') ? JSON.parse(localStorage.getItem('expiryguard_cached_suppliers')) : null);
+        if (cachedSuppliers) {
+          populateSuppliersFilter(cachedSuppliers);
+        }
+        const cachedIntel = (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/inventory/intelligence?limit=150')) ||
+          (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/inventory/intelligence')) ||
+          (localStorage.getItem('expiryguard_cached_intel') ? JSON.parse(localStorage.getItem('expiryguard_cached_intel')) : null);
+        if (cachedIntel) {
+          allRecommendations = cachedIntel.recommendations || [];
+          renderSummaryKPIs(cachedIntel.summary || {});
+          applyFilters();
+        }
+      } catch (e) {
+        console.warn('Smart restock cache read error:', e);
+      }
+
+      // Parallel background revalidation
+      loadSuppliers();
+      loadSmartRestockData();
+
+      const searchInput = document.getElementById('restock-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          applyFilters();
+        });
+      }
+    });
+
+    async function loadSuppliers() {
+      try {
+        const sups = await api.getSuppliers();
+        populateSuppliersFilter(sups);
+      } catch (e) {
+        console.warn('Failed to load suppliers:', e);
+      }
+    }
+
+    async function loadSmartRestockData() {
+      try {
+        const res = await api.getInventoryIntelligence({ limit: 150 });
+        if (res) {
+          allRecommendations = res.recommendations || [];
+          renderSummaryKPIs(res.summary || {});
+          applyFilters();
+        }
+      } catch (err) {
+        console.error('Failed to load Smart Restock decisions:', err);
+        if (!allRecommendations || allRecommendations.length === 0) {
+          document.getElementById('recommendations-container').innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--error-red);">
+              ⚠️ Failed to load Smart Restock decision engine: ${err.message}
+            </div>
+          `;
+        }
+      }
+    }
+
+    function renderSummaryKPIs(summary) {
+      document.getElementById('kpi-critical').textContent = summary.critical_restock || 0;
+      document.getElementById('kpi-soon').textContent = summary.restock_soon || 0;
+      document.getElementById('kpi-expiry-risk').textContent = summary.expiry_risk || 0;
+      document.getElementById('kpi-slow').textContent = summary.slow_moving || 0;
+      document.getElementById('kpi-dead').textContent = summary.dead_stock || 0;
+      document.getElementById('kpi-overstock').textContent = summary.overstock || 0;
+    }
+
+    function filterPriority(level) {
+      const sel = document.getElementById('filter-priority');
+      if (sel) sel.value = level;
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const q = (document.getElementById('restock-search')?.value || '').toLowerCase().trim();
+      const priorityFilter = document.getElementById('filter-priority')?.value || 'ALL';
+      const supplierFilter = document.getElementById('filter-supplier')?.value || '';
+      const sortFilter = document.getElementById('filter-sort')?.value || 'priority';
+
+      let filtered = [...allRecommendations];
+
+      if (q) {
+        filtered = filtered.filter(r => 
+          (r.product_name || '').toLowerCase().includes(q) ||
+          (r.brand || '').toLowerCase().includes(q) ||
+          (r.batch_number || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (priorityFilter !== 'ALL') {
+        filtered = filtered.filter(r => r.priority_level === priorityFilter);
+      }
+
+      if (supplierFilter) {
+        const supId = parseInt(supplierFilter, 10);
+        filtered = filtered.filter(r => r.supplier_id === supId);
+      }
+
+      // Sorting
+      if (sortFilter === 'urgency') {
+        filtered.sort((a, b) => b.priority_score - a.priority_score);
+      } else if (sortFilter === 'at_risk_value') {
+        filtered.sort((a, b) => (b.at_risk_value || 0) - (a.at_risk_value || 0));
+      } else if (sortFilter === 'suggested_qty') {
+        filtered.sort((a, b) => (b.suggested_order_quantity || 0) - (a.suggested_order_quantity || 0));
+      } else if (sortFilter === 'demand') {
+        filtered.sort((a, b) => (b.daily_demand || 0) - (a.daily_demand || 0));
+      } else {
+        filtered.sort((a, b) => a.rank - b.rank);
+      }
+
+      document.getElementById('rec-count-display').textContent = filtered.length;
+      renderRecommendations(filtered);
+    }
+
+    function renderRecommendations(recs) {
+      const container = document.getElementById('recommendations-container');
+      if (!recs || recs.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-size: 40px; margin-bottom: 10px;">🟢</div>
+            <h3 style="margin-bottom: 6px;">All Clear! No Restock Actions Needed</h3>
+            <p style="font-size: 13px; color: var(--muted-text); max-width: 420px; margin: 0 auto;">
+              All inventory levels are healthy with zero critical stockouts or unmanaged expiry risks detected.
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = recs.map(item => {
+        let badgeClass = 'badge-healthy';
+        let badgeIcon = '🟢';
+        let levelLabel = 'HEALTHY';
+        let scoreClass = 'score-safe';
+
+        if (item.priority_level === 'CRITICAL_RESTOCK') {
+          badgeClass = 'badge-critical'; badgeIcon = '🔴'; levelLabel = 'CRITICAL RESTOCK'; scoreClass = 'score-critical';
+        } else if (item.priority_level === 'RESTOCK_SOON') {
+          badgeClass = 'badge-soon'; badgeIcon = '🟡'; levelLabel = 'RESTOCK SOON'; scoreClass = 'score-warning';
+        } else if (item.priority_level === 'EXPIRY_RISK') {
+          badgeClass = 'badge-expiry'; badgeIcon = '🟠'; levelLabel = 'EXPIRY RISK'; scoreClass = 'score-critical';
+        } else if (item.priority_level === 'SLOW_MOVING') {
+          badgeClass = 'badge-slow'; badgeIcon = '🔵'; levelLabel = 'SLOW MOVING'; scoreClass = 'score-info';
+        } else if (item.priority_level === 'DEAD_STOCK') {
+          badgeClass = 'badge-dead'; badgeIcon = '⚪'; levelLabel = 'DEAD STOCK'; scoreClass = 'score-info';
+        } else if (item.priority_level === 'OVERSTOCK') {
+          badgeClass = 'badge-overstock'; badgeIcon = '🟢'; levelLabel = 'OVERSTOCK'; scoreClass = 'score-safe';
+        }
+
+        const daysStockText = item.days_of_stock !== null && item.days_of_stock !== undefined ? `${item.days_of_stock} days` : 'No Recent Sales';
+
+        return `
+          <div class="rec-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="score-circle ${scoreClass}" title="Unified Risk Priority Score">${item.priority_score}</div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span class="priority-badge ${badgeClass}">${badgeIcon} ${levelLabel}</span>
+                    <span style="font-size: 12px; color: var(--muted-text);">#${item.rank} Priority</span>
+                    <span style="font-size: 11.5px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; color: var(--muted-text);">
+                      Confidence: ${item.confidence}
+                    </span>
+                  </div>
+                  <h3 style="margin: 6px 0 2px 0; font-size: 18px; color: var(--color-text-primary);">${window.escapeHtml(item.product_name)}</h3>
+                  <div style="font-size: 12.5px; color: var(--muted-text);">
+                    Batch: <strong>${window.escapeHtml(item.batch_number)}</strong> | Supplier: <strong>${window.escapeHtml(item.supplier_name)}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                ${item.priority_level.includes('RESTOCK') ? `
+                  <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12.5px;" onclick="addToPurchaseDraft(${item.product_id}, '${window.escapeHtml(item.product_name).replace(/'/g, "\\'")}', ${item.suggested_order_quantity}, ${item.supplier_id || 'null'})">
+                    + Add ${item.suggested_order_quantity} Units to Purchase
+                  </button>
+                ` : ''}
+                ${item.priority_level === 'EXPIRY_RISK' ? `
+                  <button class="btn btn-secondary" style="padding: 6px 14px; font-size: 12.5px; color: #C2410C; border-color: #FFEDD5;" onclick="triggerExpiryReturn(${item.product_id}, '${window.escapeHtml(item.product_name).replace(/'/g, "\\'")}', ${item.at_risk_expiry_qty})">
+                    🔄 Create Supplier Return
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+
+            <div class="metrics-pill-grid">
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Current Stock</span>
+                <span class="metric-pill-val">${item.current_stock} units</span>
+              </div>
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Daily Demand</span>
+                <span class="metric-pill-val">${item.daily_demand} / day</span>
+              </div>
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Days of Stock</span>
+                <span class="metric-pill-val">${daysStockText}</span>
+              </div>
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Lead Time</span>
+                <span class="metric-pill-val">${item.supplier_lead_time_days} days</span>
+              </div>
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Suggested Order</span>
+                <span class="metric-pill-val" style="color: var(--primary-green);">${item.suggested_order_quantity} units</span>
+              </div>
+              <div class="metric-pill-item">
+                <span class="metric-pill-label">Capital at Risk</span>
+                <span class="metric-pill-val" style="color: ${item.at_risk_value > 0 ? '#DC2626' : 'var(--muted-text)'};">₹${item.at_risk_value.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div style="background: rgba(15, 23, 42, 0.4); border-left: 3px solid var(--primary-green); padding: 8px 12px; border-radius: 4px; font-size: 13px; color: var(--color-text-primary);">
+              💡 <strong>Why:</strong> ${window.escapeHtml(item.reason)}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addToPurchaseDraft(productId, productName, qty, supplierId) {
+      if (typeof openAddInventoryModal === 'function') {
+        openAddInventoryModal();
+        showSearchMedicineStep();
+        const searchBox = document.getElementById('inv-flow-search');
+        if (searchBox) {
+          searchBox.value = productName;
+          searchBox.dispatchEvent(new Event('input'));
+        }
+      } else {
+        alert(`Added ${qty} units of ${productName} to purchase draft.`);
+      }
+    }
+
+    function triggerExpiryReturn(productId, productName, atRiskQty) {
+      window.location.href = `suppliers.html?product_id=${productId}&action=return`;
+    }
+
+    function createSupplierPurchaseDraft() {
+      if (typeof openAddInventoryModal === 'function') {
+        openAddInventoryModal();
+        showChoiceStep();
+      }
+    }
+  </script>
+</body>
+</html>

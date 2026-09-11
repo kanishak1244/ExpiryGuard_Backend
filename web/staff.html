@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff & Users Management — ExpiryGuard</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-owner {
+      background: rgba(139, 92, 246, 0.15);
+      color: #8B5CF6;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+    .role-pharmacist {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3B82F6;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .role-billing {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .role-inventory {
+      background: rgba(245, 158, 11, 0.15);
+      color: #F59E0B;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .role-accountant {
+      background: rgba(236, 72, 153, 0.15);
+      color: #EC4899;
+      border: 1px solid rgba(236, 72, 153, 0.3);
+    }
+    .status-badge-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      color: #10B981;
+    }
+    .status-badge-inactive {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(239, 68, 68, 0.12);
+      color: #EF4444;
+    }
+    .action-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 11.5px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .btn-xs:hover {
+      background: var(--color-surface-card);
+      border-color: var(--color-brand-deep);
+    }
+    .credential-box {
+      background: var(--color-surface-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 14px;
+      margin: 12px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      word-break: break-all;
+    }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal-dialog {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg, 12px);
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--color-surface-bg);
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+      font-size: 13.5px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .form-control:focus {
+      border-color: var(--color-brand-deep);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="staff-page">
+    <!-- Canonical Sidebar -->
+    <aside class="sidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Staff & Users Management</h1>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+            Manage team accounts, assign roles & permissions, toggle account status, and administer staff credentials.
+          </p>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-primary" id="btn-open-add-staff" onclick="StaffApp.openAddModal()" style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Add Staff Member</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        <!-- Quick Stats Cards -->
+        <div class="reports-kpi-grid" style="margin-bottom: 20px;">
+          <div class="kpi-card">
+            <span class="kpi-title">Total Staff</span>
+            <div class="kpi-num" id="stat-total-staff">0</div>
+            <div class="kpi-desc">Registered team accounts</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Active Members</span>
+            <div class="kpi-num" id="stat-active-staff" style="color: var(--status-safe, #10B981);">0</div>
+            <div class="kpi-desc">Authorized to sign in</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Pharmacists & Billing</span>
+            <div class="kpi-num" id="stat-front-staff">0</div>
+            <div class="kpi-desc">Counter & sales operators</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Accountants & Inventory</span>
+            <div class="kpi-num" id="stat-back-staff">0</div>
+            <div class="kpi-desc">Audit & stock managers</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="card" style="padding: 14px 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 220px; position: relative;">
+            <input type="text" id="staff-search-input" class="form-control" placeholder="Search staff by name, username, phone..." oninput="StaffApp.filterStaff()">
+          </div>
+          <div style="width: 180px;">
+            <select id="staff-role-filter" class="form-control" onchange="StaffApp.filterStaff()">
+              <option value="">All Roles</option>
+              <option value="PHARMACIST">Pharmacist</option>
+              <option value="BILLING_STAFF">Billing Staff</option>
+              <option value="INVENTORY_STAFF">Inventory Staff</option>
+              <option value="ACCOUNTANT">Accountant</option>
+            </select>
+          </div>
+          <div style="width: 140px;">
+            <select id="staff-status-filter" class="form-control" onchange="StaffApp.filterStaff()">
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary" onclick="StaffApp.loadStaff()" style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        <!-- Staff Table Panel -->
+        <div class="panel">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Staff Member</th>
+                  <th>Username</th>
+                  <th>Assigned Role</th>
+                  <th>Contact Info</th>
+                  <th>Status</th>
+                  <th>Last Login</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="staff-table-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">
+                    Loading staff directory...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT STAFF MODAL -->
+  <div class="modal-backdrop" id="modal-staff-form">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modal-staff-title">Add Staff Member</h3>
+        <button type="button" class="btn-xs" onclick="StaffApp.closeFormModal()">✕</button>
+      </div>
+      <form id="staff-form" onsubmit="StaffApp.handleSaveStaff(event)">
+        <div class="modal-body">
+          <input type="hidden" id="staff-form-id" value="">
+          
+          <div class="form-group">
+            <label for="staff-form-name">Full Name *</label>
+            <input type="text" id="staff-form-name" class="form-control" required placeholder="e.g. Ramesh Kumar">
+          </div>
+
+          <div class="form-group" id="group-username">
+            <label for="staff-form-username">Login Username *</label>
+            <input type="text" id="staff-form-username" class="form-control" required placeholder="e.g. ramesh_billing">
+          </div>
+
+          <div class="form-group" id="group-password">
+            <label for="staff-form-password">Password *</label>
+            <input type="password" id="staff-form-password" class="form-control" required placeholder="Minimum 4 characters">
+          </div>
+
+          <div class="form-group">
+            <label for="staff-form-role">Role & Access Level *</label>
+            <select id="staff-form-role" class="form-control" required>
+              <option value="BILLING_STAFF">Billing Staff (Bills, Customers, Sales View)</option>
+              <option value="PHARMACIST">Pharmacist (Bills, Inventory, Purchases, Returns)</option>
+              <option value="INVENTORY_STAFF">Inventory Staff (Live Stock, Add Stock, Expiry)</option>
+              <option value="ACCOUNTANT">Accountant (Reports, GST, Customer Khata, Financials)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="staff-form-phone">Phone Number</label>
+            <input type="tel" id="staff-form-phone" class="form-control" placeholder="10-digit mobile number">
+          </div>
+
+          <div class="form-group">
+            <label for="staff-form-email">Email Address</label>
+            <input type="email" id="staff-form-email" class="form-control" placeholder="e.g. ramesh@gmail.com">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="StaffApp.closeFormModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="staff-form-submit-btn">Save Staff Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- REVEAL PASSWORD MODAL (OWNER ONLY) -->
+  <div class="modal-backdrop" id="modal-reveal-password">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>Staff Login Credentials</h3>
+        <button type="button" class="btn-xs" onclick="StaffApp.closeRevealModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 12px;">
+          Stored credentials for <strong id="reveal-staff-name" style="color: var(--color-text-primary);"></strong>:
+        </p>
+
+        <label style="font-size: 11px; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Username</label>
+        <div class="credential-box" id="reveal-username"></div>
+
+        <label style="font-size: 11px; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 700;">Decrypted Password</label>
+        <div class="credential-box" style="display: flex; align-items: center; justify-content: space-between;">
+          <span id="reveal-password-text">••••••••</span>
+          <button type="button" class="btn-xs" id="btn-toggle-reveal-pwd" onclick="StaffApp.toggleRevealPlaintext()">Show</button>
+        </div>
+
+        <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="StaffApp.copyCredentials()" style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span id="copy-btn-text">Copy Username & Password</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="StaffApp.closeRevealModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESET PASSWORD MODAL -->
+  <div class="modal-backdrop" id="modal-reset-password">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>Reset Staff Password</h3>
+        <button type="button" class="btn-xs" onclick="StaffApp.closeResetModal()">✕</button>
+      </div>
+      <form id="reset-password-form" onsubmit="StaffApp.handleResetPassword(event)">
+        <div class="modal-body">
+          <input type="hidden" id="reset-staff-id" value="">
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 14px;">
+            Enter a new password for <strong id="reset-staff-name" style="color: var(--color-text-primary);"></strong>.
+          </p>
+
+          <div class="form-group">
+            <label for="reset-new-password">New Password *</label>
+            <input type="password" id="reset-new-password" class="form-control" required placeholder="Minimum 4 characters">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="StaffApp.closeResetModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-reset">Reset Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/staff.js?v=9.0"></script>
+</body>
+</html>

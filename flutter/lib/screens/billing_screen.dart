@@ -22,11 +22,12 @@ class CustomerParty {
     this.gstin = '',
     this.address = '',
   });
-}
+typedef ProductBatchOption = Map<String, dynamic>;
 
 /// Retail POS Item Entry Model with FEFO batch selection and live tax calculations
 class PosBillItem {
   String id;
+  int? productId;
   String medicineName;
   String brand;
   String composition;
@@ -43,6 +44,7 @@ class PosBillItem {
 
   PosBillItem({
     required this.id,
+    this.productId,
     required this.medicineName,
     required this.brand,
     this.composition = '',
@@ -89,6 +91,7 @@ class _BillingScreenState extends State<BillingScreen> {
   String _invoiceNumber = 'INV-2026-0048';
   DateTime _invoiceDate = DateTime.now();
   String _paymentMode = 'Cash'; // Cash, UPI, Credit
+  bool _isSubmittingBill = false;
 
   // 2. Mock Medicine Catalog with FEFO Batch Stock
   final List<Map<String, dynamic>> _medicineCatalog = [
@@ -249,6 +252,7 @@ class _BillingScreenState extends State<BillingScreen> {
       _billItems.add(
         PosBillItem(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
+          productId: (med['id'] is int) ? med['id'] as int : int.tryParse(med['id']?.toString() ?? ''),
           medicineName: med['name'],
           brand: med['brand'],
           composition: med['composition'] ?? '',
@@ -270,8 +274,14 @@ class _BillingScreenState extends State<BillingScreen> {
     });
   }
 
+  Timer? _searchDebounceTimer;
+  int _currentSearchSeq = 0;
+
   void _onSearchChanged(String query) {
-    if (query.trim().isEmpty) {
+    _searchDebounceTimer?.cancel();
+    final cleanQ = query.trim();
+
+    if (cleanQ.isEmpty) {
       setState(() {
         _filteredSuggestions = [];
         _isSearching = false;
@@ -279,17 +289,60 @@ class _BillingScreenState extends State<BillingScreen> {
       return;
     }
 
-    final q = query.toLowerCase();
-    final matches = _medicineCatalog.where((m) {
+    // 1. Instant local filtering on cached catalog for 0ms immediate feedback
+    final qLower = cleanQ.toLowerCase();
+    final localMatches = _medicineCatalog.where((m) {
       final name = (m['name'] as String).toLowerCase();
       final brand = (m['brand'] as String).toLowerCase();
       final comp = ((m['composition'] as String?) ?? '').toLowerCase();
-      return name.contains(q) || brand.contains(q) || comp.contains(q);
+      return name.contains(qLower) || brand.contains(qLower) || comp.contains(qLower);
     }).toList();
 
     setState(() {
-      _filteredSuggestions = matches;
+      _filteredSuggestions = localMatches;
       _isSearching = true;
+    });
+
+    // 2. Debounced API search (200ms) with sequence tracking to prevent race conditions
+    final requestSeq = ++_currentSearchSeq;
+
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 200), () async {
+      try {
+        final apiResults = await ApiService.searchBillingProducts(cleanQ, limit: 15);
+        
+        // Guard against stale response overwriting a newer search request
+        if (requestSeq != _currentSearchSeq || !mounted) return;
+
+        final formattedResults = <Map<String, dynamic>>[];
+        for (var item in apiResults) {
+          formattedResults.add({
+            'id': item['id'],
+            'name': item['product_name'] ?? 'Unnamed Product',
+            'brand': item['brand'] ?? 'General',
+            'composition': item['composition'] ?? '',
+            'hsn': item['hsn_code'] ?? '3004',
+            'mrp': (item['unit_price'] ?? 50.0) as num,
+            'gst': (item['gst_rate'] ?? 12.0) as num,
+            'batches': [
+              {
+                'batch': item['batch_number'] ?? 'BATCH-01',
+                'expiry': item['expiry_date'] ?? '2028-12-31',
+                'stock': item['quantity'] ?? 10,
+                'mrp': (item['unit_price'] ?? 50.0) as num,
+              }
+            ]
+          });
+        }
+
+        if (formattedResults.isNotEmpty) {
+          setState(() {
+            _filteredSuggestions = formattedResults;
+            _isSearching = true;
+          });
+        }
+      } catch (e) {
+        debugPrint('[BillingScreen] Debounced search error: $e');
+      }
     });
   }
 
@@ -452,7 +505,8 @@ class _BillingScreenState extends State<BillingScreen> {
   // ACTIONS: SAVE & PRINT / SAVE & NEW / DRAFT
   // ==========================================
 
-  void _saveAndPrintBill() {
+  Future<void> _saveAndPrintBill() async {
+    if (_isSubmittingBill) return;
     if (_billItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot print empty bill. Please add medicines.')),
@@ -460,70 +514,114 @@ class _BillingScreenState extends State<BillingScreen> {
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: AppColors.statusSafe),
-            SizedBox(width: 8),
-            Text('Bill Confirmed & Saved'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Invoice No: $_invoiceNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('Customer: ${_selectedCustomer.name}'),
-            Text('Payment Mode: $_paymentMode'),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Grand Total Paid:'),
-                  TabularCurrency(amount: grandTotal, style: AppTypography.numericPrice.copyWith(fontSize: 16)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Stock automatically deducted in FEFO priority order. GST invoice PDF generated ready for thermal/A4 printing.',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _resetForNewBill();
-            },
-            child: const Text('New Bill'),
+    setState(() => _isSubmittingBill = true);
+
+    try {
+      final payloadItems = _billItems.map((item) => {
+        'product_id': item.productId ?? 1,
+        'quantity': item.quantity,
+        'unit_price': item.rate,
+        'unit_type': 'strip',
+        'batch_number': item.selectedBatch,
+        'discount': item.discountPercent,
+        'gst_percentage': item.gstRate,
+      }).toList();
+
+      final payload = {
+        'items': payloadItems,
+        'idempotency_key': 'df_mob_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch % 100000}',
+        'payment_method': _paymentMode.toUpperCase(),
+        'customer_name': _selectedCustomer.name,
+        'customer_phone': _selectedCustomer.phone == 'Cash Sale' ? null : _selectedCustomer.phone,
+        'notes': 'Mobile Counter Billing - $_invoiceNumber',
+        'is_interstate': false,
+        'discount_type': billDiscountPercent > 0 ? 'percent' : null,
+        'discount_value': billDiscountPercent,
+      };
+
+      final saleRes = await ApiService.createSale(payload);
+      final confirmedBillNo = saleRes['bill_number'] ?? _invoiceNumber;
+      final actualGrandTotal = (saleRes['total_amount'] as num?)?.toDouble() ?? grandTotal;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_outline, color: AppColors.statusSafe),
+              SizedBox(width: 8),
+              Text('Bill Confirmed & Saved'),
+            ],
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.print, size: 16),
-            label: const Text('Print / Share PDF'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Printing $_invoiceNumber (PDF dispatched to printer)...'),
-                  backgroundColor: AppColors.brandDeep,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Invoice No: $confirmedBillNo', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('Customer: ${_selectedCustomer.name}'),
+              Text('Payment Mode: $_paymentMode'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              );
-              _resetForNewBill();
-            },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Grand Total Paid:'),
+                    TabularCurrency(amount: actualGrandTotal, style: AppTypography.numericPrice.copyWith(fontSize: 16)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Stock automatically deducted in FEFO priority order. GST invoice PDF generated ready for thermal/A4 printing.',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _resetForNewBill();
+              },
+              child: const Text('New Bill'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.print, size: 16),
+              label: const Text('Print / Share PDF'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Printing $confirmedBillNo (PDF dispatched to printer)...'),
+                    backgroundColor: AppColors.brandDeep,
+                  ),
+                );
+                _resetForNewBill();
+              },
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save bill: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingBill = false);
+      }
+    }
   }
 
   void _saveAndNewBill() {

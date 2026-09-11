@@ -17,7 +17,26 @@ class _AppLayoutState extends State<AppLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _activeModule = 'Dashboard';
 
-  // State to manage collapsible drawer sections
+  String _shopName = 'Pharmacy';
+  String _userEmail = 'Owner / Pharmacist';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final u = await ApiService.fetchUserProfile();
+      if (u.isNotEmpty) {
+        setState(() {
+          _shopName = u['shop_name'] ?? 'Pharmacy';
+          _userEmail = u['email'] ?? 'Owner / Pharmacist';
+        });
+      }
+    } catch (_) {}
+  }
   bool _salesExpanded = true;
   bool _purchasesExpanded = false;
   bool _businessExpanded = false;
@@ -50,7 +69,7 @@ class _AppLayoutState extends State<AppLayout> {
 
   Widget _buildDashboardMockView() {
     return Container(
-      color: AppColors.surfaceBg,
+      color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: ListView(
         children: [
@@ -196,18 +215,15 @@ class _AppLayoutState extends State<AppLayout> {
             // Premium Header Section
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(color: AppColors.brandDeep),
-              currentAccountPicture: const CircleAvatar(
+              currentAccountPicture: CircleAvatar(
                 backgroundColor: Colors.white,
-                child: Text('EG', style: TextStyle(color: AppColors.brandDeep, fontWeight: FontWeight.bold, fontSize: 20)),
+                child: Text(
+                  _shopName.isNotEmpty ? _shopName[0].toUpperCase() : 'P',
+                  style: const TextStyle(color: AppColors.brandDeep, fontWeight: FontWeight.bold, fontSize: 20),
+                ),
               ),
-              accountName: const Text('ExpiryGuard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              accountEmail: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Apollo Pharmacy — Delhi', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                  Text('Kanishak • Owner', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                ],
-              ),
+              accountName: Text(_shopName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              accountEmail: Text(_userEmail, style: const TextStyle(fontSize: 12, color: Colors.white70)),
             ),
             
             // Scrollable Menu List

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khata Ledger & Credit Management — DawaiFlow ERP</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .khata-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .badge-danger {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: #EF4444;
+    }
+    .badge-success {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: #10B981;
+    }
+    .badge-warning {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: #F59E0B;
+    }
+    .badge-info {
+      background-color: rgba(59, 130, 246, 0.1);
+      color: #3B82F6;
+    }
+    .profile-tabs {
+      display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;
+    }
+    .profile-tab-btn {
+      padding: 10px 16px; border: none; background: transparent; color: var(--dark-text);
+      font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .profile-tab-btn.active {
+      color: var(--primary-green); border-bottom-color: var(--primary-green); font-weight: 600;
+    }
+    .tab-content-panel { display: none; }
+    .tab-content-panel.active { display: block; }
+    .ledger-summary-row {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="khata-page">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Expiry<span>Guard</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item active" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Today's Returns</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Khata & Customer Credit Directory</h1>
+          <p style="font-size: 13px; color: var(--muted-text);">Manage customer ledger accounts, track outstanding credit, record collections, and view overdue accounts.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Add New Customer</button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        
+        <!-- Khata Dashboard KPI Widgets -->
+        <div class="khata-kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Active Ledger Accounts</span>
+            <span class="kpi-value" id="kpi-customers">0</span>
+            <span style="font-size: 11px; color: var(--muted-text);">Total registered customers</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Total Outstanding</span>
+            <span class="kpi-value" id="kpi-outstanding" style="color: #E11D48;">₹0.00</span>
+            <span style="font-size: 11px; color: var(--muted-text);">Pending customer credit</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Due / Overdue Balance</span>
+            <span class="kpi-value" id="kpi-overdue" style="color: #EA580C;">₹0.00</span>
+            <span style="font-size: 11px; color: var(--muted-text);">Sales outstanding >30 days</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Today's Collections</span>
+            <span class="kpi-value" id="kpi-today" style="color: #16A34A;">₹0.00</span>
+            <span style="font-size: 11px; color: var(--muted-text);">Payments received today</span>
+          </div>
+        </div>
+
+        <!-- Split Grid layout -->
+        <div class="grid-2">
+          
+          <!-- Left Panel: Customer credit ledger list -->
+          <div class="card">
+            <div class="card-header" style="border-bottom: none; margin-bottom: 0;">
+              <h3 class="panel-title">Khata Accounts Directory</h3>
+            </div>
+            
+            <!-- Filters & Search Toolbar inside card -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
+              <input type="text" id="khata-search-input" class="form-input" placeholder="🔍 Search customer name or phone number..." oninput="filterKhataCustomers()">
+              <select id="khata-status-filter" class="form-input" onchange="filterKhataCustomers()">
+                <option value="ALL">All Accounts</option>
+                <option value="OUTSTANDING">Outstanding Balance Only</option>
+                <option value="PAID">Fully Settled Only</option>
+                <option value="OVERDUE">Overdue Accounts Only</option>
+              </select>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Customer Name</th>
+                    <th>Phone Number</th>
+                    <th style="text-align: right;">Outstanding (₹)</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: center;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="khata-tbody">
+                  <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--muted-text);">Loading customer list...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right Panel: High-risk Analytics -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Highest Outstanding list -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="panel-title">Highest Outstanding Bookings</h3>
+              </div>
+              <div id="highest-outstanding-list" style="display: flex; flex-direction: column; gap: 10px;">
+                <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading analysis...</p>
+              </div>
+            </div>
+
+            <!-- Recent Collections -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="panel-title">Recent Settled Payments</h3>
+              </div>
+              <div id="recent-payments-list" style="display: flex; flex-direction: column; gap: 10px;">
+                <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading history...</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal: Add New Customer Modal -->
+  <div id="customer-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 class="panel-title" id="customer-modal-title">Add New Customer Account</h3>
+        <button class="close-btn" onclick="closeCustomerModal()">&times;</button>
+      </div>
+      <form id="customer-form" onsubmit="saveCustomer(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Full Name *</label>
+            <input type="text" id="cust-name" class="form-input" placeholder="e.g. Ramesh Kumar" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number *</label>
+            <input type="text" id="cust-phone" class="form-input" placeholder="e.g. 9876543210" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address (Optional)</label>
+            <input type="email" id="cust-email" class="form-input" placeholder="e.g. ramesh@example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Address (Optional)</label>
+            <input type="text" id="cust-address" class="form-input" placeholder="e.g. Block C, Okhla">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fixed Discount % (Auto-applied to new bills)</label>
+            <input type="number" step="0.5" id="cust-discount" class="form-input" value="0.0" min="0" max="100">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeCustomerModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Customer Ledger Details Sheet -->
+  <div id="ledger-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 780px;">
+      <div class="modal-header">
+        <h3 class="panel-title" id="ledger-customer-name">Customer Ledger Sheet</h3>
+        <button class="close-btn" onclick="closeLedgerModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-tabs">
+          <button class="profile-tab-btn active" id="tab-ledger-btn" onclick="switchLedgerTab('ledger')">Ledger Entries</button>
+          <button class="profile-tab-btn" id="tab-info-btn" onclick="switchLedgerTab('info')">Account Details</button>
+        </div>
+
+        <!-- Ledger Entries Tab -->
+        <div class="tab-content-panel active" id="panel-ledger">
+          <div class="ledger-summary-row">
+            <div>
+              <span style="font-size: 13px; color: var(--muted-text);">Current Outstanding Balance:</span>
+              <h2 style="font-size: 24px; font-weight: 800; color: #E11D48; margin: 4px 0 0 0;" id="ledger-outstanding-value">₹0.00</h2>
+            </div>
+            <button class="btn btn-primary" onclick="openRecordPaymentDialog()">Collect Payment / Settle</button>
+          </div>
+          
+          <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+            <table class="data-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Reference ID</th>
+                  <th style="text-align: right;">Amount (₹)</th>
+                  <th style="text-align: right;">Running Balance (₹)</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-items-tbody">
+                <!-- Renders dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Account details Tab -->
+        <div class="tab-content-panel" id="panel-info">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+              <h4 style="margin-top: 0; margin-bottom: 8px;">Customer Contact Information</h4>
+              <p><strong>Mobile Phone:</strong> <span id="info-phone">N/A</span></p>
+              <p><strong>Email Address:</strong> <span id="info-email">N/A</span></p>
+              <p><strong>Billing Address:</strong> <span id="info-address">N/A</span></p>
+            </div>
+            <div>
+              <h4 style="margin-top: 0; margin-bottom: 8px;">Billing Policy</h4>
+              <p><strong>Preferred Fixed Discount:</strong> <span id="info-discount">0.0%</span></p>
+              <p><strong>Account Status:</strong> <span class="badge badge-success">Active</span></p>
+              <p><strong>Opened Date:</strong> <span id="info-created">N/A</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeLedgerModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Settle Payment -->
+  <div id="payment-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 400px; z-index: 1100;">
+      <div class="modal-header">
+        <h3 class="panel-title">Record Settlement Payment</h3>
+        <button class="close-btn" onclick="closePaymentModal()">&times;</button>
+      </div>
+      <form id="payment-form" onsubmit="submitPayment(event)">
+        <div class="modal-body">
+          <h4 id="payment-cust-name" style="margin-top: 0; color: var(--dark-text);">Settle for: Rajesh Sharma</h4>
+          <div class="form-group">
+            <label class="form-label">Payment Amount * (₹)</label>
+            <input type="number" step="0.01" id="pay-amount" class="form-input" placeholder="e.g. 500" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Payment Method *</label>
+            <select id="pay-method" class="form-input">
+              <option value="UPI">📱 UPI / NetBanking</option>
+              <option value="CASH">💵 Cash</option>
+              <option value="CARD">💳 Debit / Credit Card</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm Settle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+
+  <script>
+    let allCustomers = [];
+    let selectedCustomerId = null;
+    let selectedCustomerName = '';
+
+    function renderKhataStats(stats) {
+      if (!stats) return;
+      const elCust = document.getElementById('kpi-customers');
+      const elOut = document.getElementById('kpi-outstanding');
+      const elOver = document.getElementById('kpi-overdue');
+      const elToday = document.getElementById('kpi-today');
+      if (elCust) elCust.textContent = stats.total_customers || 0;
+      if (elOut) elOut.textContent = `₹${(Number(stats.total_outstanding) || 0).toFixed(2)}`;
+      if (elOver) elOver.textContent = `₹${(Number(stats.overdue_amount) || 0).toFixed(2)}`;
+      if (elToday) elToday.textContent = `₹${(Number(stats.today_collection) || 0).toFixed(2)}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // 0ms instant cached render from memory/sessionStorage/localStorage
+      try {
+        const cachedProfile = localStorage.getItem('expiryguard_cached_user_profile');
+        if (cachedProfile) {
+          const p = JSON.parse(cachedProfile);
+          if (p && p.shop_name) {
+            const h = document.getElementById('shop-name-header');
+            if (h) h.textContent = p.shop_name;
+          }
+        }
+        const preloaderStats = window.AppDataPreloader ? window.AppDataPreloader.get('/khata/dashboard') : null;
+        const cachedStats = preloaderStats
+          || (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/khata/dashboard'))
+          || (localStorage.getItem('expiryguard_cached_khata_dashboard') ? JSON.parse(localStorage.getItem('expiryguard_cached_khata_dashboard')) : null);
+        if (cachedStats) {
+          renderKhataStats(cachedStats);
+        }
+
+        const preloaderCustomers = window.AppDataPreloader ? window.AppDataPreloader.get('/customers') : null;
+        const cachedCustomers = preloaderCustomers
+          || (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/customers'))
+          || (localStorage.getItem('expiryguard_cached_customers') ? JSON.parse(localStorage.getItem('expiryguard_cached_customers')) : null);
+        if (Array.isArray(cachedCustomers) && cachedCustomers.length > 0) {
+          allCustomers = cachedCustomers;
+          renderKhataCustomersTable(allCustomers);
+          renderAnalytics(allCustomers);
+        }
+      } catch (e) {
+        console.warn('Khata cache read error:', e);
+      }
+
+      // Background parallel revalidation
+      Promise.allSettled([
+        loadKhataDashboard(),
+        loadKhataCustomers()
+      ]);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const filterParam = urlParams.get('filter');
+      if (filterParam) {
+        const filterSelect = document.getElementById('khata-status-filter');
+        if (filterSelect) {
+          filterSelect.value = filterParam.toUpperCase();
+          filterKhataCustomers();
+        }
+      }
+    });
+
+    async function loadKhataDashboard() {
+      try {
+        const stats = await api.getKhataDashboard();
+        if (stats) {
+          localStorage.setItem('expiryguard_cached_khata_dashboard', JSON.stringify(stats));
+          renderKhataStats(stats);
+        }
+      } catch (err) {
+        console.error("Failed to load Khata dashboard KPIs:", err);
+      }
+    }
+
+    async function loadKhataCustomers() {
+      try {
+        allCustomers = await api.getCustomers();
+        if (Array.isArray(allCustomers)) {
+          localStorage.setItem('expiryguard_cached_customers', JSON.stringify(allCustomers));
+        }
+        renderKhataCustomersTable(allCustomers);
+        renderAnalytics(allCustomers);
+      } catch (err) {
+        if (!allCustomers || allCustomers.length === 0) {
+          document.getElementById('khata-tbody').innerHTML = `
+            <tr><td colspan="5" style="text-align: center; color: var(--error-red);">Failed to load customers: ${err.message}</td></tr>
+          `;
+        }
+      }
+    }
+
+    function renderKhataCustomersTable(customersList) {
+      const tbody = document.getElementById('khata-tbody');
+      if (customersList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No Khata customer accounts found.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = customersList.map(c => {
+        const outstanding = c.pending_amount || 0.0;
+        let badge = '<span class="badge badge-success">Settled</span>';
+        if (outstanding > 0) {
+          badge = '<span class="badge badge-danger">Outstanding</span>';
+        }
+        return `
+          <tr>
+            <td><strong>${escapeHtml(c.name)}</strong></td>
+            <td>${escapeHtml(c.phone || 'N/A')}</td>
+            <td style="text-align: right; font-weight: bold; font-family: monospace;">₹${outstanding.toFixed(2)}</td>
+            <td style="text-align: center;">${badge}</td>
+            <td style="text-align: center;">
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12.5px;" onclick="openLedgerModal(${c.id}, '${escapeHtml(c.name)}')">📄 Ledger / Detail</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderAnalytics(list) {
+      // 1. Highest Outstanding
+      const sortedOutstanding = [...list].sort((a, b) => (b.pending_amount || 0) - (a.pending_amount || 0)).slice(0, 5);
+      const highList = document.getElementById('highest-outstanding-list');
+      if (sortedOutstanding.filter(c => c.pending_amount > 0).length === 0) {
+        highList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text);">All credit accounts settled!</p>';
+      } else {
+        highList.innerHTML = sortedOutstanding.filter(c => c.pending_amount > 0).map(c => `
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+            <div>
+              <strong style="font-size:13.5px;">${escapeHtml(c.name)}</strong>
+              <div style="font-size:11px; color: var(--muted-text);">${escapeHtml(c.phone)}</div>
+            </div>
+            <strong style="color: var(--error-red); font-family: monospace;">₹${c.pending_amount.toFixed(2)}</strong>
+          </div>
+        `).join('');
+      }
+
+      // 2. Fetch payments received across all customers (mock/recent settlements list)
+      const recentList = document.getElementById('recent-payments-list');
+      recentList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text);">Settle history is kept on detailed ledger sheets.</p>';
+    }
+
+    function filterKhataCustomers() {
+      const q = document.getElementById('khata-search-input').value.toLowerCase().trim();
+      const status = document.getElementById('khata-status-filter').value;
+
+      let filtered = allCustomers.filter(c => {
+        const nameMatch = c.name.toLowerCase().includes(q);
+        const phoneMatch = (c.phone || '').includes(q);
+        return nameMatch || phoneMatch;
+      });
+
+      if (status === 'OUTSTANDING') {
+        filtered = filtered.filter(c => (c.pending_amount || 0) > 0);
+      } else if (status === 'PAID') {
+        filtered = filtered.filter(c => (c.pending_amount || 0) === 0);
+      } else if (status === 'OVERDUE') {
+        filtered = filtered.filter(c => (c.pending_amount || 0) > 0); // Simplification: any outstanding
+      }
+
+      renderKhataCustomersTable(filtered);
+    }
+
+    // Modal Add Customer
+    function openAddCustomerModal() {
+      document.getElementById('customer-form').reset();
+      document.getElementById('customer-modal').classList.add('active');
+    }
+
+    function closeCustomerModal() {
+      document.getElementById('customer-modal').classList.remove('active');
+    }
+
+    async function saveCustomer(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('cust-name').value,
+        phone: document.getElementById('cust-phone').value,
+        email: document.getElementById('cust-email').value || null,
+        address: document.getElementById('cust-address').value || null,
+        fixed_discount_percent: parseFloat(document.getElementById('cust-discount').value) || 0.0
+      };
+
+      try {
+        await api.createCustomer(payload);
+        alert('Customer Khata account created successfully.');
+        closeCustomerModal();
+        await loadKhataDashboard();
+        await loadKhataCustomers();
+      } catch (err) {
+        alert(`Failed to create customer: ${err.message}`);
+      }
+    }
+
+    // Ledger Detail Modal Tab Switcher
+    function switchLedgerTab(tab) {
+      document.getElementById('tab-ledger-btn').classList.toggle('active', tab === 'ledger');
+      document.getElementById('tab-info-btn').classList.toggle('active', tab === 'info');
+      document.getElementById('panel-ledger').classList.toggle('active', tab === 'ledger');
+      document.getElementById('panel-info').classList.toggle('active', tab === 'info');
+    }
+
+    async function openLedgerModal(custId, name) {
+      selectedCustomerId = custId;
+      selectedCustomerName = name;
+      document.getElementById('ledger-customer-name').textContent = `Ledger: ${name}`;
+
+      switchLedgerTab('ledger');
+      document.getElementById('ledger-modal').classList.add('active');
+
+      await refreshLedgerData();
+    }
+
+    async function refreshLedgerData() {
+      try {
+        const ledger = await api.getCustomerLedger(selectedCustomerId);
+        
+        document.getElementById('ledger-outstanding-value').textContent = `₹${ledger.current_outstanding.toFixed(2)}`;
+        
+        // Populate Account details Tab
+        document.getElementById('info-phone').textContent = ledger.phone || 'N/A';
+        const fullCustomer = allCustomers.find(c => c.id === selectedCustomerId);
+        if (fullCustomer) {
+          document.getElementById('info-email').textContent = fullCustomer.email || 'N/A';
+          document.getElementById('info-address').textContent = fullCustomer.address || 'N/A';
+          document.getElementById('info-discount').textContent = `${(fullCustomer.fixed_discount_percent || 0.0).toFixed(1)}%`;
+          document.getElementById('info-created').textContent = new Date(fullCustomer.created_at).toLocaleDateString();
+        }
+
+        // Render transactions chronologically with running balance
+        const tbody = document.getElementById('ledger-items-tbody');
+        const txns = ledger.transactions || [];
+
+        if (txns.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No transaction history for this customer.</td></tr>';
+          return;
+        }
+
+        let balance = 0;
+        tbody.innerHTML = txns.map(t => {
+          const isSale = t.type === 'sale';
+          if (isSale) {
+            balance += t.amount;
+          } else {
+            balance -= t.amount;
+          }
+          const badgeType = isSale ? 'badge-danger' : 'badge-success';
+          const badgeText = isSale ? 'Credit Sale' : 'Collection Payment';
+          return `
+            <tr>
+              <td>${new Date(t.date).toLocaleDateString()}</td>
+              <td><span class="badge ${badgeType}">${badgeText}</span></td>
+              <td><strong>${escapeHtml(t.reference)}</strong></td>
+              <td style="text-align: right; font-weight: bold; color: ${isSale ? 'var(--error-red)' : 'var(--status-safe)'};">${isSale ? '+' : '-'} ₹${t.amount.toFixed(2)}</td>
+              <td style="text-align: right; font-weight: bold; font-family: monospace;">₹${balance.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        document.getElementById('ledger-items-tbody').innerHTML = `
+          <tr><td colspan="5" style="text-align: center; color: var(--error-red);">Failed to load ledger: ${err.message}</td></tr>
+        `;
+      }
+    }
+
+    function closeLedgerModal() {
+      document.getElementById('ledger-modal').classList.remove('active');
+    }
+
+    // Payment Dialog
+    function openRecordPaymentDialog() {
+      document.getElementById('payment-cust-name').textContent = `Settle for: ${selectedCustomerName}`;
+      document.getElementById('payment-form').reset();
+      document.getElementById('payment-modal').classList.add('active');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('payment-modal').classList.remove('active');
+    }
+
+    async function submitPayment(e) {
+      e.preventDefault();
+      const payload = {
+        customer_id: selectedCustomerId,
+        amount_paid: parseFloat(document.getElementById('pay-amount').value),
+        payment_method: document.getElementById('pay-method').value
+      };
+
+      try {
+        await api.createCustomerPayment(selectedCustomerId, payload);
+        alert('Payment settlement recorded successfully!');
+        closePaymentModal();
+        
+        // Refresh detail views & dashboards
+        await refreshLedgerData();
+        await loadKhataDashboard();
+        await loadKhataCustomers();
+      } catch (err) {
+        alert(`Failed to submit payment: ${err.message}`);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

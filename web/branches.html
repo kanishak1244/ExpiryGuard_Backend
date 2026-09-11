@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store Branches Directory — ExpiryGuard</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .branch-code-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--color-surface-bg);
+      border: 1px solid var(--color-border);
+      color: var(--color-brand-deep, #10B981);
+    }
+    .main-branch-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(139, 92, 246, 0.15);
+      color: #8B5CF6;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+    .status-badge-active {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      color: #10B981;
+    }
+    .status-badge-inactive {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(239, 68, 68, 0.12);
+      color: #EF4444;
+    }
+    .btn-xs {
+      padding: 4px 8px;
+      font-size: 11.5px;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .btn-xs:hover {
+      background: var(--color-surface-card);
+      border-color: var(--color-brand-deep);
+    }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal-dialog {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg, 12px);
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: var(--color-surface-bg);
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+      font-size: 13.5px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .form-control:focus {
+      border-color: var(--color-brand-deep);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="branches-page">
+    <!-- Canonical Sidebar -->
+    <aside class="sidebar"></aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Store Branches Directory</h1>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+            Manage pharmacy branch locations, branch codes, contact phone numbers, and operational status.
+          </p>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-primary" id="btn-open-add-branch" onclick="BranchesApp.openAddModal()" style="display: flex; align-items: center; gap: 6px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ Add Store Branch</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="content-body">
+        <!-- Quick Stats Cards -->
+        <div class="reports-kpi-grid" style="margin-bottom: 20px;">
+          <div class="kpi-card">
+            <span class="kpi-title">Total Branches</span>
+            <div class="kpi-num" id="stat-total-branches">0</div>
+            <div class="kpi-desc">Registered store locations</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Active Outlets</span>
+            <div class="kpi-num" id="stat-active-branches" style="color: var(--status-safe, #10B981);">0</div>
+            <div class="kpi-desc">Currently operational</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Main Headquarters</span>
+            <div class="kpi-num" id="stat-main-branch-name" style="font-size: 18px; font-weight: 700; color: #8B5CF6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+            <div class="kpi-desc">Primary billing store</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Cities Covered</span>
+            <div class="kpi-num" id="stat-cities-count">0</div>
+            <div class="kpi-desc">Distinct geographic locations</div>
+          </div>
+        </div>
+
+        <!-- Branches Table Panel -->
+        <div class="panel">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Branch Name</th>
+                  <th>Code</th>
+                  <th>City / Location</th>
+                  <th>Contact Phone</th>
+                  <th>Address</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="branches-table-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">
+                    Loading store branches...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT BRANCH MODAL -->
+  <div class="modal-backdrop" id="modal-branch-form">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modal-branch-title">Add Store Branch</h3>
+        <button type="button" class="btn-xs" onclick="BranchesApp.closeFormModal()">✕</button>
+      </div>
+      <form id="branch-form" onsubmit="BranchesApp.handleSaveBranch(event)">
+        <div class="modal-body">
+          <input type="hidden" id="branch-form-id" value="">
+          
+          <div class="form-group">
+            <label for="branch-form-name">Branch Name *</label>
+            <input type="text" id="branch-form-name" class="form-control" required placeholder="e.g. City Center Branch">
+          </div>
+
+          <div class="form-group">
+            <label for="branch-form-code">Branch Code (e.g. BR-02)</label>
+            <input type="text" id="branch-form-code" class="form-control" placeholder="e.g. BR-02">
+          </div>
+
+          <div class="form-group">
+            <label for="branch-form-city">City / Area</label>
+            <input type="text" id="branch-form-city" class="form-control" placeholder="e.g. Mumbai, Bandra West">
+          </div>
+
+          <div class="form-group">
+            <label for="branch-form-phone">Contact Phone</label>
+            <input type="tel" id="branch-form-phone" class="form-control" placeholder="e.g. +91 9876543210">
+          </div>
+
+          <div class="form-group">
+            <label for="branch-form-address">Full Address</label>
+            <textarea id="branch-form-address" class="form-control" rows="2" placeholder="Shop no, street, landmark..."></textarea>
+          </div>
+
+          <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
+            <input type="checkbox" id="branch-form-main" style="width: 16px; height: 16px; cursor: pointer;">
+            <label for="branch-form-main" style="margin: 0; cursor: pointer; font-size: 13px;">Set as Main Headquarters Branch</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="BranchesApp.closeFormModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="branch-form-submit-btn">Save Branch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
+  <script src="js/nav.js?v=9.0"></script>
+  <script src="js/confirm_modal.js?v=9.0"></script>
+  <script src="js/app.js?v=9.0"></script>
+  <script src="js/branches.js?v=9.0"></script>
+</body>
+</html>

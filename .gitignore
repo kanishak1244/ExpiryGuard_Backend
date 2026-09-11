@@ -40,6 +40,10 @@ Expiryguard1/
 *.jpeg
 *.jpg
 *.png
+*.pptx
+*.log
+backups/
+desktop_agent/
 
 # Un-ignore assets needed for web/public site
 !public_site/assets/**

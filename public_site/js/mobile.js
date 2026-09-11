@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
       statusBox.className = 'mobile-form-status';
       statusBox.style.display = 'none';
 
+      const numPharmacies = document.getElementById('m_num_pharmacies')?.value || '';
       const payload = {
         full_name: document.getElementById('m_full_name')?.value?.trim(),
         pharmacy_name: document.getElementById('m_pharmacy_name')?.value?.trim(),
@@ -98,17 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
         phone: document.getElementById('m_phone')?.value?.trim(),
         current_billing_method: document.getElementById('m_current_billing_method')?.value,
         bills_per_day: document.getElementById('m_bills_per_day')?.value,
-        num_pharmacies: document.getElementById('m_num_pharmacies')?.value,
-        biggest_problem: ''
+        biggest_problem: numPharmacies ? `[Number of Pharmacies: ${numPharmacies}]` : ''
       };
 
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
 
       try {
-        const response = await fetch('/api/v1/leads/pilot-request', {
+        const response = await fetch('/api/pilot-leads', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(payload)
         });
 

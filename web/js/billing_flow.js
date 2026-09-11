@@ -6,9 +6,12 @@ let activeBillState = {
   invoiceNumber: '',
   invoiceDate: new Date().toISOString().split('T')[0],
   paymentMode: 'CASH',
+  splitPayments: [],
   billDiscountPercent: 0.0,
   manualRoundOff: 0.0,
   useManualRoundOff: false,
+  activeHeldBillId: null,
+  activeHeldBillNumber: null,
   items: []
 };
 
@@ -35,34 +38,75 @@ async function initBillingEngine() {
     activeBillState.invoiceNumber = generateBillInvoiceNumber();
   }
   
+  // Load from AppDataPreloader or localStorage cache for instant 0ms billing load
   try {
-    if (window.api && typeof window.api.getCustomers === 'function') {
-      const custs = await window.api.getCustomers().catch(() => []);
-      if (Array.isArray(custs) && custs.length > 0) {
-        billingCustomersCache = [
-          { id: 1, name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
-          ...custs
-        ];
-      }
+    const preloaderCusts = window.AppDataPreloader ? window.AppDataPreloader.get('/customers') : null;
+    const cachedCusts = preloaderCusts || (localStorage.getItem('expiryguard_cached_billing_customers') ? JSON.parse(localStorage.getItem('expiryguard_cached_billing_customers')) : null);
+    if (Array.isArray(cachedCusts) && cachedCusts.length > 0) {
+      billingCustomersCache = [
+        { id: 1, name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
+        ...cachedCusts
+      ];
+    }
+    const preloaderProds = window.AppDataPreloader ? window.AppDataPreloader.get('/products') : null;
+    const cachedProds = preloaderProds || (localStorage.getItem('expiryguard_cached_billing_products') ? JSON.parse(localStorage.getItem('expiryguard_cached_billing_products')) : null);
+    if (Array.isArray(cachedProds)) {
+      availableInventoryCache = cachedProds;
     }
   } catch (e) {
-    console.warn('Could not load customer list:', e);
+    console.warn('Failed to parse cached billing data:', e);
   }
 
-  try {
-    if (window.api && typeof window.api.getProducts === 'function') {
-      const prods = await window.api.getProducts().catch(() => []);
-      if (Array.isArray(prods)) {
-        availableInventoryCache = prods;
-      }
-    }
-  } catch (e) {
-    console.warn('Could not load inventory cache:', e);
-  }
-
+  // Render initial UI immediately
   renderCustomerDropdown();
   renderBillItemsTable();
   recalculateTotals();
+  updateResumedHeldBanner();
+  refreshHeldBillsCount();
+
+  // Re-fetch when customers or inventory are mutated
+  window.addEventListener('dawaiflow:mutate', (e) => {
+    if (e.detail && (e.detail.tag === 'inventory' || e.detail.tag === 'khata')) {
+      if (window.api && window.api.getCustomers) {
+        window.api.getCustomers().then(c => {
+          if (Array.isArray(c)) {
+            billingCustomersCache = [{ id: 1, name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' }, ...c];
+            renderCustomerDropdown();
+          }
+        }).catch(() => {});
+      }
+      if (window.api && window.api.getProducts) {
+        window.api.getProducts().then(p => {
+          if (Array.isArray(p)) availableInventoryCache = p;
+        }).catch(() => {});
+      }
+    }
+  });
+
+  // Load backend data in parallel in the background without blocking page render
+  Promise.all([
+    window.api && typeof window.api.getCustomers === 'function'
+      ? window.api.getCustomers().catch(() => [])
+      : Promise.resolve([]),
+    window.api && typeof window.api.getProducts === 'function'
+      ? window.api.getProducts().catch(() => [])
+      : Promise.resolve([])
+  ]).then(([custs, prods]) => {
+    if (Array.isArray(custs) && custs.length > 0) {
+      billingCustomersCache = [
+        { id: 1, name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
+        ...custs
+      ];
+      localStorage.setItem('expiryguard_cached_billing_customers', JSON.stringify(custs));
+      renderCustomerDropdown();
+    }
+    if (Array.isArray(prods)) {
+      availableInventoryCache = prods;
+      localStorage.setItem('expiryguard_cached_billing_products', JSON.stringify(prods));
+    }
+  }).catch(e => {
+    console.warn('Billing background load failed:', e);
+  });
 }
 
 function renderCustomerDropdown() {
@@ -178,165 +222,429 @@ async function handleSaveNewCustomer(e) {
 }
 
 // ----------------------------------------------------
-// AUTOCOMPLETE SEARCH (DEBOUNCED + PREFIX/FUZZY MATCH)
-// ----------------------------------------------------
+// =========================================================================
+// REBUILT MEDICINE SEARCH ENGINE (DUAL-MODE: NAME vs CODE/BARCODE)
+// Deterministic, keyboard-first, race-condition immune, zero-AI, POS-optimized
+// =========================================================================
 
-let searchTimeout = null;
-let currentSearchQuery = '';
+// ====================================================
+// REBUILT MEDICINE SEARCH & SELECTION ENGINE (FROM SCRATCH)
+// High-performance live inventory search matching mobile billing
+// ====================================================
+
+let currentBillingSearchMode = 'name'; // 'name' | 'code'
+let searchAbortController = null;
+let searchDebounceTimer = null;
+let currentSearchSeq = 0;
+let searchHighlightIndex = -1;
+
+function setBillingSearchMode(mode) {
+  currentBillingSearchMode = (mode === 'code') ? 'code' : 'name';
+
+  // Update tabs across both billing.html and create-bill-modal
+  const nameBtns = [
+    document.getElementById('search-mode-name-btn'),
+    document.getElementById('modal-search-mode-name-btn')
+  ];
+  const codeBtns = [
+    document.getElementById('search-mode-code-btn'),
+    document.getElementById('modal-search-mode-code-btn')
+  ];
+
+  nameBtns.forEach(btn => {
+    if (btn) {
+      if (currentBillingSearchMode === 'name') btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+
+  codeBtns.forEach(btn => {
+    if (btn) {
+      if (currentBillingSearchMode === 'code') btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+
+  // Update placeholder and clear search input
+  const searchInput = document.getElementById('bill-medicine-search-input');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.placeholder = (currentBillingSearchMode === 'code')
+      ? 'Type medicine code / barcode…'
+      : 'Type medicine name…';
+    searchInput.focus();
+  }
+
+  clearMedicineSearch(false);
+}
+window.setBillingSearchMode = setBillingSearchMode;
+
+function showSearchSpinner(show) {
+  const spinner = document.getElementById('bill-search-loading-spinner');
+  if (spinner) spinner.style.display = show ? 'block' : 'none';
+}
+
+function updateSearchClearBtn(hasValue) {
+  const clearBtn = document.getElementById('bill-search-clear-btn');
+  if (clearBtn) {
+    clearBtn.style.display = hasValue ? 'block' : 'none';
+  }
+}
+
+function clearMedicineSearch(refocus = true) {
+  clearTimeout(searchDebounceTimer);
+  if (searchAbortController) {
+    searchAbortController.abort();
+    searchAbortController = null;
+  }
+  showSearchSpinner(false);
+  updateSearchClearBtn(false);
+
+  const searchInput = document.getElementById('bill-medicine-search-input');
+  if (searchInput && searchInput.value !== '') {
+    searchInput.value = '';
+  }
+
+  const dropdown = document.getElementById('bill-search-results-dropdown');
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+  }
+
+  window._lastSearchResults = [];
+  searchHighlightIndex = -1;
+
+  if (refocus && searchInput) {
+    searchInput.focus();
+  }
+}
+window.clearMedicineSearch = clearMedicineSearch;
 
 async function handleMedicineSearchInput(val) {
-  clearTimeout(searchTimeout);
+  const cleanQ = (val || '').trim();
+  const rawVal = val || '';
+  updateSearchClearBtn(rawVal.length > 0);
+
   const dropdown = document.getElementById('bill-search-results-dropdown');
   if (!dropdown) return;
 
-  const q = (val || '').trim();
-  currentSearchQuery = q;
-
-  if (q.length < 2) {
+  // If input is empty, instantly close dropdown and cancel ongoing requests
+  if (cleanQ.length === 0) {
+    clearTimeout(searchDebounceTimer);
+    if (searchAbortController) {
+      searchAbortController.abort();
+      searchAbortController = null;
+    }
+    showSearchSpinner(false);
     dropdown.style.display = 'none';
     dropdown.innerHTML = '';
+    window._lastSearchResults = [];
+    searchHighlightIndex = -1;
     return;
   }
 
-  // Show lightweight loading state immediately
-  dropdown.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--color-text-muted); font-size: 13px;">⏳ Searching inventory & catalog for "${escapeHtml(q)}"...</div>`;
+  // Cancel prior timer & abort prior in-flight request
+  clearTimeout(searchDebounceTimer);
+  if (searchAbortController) {
+    searchAbortController.abort();
+  }
+  searchAbortController = new AbortController();
+  const currentSignal = searchAbortController.signal;
+  const requestSeq = ++currentSearchSeq;
+
+  // Show loading indicator
+  showSearchSpinner(true);
+  dropdown.innerHTML = `
+    <div style="padding: 14px 18px; text-align: center; color: var(--color-text-muted); font-size: 13.5px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <span style="display: inline-block; animation: spin 1s linear infinite;">🔄</span> Searching inventory…
+    </div>`;
   dropdown.style.display = 'block';
 
-  searchTimeout = setTimeout(async () => {
-    if (currentSearchQuery !== q) return; // Stale request guard
-    const cleanLowerQ = q.toLowerCase();
+  // Debounce 200ms (within 200–300ms requirement)
+  const debounceDelay = 200;
 
-    let results = [];
+  searchDebounceTimer = setTimeout(async () => {
+    if (currentSignal.aborted || requestSeq !== currentSearchSeq) return;
 
-    // 1. Prefix and contains match over active shop inventory
-    const invMatches = availableInventoryCache.filter(p => {
-      const pName = (p.name || p.product_name || '').toLowerCase();
-      const pBrand = (p.brand || p.manufacturer || '').toLowerCase();
-      const pComp = (p.composition || '').toLowerCase();
-      const pBatch = (p.batch_number || '').toLowerCase();
-      return pName.includes(cleanLowerQ) || pBrand.includes(cleanLowerQ) || pComp.includes(cleanLowerQ) || pBatch.includes(cleanLowerQ);
-    });
+    try {
+      let results = [];
+      const endpoint = `/billing/search-products?query=${encodeURIComponent(cleanQ)}&search_mode=${encodeURIComponent(currentBillingSearchMode)}&limit=15`;
 
-    results = invMatches.map(p => ({
+      if (window.api && typeof window.api.searchBillingProducts === 'function') {
+        results = await window.api.searchBillingProducts(cleanQ, currentBillingSearchMode, 15, currentSignal);
+      } else if (window.api && typeof window.api.request === 'function') {
+        results = await window.api.request(endpoint, { signal: currentSignal });
+      } else {
+        const token = localStorage.getItem('expiryguard_token') || localStorage.getItem('token');
+        const resp = await fetch(endpoint, {
+          headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+          credentials: 'include',
+          signal: currentSignal
+        });
+        if (resp.ok) {
+          results = await resp.json();
+        }
+      }
+
+      // Guard against stale response overwriting a newer search request
+      if (currentSignal.aborted || requestSeq !== currentSearchSeq) return;
+
+      showSearchSpinner(false);
+      const itemsList = Array.isArray(results) ? results : (results && Array.isArray(results.items) ? results.items : []);
+      renderSearchResultsDropdown(itemsList, cleanQ, false);
+
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      if (requestSeq === currentSearchSeq) {
+        showSearchSpinner(false);
+        console.warn('Medicine search error:', err);
+        renderSearchResultsDropdown([], cleanQ, true);
+      }
+    }
+  }, debounceDelay);
+}
+window.handleMedicineSearchInput = handleMedicineSearchInput;
+
+function renderSearchResultsDropdown(rawItems, query, isError = false) {
+  const dropdown = document.getElementById('bill-search-results-dropdown');
+  if (!dropdown) return;
+
+  if (isError) {
+    dropdown.innerHTML = `
+      <div style="padding: 16px 20px; text-align: center; color: #DC2626; font-size: 13px;">
+        ⚠️ Unable to search medicines. Please check connection and try again.
+      </div>`;
+    dropdown.style.display = 'block';
+    window._lastSearchResults = [];
+    return;
+  }
+
+  if (!rawItems || rawItems.length === 0) {
+    dropdown.innerHTML = `
+      <div style="padding: 18px 20px; text-align: center; color: var(--color-text-muted); font-size: 13.5px;">
+        No medicines found matching "<strong>${escapeHtml(query)}</strong>"
+        <div style="font-size: 12px; margin-top: 5px; opacity: 0.85;">
+          ${currentBillingSearchMode === 'code' ? 'Check the medicine code or barcode and try again.' : 'Check the spelling or try generic composition.'}
+        </div>
+      </div>`;
+    dropdown.style.display = 'block';
+    window._lastSearchResults = [];
+    return;
+  }
+
+  // Format uniform items from real inventory database
+  const formattedItems = rawItems.map(p => {
+    return {
       productId: p.id,
-      name: p.name || p.product_name,
-      brand: p.brand || p.manufacturer || 'General',
+      name: p.product_name || p.name || 'Unknown Medicine',
+      brand: p.brand || '',
       composition: p.composition || '',
       hsnCode: p.hsn_code || '3004',
       batchNumber: p.batch_number || 'BATCH-01',
-      expiryDate: p.expiry_date ? p.expiry_date.split('T')[0] : '2028-12-31',
-      stock: p.quantity || 10,
-      mrp: p.unit_price || 50.0,
+      barcode: p.barcode || '',
+      expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '2028-12-31',
+      stock: (p.quantity !== undefined && p.quantity !== null) ? Number(p.quantity) : 0,
+      mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 50.0,
       pricePerUnit: p.price_per_unit || p.loose_tablet_price,
       unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10,
-      gst: p.gst_percentage || p.gst_rate || 12.0,
-      isInventory: true
-    }));
+      gst: p.gst_percentage || p.gst_rate || 12.0
+    };
+  });
 
-    // 2. Fetch catalog suggestions if needed (supports name, brand, salt)
-    if (window.api && typeof window.api.request === 'function') {
-      try {
-        const catRes = await window.api.request(`/catalog/search?q=${encodeURIComponent(q)}&limit=8`).catch(() => []);
-        if (Array.isArray(catRes)) {
-          catRes.forEach(c => {
-            const medName = c.product_name || c.name;
-            if (medName && !results.some(r => r.name.toLowerCase() === medName.toLowerCase())) {
-              results.push({
-                productId: 0,
-                name: medName,
-                brand: c.brand || 'General',
-                composition: c.composition || '',
-                hsnCode: c.hsn_code || '3004',
-                batchNumber: 'BATCH-01',
-                expiryDate: '2028-12-31',
-                stock: 25,
-                mrp: c.default_price || c.mrp || 45.0,
-                pricePerUnit: c.price_per_unit,
-                unitsPerPack: c.units_per_pack || c.tablets_per_strip || 10,
-                gst: c.gst_rate || c.gst || 12.0,
-                isInventory: false
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Catalog search error:', err);
-      }
-    }
+  window._lastSearchResults = formattedItems;
+  searchHighlightIndex = -1;
 
-    if (currentSearchQuery !== q) return;
-
-    if (results.length === 0) {
-      dropdown.innerHTML = `<div style="padding: 14px 16px; color: var(--color-text-muted); text-align: center; font-size: 13px;">No medicines found matching "<strong>${escapeHtml(q)}</strong>".<br><span style="font-size: 11.5px;">Try typing generic salt (e.g. Paracetamol) or brand name.</span></div>`;
-      dropdown.style.display = 'block';
-      return;
-    }
-
-    dropdown.innerHTML = results.map((r, idx) => `
-      <div class="search-result-item" onclick="selectMedicineForBill(${idx})" style="padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <div style="font-weight: 600; font-size: 13.5px; color: var(--color-text-primary);">${escapeHtml(r.name)}</div>
-          <div style="font-size: 11.5px; color: var(--color-text-muted); margin-top: 2px;">
-            ${escapeHtml(r.brand)}${r.composition ? ' • ' + escapeHtml(r.composition) : ''}
-            • Batch: <strong style="color: var(--status-safe);">${escapeHtml(r.batchNumber)}</strong>
-            • Exp: ${escapeHtml(r.expiryDate)}
-            • Avail: ${r.stock} ${r.unitsPerPack ? '(1x' + r.unitsPerPack + ')' : ''}
+  let html = formattedItems.map((r, idx) => `
+    <div class="search-result-item" id="search-res-item-${idx}" onclick="selectMedicineForBill(${idx})"
+         style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--color-border); transition: background 0.12s ease;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>${escapeHtml(r.name)}</span>
+            ${r.brand ? `<span style="font-size: 11.5px; font-weight: 500; color: var(--color-text-muted); background: var(--color-surface-bg); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--color-border);">${escapeHtml(r.brand)}</span>` : ''}
+            ${r.barcode ? `<span class="badge badge-info" style="font-size: 10.5px;">🏷️ ${escapeHtml(r.barcode)}</span>` : ''}
+          </div>
+          ${r.composition ? `<div style="font-size: 12px; font-weight: 600; color: #2563EB; margin-top: 3px; text-transform: uppercase;">Composition: ${escapeHtml(r.composition)}</div>` : ''}
+          <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 12px;">
+            ${r.hsnCode ? `<span>Code: <strong>${escapeHtml(r.hsnCode)}</strong></span>` : ''}
+            <span>Batch: <strong style="color: var(--status-safe);">${escapeHtml(r.batchNumber)}</strong></span>
+            <span>Exp: <strong>${escapeHtml(r.expiryDate)}</strong></span>
+            <span>Stock: <strong style="${r.stock <= 0 ? 'color: #DC2626;' : 'color: #10B981;'}">${r.stock}</strong></span>
           </div>
         </div>
-        <div style="text-align: right;">
-          <div style="font-weight: 700; color: var(--status-safe); font-size: 14px;">₹${Number(r.mrp).toFixed(2)}</div>
-          <span class="badge badge-info" style="font-size: 10.5px;">GST ${r.gst}%</span>
+        <div style="text-align: right; flex-shrink: 0; margin-left: 8px;">
+          <div style="font-weight: 800; color: var(--status-safe); font-size: 16px;">₹${Number(r.mrp).toFixed(2)}</div>
+          <span class="badge badge-info" style="font-size: 10px; margin-top: 4px; display: inline-block;">GST ${r.gst}%</span>
         </div>
       </div>
-    `).join('');
+    </div>
+  `).join('');
 
-    window._lastSearchResults = results;
-    dropdown.style.display = 'block';
-  }, 250);
+  dropdown.innerHTML = html;
+  dropdown.style.display = 'block';
 }
 
-function selectMedicineForBill(index) {
-  const med = (window._lastSearchResults || [])[index];
-  if (!med) return;
+// ----------------------------------------------------
+// KEYBOARD NAVIGATION IN SEARCH RESULTS (Arrows, Enter, Escape)
+// ----------------------------------------------------
 
+function handleSearchKeydown(e) {
   const dropdown = document.getElementById('bill-search-results-dropdown');
-  const searchInput = document.getElementById('bill-medicine-search-input');
-  if (dropdown) dropdown.style.display = 'none';
-  if (searchInput) searchInput.value = '';
+  const results = window._lastSearchResults || [];
+  const isOpen = dropdown && dropdown.style.display === 'block' && results.length > 0;
 
-  // FEFO: Find all active batches for this product in inventory
-  const relatedBatches = availableInventoryCache.filter(p => 
-    (p.name && p.name.toLowerCase() === med.name.toLowerCase()) ||
-    (p.product_name && p.product_name.toLowerCase() === med.name.toLowerCase())
-  );
-
-  let batchesList = [];
-  if (relatedBatches.length > 0) {
-    batchesList = relatedBatches.map(b => ({
-      productId: b.id,
-      batchNumber: b.batch_number,
-      expiryDate: b.expiry_date ? b.expiry_date.split('T')[0] : '2028-12-31',
-      stock: b.quantity,
-      mrp: b.unit_price,
-      pricePerUnit: b.price_per_unit || b.loose_tablet_price,
-      unitsPerPack: b.units_per_pack || b.tablets_per_strip || 10
-    })).sort((a, b) => (a.expiryDate > b.expiryDate ? 1 : -1));
-  } else {
-    batchesList = [{
-      productId: med.productId || (availableInventoryCache[0] ? availableInventoryCache[0].id : 1),
-      batchNumber: med.batchNumber,
-      expiryDate: med.expiryDate,
-      stock: med.stock,
-      mrp: med.mrp,
-      pricePerUnit: med.pricePerUnit,
-      unitsPerPack: med.unitsPerPack || 10
-    }];
+  if (e.key === 'ArrowDown') {
+    if (!isOpen) return;
+    e.preventDefault();
+    searchHighlightIndex = Math.min(results.length - 1, searchHighlightIndex + 1);
+    updateSearchHighlight(results.length);
+    return;
   }
 
+  if (e.key === 'ArrowUp') {
+    if (!isOpen) return;
+    e.preventDefault();
+    searchHighlightIndex = Math.max(0, searchHighlightIndex - 1);
+    updateSearchHighlight(results.length);
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (isOpen) {
+      const targetIdx = (searchHighlightIndex >= 0) ? searchHighlightIndex : 0;
+      selectMedicineForBill(targetIdx);
+    }
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    if (dropdown) dropdown.style.display = 'none';
+    searchHighlightIndex = -1;
+    e.target.blur();
+    return;
+  }
+}
+
+function updateSearchHighlight(count) {
+  for (let i = 0; i < count; i++) {
+    const el = document.getElementById(`search-res-item-${i}`);
+    if (el) {
+      if (i === searchHighlightIndex) {
+        el.classList.add('selected');
+        el.scrollIntoView({ block: 'nearest' });
+      } else {
+        el.classList.remove('selected');
+      }
+    }
+  }
+}
+
+// Global click outside to dismiss search dropdown
+document.addEventListener('click', (e) => {
+  const searchBox = document.querySelector('.billing-search-box');
+  const dropdown = document.getElementById('bill-search-results-dropdown');
+  if (dropdown && searchBox && !searchBox.contains(e.target)) {
+    dropdown.style.display = 'none';
+  }
+});
+
+// Global listener for keydown on search input
+document.addEventListener('keydown', (e) => {
+  if (e.target && e.target.id === 'bill-medicine-search-input') {
+    handleSearchKeydown(e);
+  }
+});
+
+function selectMedicineForBill(index, overrides = {}) {
+  const results = window._lastSearchResults || [];
+  const med = results[index];
+  if (!med) return;
+
+  const currentSearchResults = [...results];
+  // Clear search field, hide dropdown, hide clear button
+  clearMedicineSearch(false);
+
+  // FEFO: Gather all active batches for this product in inventory
+  const seenBatches = new Set();
+  const allBatches = [];
+
+  function addBatch(b) {
+    if (!b || !b.batchNumber || seenBatches.has(b.batchNumber)) return;
+    seenBatches.add(b.batchNumber);
+    allBatches.push(b);
+  }
+
+  // 1. Add the clicked medicine batch
+  addBatch({
+    productId: med.productId || 1,
+    batchNumber: med.batchNumber || 'BATCH-01',
+    expiryDate: med.expiryDate || '2028-12-31',
+    stock: med.stock !== undefined ? med.stock : 10,
+    mrp: med.mrp || 50.0,
+    pricePerUnit: med.pricePerUnit,
+    unitsPerPack: med.unitsPerPack || 10
+  });
+
+  // 2. Add matching batches from recent search results
+  currentSearchResults.forEach(sm => {
+    if (sm && sm.name && sm.name.trim().toLowerCase() === med.name.trim().toLowerCase()) {
+      addBatch({
+        productId: sm.productId || 1,
+        batchNumber: sm.batchNumber || 'BATCH-01',
+        expiryDate: sm.expiryDate || '2028-12-31',
+        stock: sm.stock !== undefined ? sm.stock : 10,
+        mrp: sm.mrp || 50.0,
+        pricePerUnit: sm.pricePerUnit,
+        unitsPerPack: sm.unitsPerPack || 10
+      });
+    }
+  });
+
+  // 3. Add matching batches from availableInventoryCache if populated
+  if (Array.isArray(availableInventoryCache) && availableInventoryCache.length > 0) {
+    availableInventoryCache.forEach(p => {
+      const pName = (p.product_name || p.name || '').trim().toLowerCase();
+      if (pName && pName === med.name.trim().toLowerCase()) {
+        addBatch({
+          productId: p.id,
+          batchNumber: p.batch_number,
+          expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '2028-12-31',
+          stock: p.quantity,
+          mrp: p.unit_price,
+          pricePerUnit: p.price_per_unit || p.loose_tablet_price,
+          unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10
+        });
+      }
+    });
+  }
+
+  // Sort batches strictly by FEFO (First Expiry First Out)
+  allBatches.sort((a, b) => {
+    const expA = a.expiryDate || '9999-12-31';
+    const expB = b.expiryDate || '9999-12-31';
+    return expA.localeCompare(expB);
+  });
+
+  const batchesList = allBatches.length > 0 ? allBatches : [{
+    productId: med.productId || 1,
+    batchNumber: med.batchNumber || 'BATCH-01',
+    expiryDate: med.expiryDate || '2028-12-31',
+    stock: med.stock || 10,
+    mrp: med.mrp || 50.0,
+    pricePerUnit: med.pricePerUnit,
+    unitsPerPack: med.unitsPerPack || 10
+  }];
+
+  // Pre-select first valid earliest-expiry batch (FEFO)
   const primaryBatch = batchesList[0];
   const unitsPerPack = Number(primaryBatch.unitsPerPack || med.unitsPerPack || 10);
   const packPrice = Number(primaryBatch.mrp || med.mrp || 50.0);
   const loosePrice = primaryBatch.pricePerUnit ? Number(primaryBatch.pricePerUnit) : Number((packPrice / unitsPerPack).toFixed(2));
+
+  const requestedUnit = (overrides.unitType === 'loose') ? 'loose' : 'strip';
+  const requestedQty = (overrides.quantity && overrides.quantity > 0) ? Number(overrides.quantity) : 1;
+  const initialRate = requestedUnit === 'loose' ? loosePrice : packPrice;
 
   const newItem = {
     id: Date.now() + Math.random(),
@@ -348,12 +656,12 @@ function selectMedicineForBill(index) {
     selectedBatch: primaryBatch.batchNumber,
     expiryDate: primaryBatch.expiryDate,
     availableStock: primaryBatch.stock,
-    unitType: 'strip', // 'strip' (full pack) vs 'loose' (loose/open tablets)
+    unitType: requestedUnit,
     packPrice: packPrice,
     unitsPerPack: unitsPerPack,
     loosePrice: loosePrice,
-    rate: packPrice,
-    quantity: 1,
+    rate: initialRate,
+    quantity: requestedQty,
     freeQuantity: 0,
     discountPercent: 0.0,
     gstRate: Number(med.gst) || 12.0,
@@ -364,16 +672,15 @@ function selectMedicineForBill(index) {
   renderBillItemsTable();
   recalculateTotals();
 
-  // Focus the Qty field of the newly added row
+  // Return focus to search input immediately for rapid counter billing
   setTimeout(() => {
-    const qtyInputs = document.querySelectorAll('.item-qty-input');
-    if (qtyInputs.length > 0) {
-      const lastQty = qtyInputs[qtyInputs.length - 1];
-      lastQty.focus();
-      lastQty.select();
+    const sInput = document.getElementById('bill-medicine-search-input');
+    if (sInput) {
+      sInput.focus();
     }
-  }, 50);
+  }, 20);
 }
+window.selectMedicineForBill = selectMedicineForBill;
 
 // ----------------------------------------------------
 // RUNNING BILL TABLE RENDERING & INLINE EDITING
@@ -608,9 +915,15 @@ function handlePaymentModeChange(mode) {
     }
   });
 
+  if (mode !== 'SPLIT') {
+    activeBillState.splitPayments = [];
+    const splitStrip = document.getElementById('split-payment-summary-strip');
+    if (splitStrip) splitStrip.style.display = 'none';
+  }
+
   const promptBox = document.getElementById('pending-customer-prompt');
   if (promptBox) {
-    if (mode === 'PENDING') {
+    if (mode === 'PENDING' || mode === 'CREDIT') {
       if (!activeBillState.customer || activeBillState.customer.name === 'Walk-in Customer') {
         promptBox.style.display = 'block';
         const inp = document.getElementById('pending-customer-name-input');
@@ -625,24 +938,229 @@ function handlePaymentModeChange(mode) {
 }
 
 // ----------------------------------------------------
+// SPLIT PAYMENT MODAL HANDLERS
+// ----------------------------------------------------
+
+let tempSplitAllocations = [];
+
+function openSplitPaymentModal() {
+  if (activeBillState.items.length === 0) {
+    alert('Please add at least one medicine before configuring split payment.');
+    return;
+  }
+
+  recalculateTotals();
+  const grandTotal = activeBillState.calculated ? activeBillState.calculated.grandTotal : 0;
+  if (grandTotal <= 0) {
+    alert('Bill total must be greater than 0 for split payment.');
+    return;
+  }
+
+  // Initialize modal state
+  if (activeBillState.splitPayments && activeBillState.splitPayments.length > 0) {
+    tempSplitAllocations = JSON.parse(JSON.stringify(activeBillState.splitPayments));
+  } else {
+    // Default suggestion: Cash for remaining
+    tempSplitAllocations = [
+      { payment_method: 'CASH', amount: grandTotal }
+    ];
+  }
+
+  renderSplitModalState();
+  const modal = document.getElementById('split-payment-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeSplitPaymentModal() {
+  const modal = document.getElementById('split-payment-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderSplitModalState() {
+  const grandTotal = activeBillState.calculated ? activeBillState.calculated.grandTotal : 0;
+  const allocated = tempSplitAllocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+  const remaining = Math.round((grandTotal - allocated) * 100) / 100;
+
+  const elTotal = document.getElementById('split-modal-total-bill');
+  const elAlloc = document.getElementById('split-modal-allocated');
+  const elRem = document.getElementById('split-modal-remaining');
+  const elCreditWarn = document.getElementById('split-credit-customer-warning');
+
+  if (elTotal) elTotal.textContent = `₹${grandTotal.toFixed(2)}`;
+  if (elAlloc) elAlloc.textContent = `₹${allocated.toFixed(2)}`;
+  if (elRem) {
+    elRem.textContent = `₹${remaining.toFixed(2)}`;
+    elRem.style.color = (Math.abs(remaining) < 0.01) ? '#16A34A' : '#DC2626';
+  }
+
+  // Check if credit is in allocations and customer is walk-in
+  const hasCredit = tempSplitAllocations.some(a => a.payment_method === 'CREDIT');
+  const isWalkIn = !activeBillState.customer || activeBillState.customer.name === 'Walk-in Customer';
+  if (elCreditWarn) {
+    elCreditWarn.style.display = (hasCredit && isWalkIn) ? 'block' : 'none';
+  }
+
+  // Render list
+  const listContainer = document.getElementById('split-allocations-list');
+  if (listContainer) {
+    if (tempSplitAllocations.length === 0) {
+      listContainer.innerHTML = `<div style="text-align: center; color: #94A3B8; font-size: 13px; padding: 12px;">No payment methods added yet. Add below.</div>`;
+    } else {
+      const methodLabels = { CASH: '💵 Cash', UPI: '📱 UPI', CARD: '💳 Card', CREDIT: '📒 Credit (Khata)' };
+      listContainer.innerHTML = tempSplitAllocations.map((alloc, idx) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 8px 12px; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 700; font-size: 13px; color: #1E293B;">${methodLabels[alloc.payment_method] || alloc.payment_method}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: 800; font-size: 14px; color: #0F172A;">₹${(parseFloat(alloc.amount) || 0).toFixed(2)}</span>
+            <button type="button" onclick="handleRemoveSplitAllocation(${idx})" style="background: none; border: none; color: #EF4444; font-size: 16px; cursor: pointer; padding: 0 4px;" title="Remove">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Pre-fill next allocation with remaining if > 0
+  const addAmtInput = document.getElementById('split-add-amount');
+  if (addAmtInput && remaining > 0) {
+    addAmtInput.value = remaining.toFixed(2);
+  }
+}
+
+function handleAddSplitAllocation() {
+  const methodSelect = document.getElementById('split-add-method');
+  const amountInput = document.getElementById('split-add-amount');
+  if (!methodSelect || !amountInput) return;
+
+  const method = methodSelect.value;
+  const amount = Math.round(parseFloat(amountInput.value) * 100) / 100;
+
+  if (isNaN(amount) || amount <= 0) {
+    alert('Please enter a valid payment amount greater than 0.');
+    return;
+  }
+
+  // Consolidate duplicate methods
+  const existing = tempSplitAllocations.find(a => a.payment_method === method);
+  if (existing) {
+    existing.amount = Math.round((existing.amount + amount) * 100) / 100;
+  } else {
+    tempSplitAllocations.push({ payment_method: method, amount: amount });
+  }
+
+  amountInput.value = '';
+  renderSplitModalState();
+}
+
+function handleRemoveSplitAllocation(index) {
+  tempSplitAllocations.splice(index, 1);
+  renderSplitModalState();
+}
+
+function handleClearSplitPayments() {
+  tempSplitAllocations = [];
+  activeBillState.splitPayments = [];
+  activeBillState.paymentMode = 'CASH';
+  handlePaymentModeChange('CASH');
+  closeSplitPaymentModal();
+  showToastNotification('Split payments reset to Cash sale.');
+}
+
+function applySplitPayments() {
+  const grandTotal = activeBillState.calculated ? activeBillState.calculated.grandTotal : 0;
+  const allocated = tempSplitAllocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+  const remaining = Math.round((grandTotal - allocated) * 100) / 100;
+
+  if (tempSplitAllocations.length === 0) {
+    alert('Please add at least one payment allocation.');
+    return;
+  }
+
+  if (Math.abs(remaining) >= 0.01) {
+    if (remaining > 0) {
+      alert(`Underpayment: Bill total is ₹${grandTotal.toFixed(2)}, but only ₹${allocated.toFixed(2)} is allocated. Remaining: ₹${remaining.toFixed(2)}.`);
+    } else {
+      alert(`Overpayment: Bill total is ₹${grandTotal.toFixed(2)}, but ₹${allocated.toFixed(2)} is allocated. Please adjust by ₹${Math.abs(remaining).toFixed(2)}.`);
+    }
+    return;
+  }
+
+  // Check credit ledger safety
+  const hasCredit = tempSplitAllocations.some(a => a.payment_method === 'CREDIT');
+  let finalCustomerName = (activeBillState.customer ? activeBillState.customer.name : 'Walk-in Customer');
+  if (hasCredit && (finalCustomerName === 'Walk-in Customer' || !finalCustomerName)) {
+    const inlineName = (activeBillState.pendingCustomerName || (document.getElementById('pending-customer-name-input') ? document.getElementById('pending-customer-name-input').value : '')).trim();
+    if (!inlineName) {
+      const promptedName = prompt('Credit allocation requires a Customer Name for Khata ledger. Enter customer name:');
+      if (!promptedName || !promptedName.trim()) {
+        alert('Cannot confirm split with Credit without a valid Customer Name.');
+        return;
+      }
+      activeBillState.pendingCustomerName = promptedName.trim();
+      const inp = document.getElementById('pending-customer-name-input');
+      if (inp) inp.value = promptedName.trim();
+    }
+  }
+
+  activeBillState.splitPayments = JSON.parse(JSON.stringify(tempSplitAllocations));
+  activeBillState.paymentMode = 'SPLIT';
+
+  // Highlight Split button
+  document.querySelectorAll('.pay-mode-btn').forEach(b => {
+    if (b.dataset.mode === 'SPLIT') {
+      b.classList.add('btn-primary');
+      b.classList.remove('btn-secondary');
+    } else {
+      b.classList.remove('btn-primary');
+      b.classList.add('btn-secondary');
+    }
+  });
+
+  // Show summary badge
+  const splitStrip = document.getElementById('split-payment-summary-strip');
+  const splitSummaryText = document.getElementById('split-payment-summary-text');
+  if (splitStrip && splitSummaryText) {
+    const breakdownStr = activeBillState.splitPayments.map(p => `${p.payment_method}: ₹${p.amount.toFixed(2)}`).join(' | ');
+    splitSummaryText.textContent = `✂️ Split: ${breakdownStr}`;
+    splitStrip.style.display = 'flex';
+  }
+
+  closeSplitPaymentModal();
+  showToastNotification('Split payment allocations applied successfully.');
+}
+
+// ----------------------------------------------------
 // COMMITTING BILL & PDF GENERATION
 // ----------------------------------------------------
 
+let isCommittingBill = false;
+
 async function commitBillTransaction(printPdf = false, saveAndNew = false) {
+  if (isCommittingBill) {
+    console.warn('[BILLING] Commit transaction already in-flight. Duplicate tap suppressed.');
+    return;
+  }
+
   if (activeBillState.items.length === 0) {
     alert('Cannot save empty bill. Please add at least one medicine.');
     return;
   }
 
-  // Validate customer for Pending payment mode
+  isCommittingBill = true;
+
+  // Validate customer for Pending/Credit payment modes
   let finalCustomerName = (activeBillState.customer ? activeBillState.customer.name : 'Walk-in Customer');
   let finalCustomerPhone = (activeBillState.customer && activeBillState.customer.phone !== 'Cash Sale' ? activeBillState.customer.phone : null);
 
-  if (activeBillState.paymentMode === 'PENDING') {
+  const hasCreditAllocation = activeBillState.paymentMode === 'CREDIT' || activeBillState.paymentMode === 'PENDING' ||
+    (activeBillState.splitPayments && activeBillState.splitPayments.some(p => p.payment_method === 'CREDIT'));
+
+  if (hasCreditAllocation) {
     const inlineName = (activeBillState.pendingCustomerName || (document.getElementById('pending-customer-name-input') ? document.getElementById('pending-customer-name-input').value : '')).trim();
     if (finalCustomerName === 'Walk-in Customer' || !finalCustomerName) {
       if (!inlineName) {
-        alert('Please enter a Customer / Patient name to record this pending payment in the ledger.');
+        alert('Please enter a Customer / Patient name to record this credit sale in the ledger.');
         const inp = document.getElementById('pending-customer-name-input');
         if (inp) inp.focus();
         return;
@@ -669,15 +1187,22 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
     gst_percentage: Number(item.gstRate) || 12.0
   }));
 
+  if (!activeBillState.idempotencyKey) {
+    activeBillState.idempotencyKey = 'df_sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
+
   const payload = {
     items: payloadItems,
+    idempotency_key: activeBillState.idempotencyKey,
     payment_method: activeBillState.paymentMode || 'CASH',
+    payments: (activeBillState.paymentMode === 'SPLIT' && activeBillState.splitPayments.length > 0) ? activeBillState.splitPayments : null,
     customer_name: finalCustomerName,
     customer_phone: finalCustomerPhone,
     notes: `Retail POS Sale - ${activeBillState.invoiceNumber}`,
     is_interstate: false,
     discount_type: activeBillState.billDiscountPercent > 0 ? 'percent' : null,
-    discount_value: Number(activeBillState.billDiscountPercent) || 0.0
+    discount_value: Number(activeBillState.billDiscountPercent) || 0.0,
+    ...(activeBillState.activeHeldBillId ? { held_bill_id: activeBillState.activeHeldBillId } : {})
   };
 
   try {
@@ -690,6 +1215,7 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Idempotency-Key': activeBillState.idempotencyKey,
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(payload)
@@ -757,6 +1283,7 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
     console.error('Bill save failed:', err);
     alert(`Failed to save bill: ${err.message}`);
   } finally {
+    isCommittingBill = false;
     if (saveBtn && saveBtn.disabled) {
       saveBtn.disabled = false;
       saveBtn.innerHTML = originalText;
@@ -766,6 +1293,7 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
 
 function resetBillForm() {
   activeBillState = {
+    idempotencyKey: 'df_sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
     customer: billingCustomersCache[0] || { id: 1, name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
     pendingCustomerName: '',
     invoiceNumber: generateBillInvoiceNumber(),
@@ -774,6 +1302,8 @@ function resetBillForm() {
     billDiscountPercent: 0.0,
     manualRoundOff: 0.0,
     useManualRoundOff: false,
+    activeHeldBillId: null,
+    activeHeldBillNumber: null,
     items: []
   };
 
@@ -790,11 +1320,314 @@ function resetBillForm() {
   handlePaymentModeChange('CASH');
   renderBillItemsTable();
   recalculateTotals();
+  updateResumedHeldBanner();
+  refreshHeldBillsCount();
 
+  clearMedicineSearch(false);
+  setBillingSearchMode('name');
   const searchInput = document.getElementById('bill-medicine-search-input');
+  if (searchInput) {
+    searchInput.focus();
+  }
+}
+
+// ----------------------------------------------------
+// HELD BILLS (PARK / RESUME) SYSTEM
+// ----------------------------------------------------
+
+async function refreshHeldBillsCount() {
+  try {
+    if (window.api && typeof window.api.getHeldBillsCount === 'function') {
+      const res = await window.api.getHeldBillsCount();
+      const count = (res && typeof res.count === 'number') ? res.count : 0;
+      const badge = document.getElementById('held-bills-badge-count');
+      if (badge) badge.textContent = count;
+    }
+  } catch (e) {
+    console.warn('Failed to refresh held bills count:', e);
+  }
+}
+
+function updateResumedHeldBanner() {
+  const banner = document.getElementById('resumed-held-banner');
+  const numSpan = document.getElementById('resumed-held-number');
+  if (!banner || !numSpan) return;
+
+  if (activeBillState.activeHeldBillNumber) {
+    numSpan.textContent = activeBillState.activeHeldBillNumber;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+    numSpan.textContent = '';
+  }
+}
+
+function clearResumedHeldBill() {
+  activeBillState.activeHeldBillId = null;
+  activeBillState.activeHeldBillNumber = null;
+  updateResumedHeldBanner();
+  showToastNotification('Bill unlinked from held record. Will be saved as a new bill.');
+}
+
+async function holdCurrentBill() {
+  if (!activeBillState.items || activeBillState.items.length === 0) {
+    alert('Cannot hold an empty bill. Add at least one medicine before holding.');
+    return;
+  }
+
+  const defaultName = (activeBillState.customer && activeBillState.customer.name !== 'Walk-in Customer')
+    ? activeBillState.customer.name
+    : '';
+
+  const custName = prompt('Enter Customer / Patient Name (optional):', defaultName);
+  if (custName === null) return; // User cancelled
+
+  const note = prompt('Enter Hold Note / Reason (optional, e.g. Customer at ATM):', '');
+  if (note === null) return;
+
+  const payloadItems = activeBillState.items.map(item => ({
+    product_id: item.productId || (availableInventoryCache[0] ? availableInventoryCache[0].id : 1),
+    product_name: item.name || 'Medicine',
+    quantity: Number(item.quantity) || 1,
+    unit_type: item.unitType || 'strip',
+    unit_price: Number(item.rate) || 0.0,
+    discount: Number(item.discountPercent) || 0.0,
+    tablets_per_strip: item.tabletsPerStrip || 10,
+    batch_number: item.selectedBatch || 'BATCH-01',
+    expiry_date: item.expiryDate || null,
+    gst_percentage: Number(item.gstRate) || 12.0
+  }));
+
+  const payload = {
+    customer_id: activeBillState.customer && activeBillState.customer.id !== 1 ? activeBillState.customer.id : null,
+    customer_name: (custName && custName.trim()) ? custName.trim() : (activeBillState.customer ? activeBillState.customer.name : 'Walk-in Customer'),
+    customer_phone: activeBillState.customer && activeBillState.customer.phone !== 'Cash Sale' ? activeBillState.customer.phone : null,
+    payment_method: activeBillState.paymentMode || 'CASH',
+    split_payments: (activeBillState.paymentMode === 'SPLIT' && activeBillState.splitPayments && activeBillState.splitPayments.length > 0) ? activeBillState.splitPayments : null,
+    discount_type: activeBillState.billDiscountPercent > 0 ? 'percent' : null,
+    discount_value: Number(activeBillState.billDiscountPercent) || 0.0,
+    notes: (note && note.trim()) ? note.trim() : null,
+    items: payloadItems
+  };
+
+  try {
+    const res = await window.api.createHeldBill(payload);
+    const billNumber = res.held_bill_number || 'HB-???';
+
+    // CRITICAL: Cart is cleared ONLY after successful hold!
+    resetBillForm();
+    await refreshHeldBillsCount();
+
+    showToastNotification(`⏸️ Bill successfully held as ${billNumber}! Parked safely.`);
+  } catch (err) {
+    // CRITICAL: On error, active cart remains untouched!
+    alert(`Failed to hold bill: ${err.message || err}`);
+  }
+}
+
+let heldBillsListCache = [];
+
+async function openHeldBillsModal() {
+  const modal = document.getElementById('held-bills-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  const searchInput = document.getElementById('held-bills-search-input');
   if (searchInput) {
     searchInput.value = '';
     searchInput.focus();
+  }
+
+  await loadHeldBillsList();
+}
+
+function closeHeldBillsModal() {
+  const modal = document.getElementById('held-bills-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadHeldBillsList(query = '') {
+  const container = document.getElementById('held-bills-modal-list');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align: center; color: #888; padding: 30px;">Loading held bills...</div>';
+
+  try {
+    const bills = await window.api.getHeldBills('HELD', query);
+    heldBillsListCache = bills || [];
+    renderHeldBillsList(heldBillsListCache);
+  } catch (e) {
+    container.innerHTML = `<div style="text-align: center; color: #dc2626; padding: 20px;">Failed to load held bills: ${e.message || e}</div>`;
+  }
+}
+
+let heldSearchDebounceTimer = null;
+function handleHeldBillsSearch(query) {
+  clearTimeout(heldSearchDebounceTimer);
+  heldSearchDebounceTimer = setTimeout(() => {
+    loadHeldBillsList(query);
+  }, 300);
+}
+
+function renderHeldBillsList(bills) {
+  const container = document.getElementById('held-bills-modal-list');
+  if (!container) return;
+
+  if (!bills || bills.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: #64748b; padding: 40px 20px;">
+        <div style="font-size: 40px; margin-bottom: 8px;">⏸️</div>
+        <div style="font-weight: 600; font-size: 15px;">No Held Bills Found</div>
+        <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Use "⏸️ Hold Bill" on active cart to park customer sales.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = bills.map(bill => {
+    const itemsPreview = (bill.items || []).slice(0, 3).map(it => `${it.product_name} (x${it.quantity})`).join(', ') + ((bill.items || []).length > 3 ? '...' : '');
+    const dateStr = bill.created_at ? new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+    return `
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; background: white; display: flex; justify-content: space-between; align-items: center; gap: 14px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="background: #ffedd5; color: #c2410c; font-weight: 700; font-size: 13px; padding: 2px 8px; border-radius: 4px; font-family: monospace;">
+              ${bill.held_bill_number}
+            </span>
+            <span style="font-weight: 600; font-size: 14px; color: #1e293b;">
+              ${bill.customer_name || 'Walk-in Customer'}
+            </span>
+            ${bill.customer_phone ? `<span style="font-size: 12.5px; color: #64748b;">(${bill.customer_phone})</span>` : ''}
+            <span style="font-size: 12px; color: #94a3b8; margin-left: auto;">${dateStr}</span>
+          </div>
+
+          <div style="font-size: 12.5px; color: #64748b; margin-bottom: 4px;">
+            ${(bill.items || []).length} item(s): <span style="color: #334155;">${itemsPreview}</span>
+          </div>
+
+          ${bill.notes ? `<div style="font-size: 12px; color: #9a3412; font-style: italic;">Note: "${bill.notes}"</div>` : ''}
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;">
+          <div style="font-size: 17px; font-weight: 800; color: #16a34a;">
+            ₹${(bill.estimated_total || 0).toFixed(2)}
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 5px 10px; color: #dc2626;" onclick="cancelHeldBillWeb(${bill.id})">
+              ✕ Cancel
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" style="background: #16a34a; font-size: 12.5px; font-weight: 700; padding: 5px 14px;" onclick="resumeHeldBillWeb(${bill.id})">
+              ▶ Resume
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function resumeHeldBillWeb(heldBillId) {
+  if (activeBillState.items && activeBillState.items.length > 0) {
+    const confirmReplace = confirm('You have items in your current bill. Resuming will replace the current active cart. Proceed?');
+    if (!confirmReplace) return;
+  }
+
+  try {
+    const resumeData = await window.api.resumeHeldBill(heldBillId);
+    const heldBill = resumeData.held_bill;
+    const resumeItems = resumeData.items || [];
+
+    if (resumeData.has_stock_shortage) {
+      const shortages = resumeItems.filter(it => !it.is_sufficient);
+      const shortageDetails = shortages.map(it => `• ${it.product_name}: Requested ${it.requested_quantity}, Available ${it.available_stock}`).join('\n');
+      const proceed = confirm(`⚠️ Stock Shortage Warning:\nSome items have lower stock than requested:\n\n${shortageDetails}\n\nDo you want to load the bill and adjust quantities?`);
+      if (!proceed) return;
+    }
+
+    // Restore activeBillState
+    activeBillState.activeHeldBillId = heldBill.id;
+    activeBillState.activeHeldBillNumber = heldBill.held_bill_number;
+    activeBillState.paymentMode = heldBill.payment_method || 'CASH';
+    activeBillState.billDiscountPercent = (heldBill.discount_type === 'percent') ? heldBill.discount_value : 0;
+    
+    if (heldBill.split_payments && Array.isArray(heldBill.split_payments) && heldBill.split_payments.length > 0) {
+      activeBillState.splitPayments = JSON.parse(JSON.stringify(heldBill.split_payments));
+      activeBillState.paymentMode = 'SPLIT';
+    } else {
+      activeBillState.splitPayments = [];
+    }
+    
+    // Match customer
+    if (heldBill.customer_id) {
+      const matched = billingCustomersCache.find(c => c.id === heldBill.customer_id);
+      if (matched) activeBillState.customer = matched;
+      else activeBillState.customer = { id: heldBill.customer_id, name: heldBill.customer_name, phone: heldBill.customer_phone || '' };
+    } else if (heldBill.customer_name) {
+      activeBillState.customer = { id: 1, name: heldBill.customer_name, phone: heldBill.customer_phone || '' };
+    }
+
+    activeBillState.items = resumeItems.map((it, idx) => {
+      const isLoose = (it.unit_type === 'loose_tablet' || it.unit_type === 'loose' || it.unit_type === 'pill');
+      return {
+        id: idx + 1,
+        productId: it.product_id,
+        name: it.product_name,
+        quantity: it.requested_quantity || 1,
+        freeQty: 0,
+        unitType: isLoose ? 'loose_tablet' : 'strip',
+        tabletsPerStrip: it.tablets_per_strip || 10,
+        rate: Number(it.unit_price) || 0.0,
+        mrp: Number(it.unit_price) || 0.0,
+        selectedBatch: it.batch_number || 'BATCH-01',
+        expiryDate: it.expiry_date || '',
+        gstRate: Number(it.gst_percentage) || 12.0,
+        discountPercent: Number(it.discount) || 0.0,
+        hsnCode: it.hsn_code || '3004',
+        availableStock: it.available_stock
+      };
+    });
+
+    renderCustomerDropdown();
+    handlePaymentModeChange(activeBillState.paymentMode);
+    if (activeBillState.paymentMode === 'SPLIT' && activeBillState.splitPayments.length > 0) {
+      document.querySelectorAll('.pay-mode-btn').forEach(b => {
+        if (b.dataset.mode === 'SPLIT') {
+          b.classList.add('btn-primary');
+          b.classList.remove('btn-secondary');
+        } else {
+          b.classList.remove('btn-primary');
+          b.classList.add('btn-secondary');
+        }
+      });
+      const splitStrip = document.getElementById('split-payment-summary-strip');
+      const splitSummaryText = document.getElementById('split-payment-summary-text');
+      if (splitStrip && splitSummaryText) {
+        const breakdownStr = activeBillState.splitPayments.map(p => `${p.payment_method}: ₹${p.amount.toFixed(2)}`).join(' | ');
+        splitSummaryText.textContent = `✂️ Split: ${breakdownStr}`;
+        splitStrip.style.display = 'flex';
+      }
+    }
+    renderBillItemsTable();
+    recalculateTotals();
+    updateResumedHeldBanner();
+
+    closeHeldBillsModal();
+    showToastNotification(`▶ Resumed bill ${heldBill.held_bill_number}`);
+  } catch (err) {
+    alert(`Failed to resume held bill: ${err.message || err}`);
+  }
+}
+
+async function cancelHeldBillWeb(heldBillId) {
+  if (!confirm('Are you sure you want to cancel this held bill? This cannot be undone.')) return;
+
+  try {
+    await window.api.cancelHeldBill(heldBillId);
+    await refreshHeldBillsCount();
+    await loadHeldBillsList();
+    showToastNotification('Held bill cancelled successfully.');
+  } catch (err) {
+    alert(`Failed to cancel held bill: ${err.message || err}`);
   }
 }
 
@@ -902,11 +1735,24 @@ function openCreateBillModal() {
           </div>
 
           <!-- Section 2: Search Medicine Autocomplete -->
-          <div class="billing-search-box">
-            <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14px; padding: 10px 14px;"
-                   placeholder="🔎 Type medicine name, brand, or generic salt (e.g. Augmentin, Dolo, Pantocid)..."
-                   oninput="handleMedicineSearchInput(this.value)" autocomplete="off">
-            <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
+          <div class="billing-search-box" style="position: relative;">
+            <!-- Search Mode Selector -->
+            <div class="billing-search-mode-bar">
+              <button type="button" class="search-mode-tab active" id="modal-search-mode-name-btn" onclick="setBillingSearchMode('name')">
+                🔎 Search by Medicine Name
+              </button>
+              <button type="button" class="search-mode-tab" id="modal-search-mode-code-btn" onclick="setBillingSearchMode('code')">
+                🏷️ Search by Medicine Code
+              </button>
+            </div>
+            <div style="position: relative;">
+              <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14px; padding: 10px 60px 10px 14px; width: 100%; box-sizing: border-box;"
+                     placeholder="Type medicine name…"
+                     oninput="handleMedicineSearchInput(this.value)" autocomplete="off">
+              <button type="button" id="bill-search-clear-btn" class="search-clear-btn" onclick="clearMedicineSearch()" title="Clear search" style="display: none;">&times;</button>
+              <div id="bill-search-loading-spinner" class="search-spinner-inline" style="display: none;"></div>
+              <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
+            </div>
           </div>
 
           <!-- Section 3: Horizontal Desktop Items Table -->
@@ -1015,3 +1861,361 @@ function closeCreateBillModal() {
 window.openCreateBillModal = openCreateBillModal;
 window.closeCreateBillModal = closeCreateBillModal;
 window.initBillingEngine = initBillingEngine;
+
+// ====================================================
+// VOICE BILLING ENGINE (Web Speech API - 100% Free / On-Device)
+// ====================================================
+
+let voiceRecognition = null;
+let isVoiceListening = false;
+let voiceCandidateResults = [];
+
+function checkVoiceSupport() {
+  return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+}
+
+function initVoiceRecognition() {
+  if (!checkVoiceSupport()) return null;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 3;
+  recognition.lang = 'en-IN'; // Indian English / Hinglish optimized
+
+  recognition.onstart = () => {
+    isVoiceListening = true;
+    updateVoiceUI(true, "Listening... Speak medicine name or HSN code");
+  };
+
+  recognition.onresult = (event) => {
+    const spokenText = event.results[0][0].transcript;
+    console.log("Voice recognized text:", spokenText);
+    matchVoiceInputToItem(spokenText);
+  };
+
+  recognition.onerror = (event) => {
+    console.warn("Voice recognition error:", event.error);
+    isVoiceListening = false;
+    updateVoiceUI(false);
+    if (event.error === 'not-allowed') {
+      showVoiceToast("Microphone permission denied. Please allow mic access.");
+    } else if (event.error !== 'no-speech') {
+      showVoiceToast(`Voice error: ${event.error}`);
+    }
+  };
+
+  recognition.onend = () => {
+    isVoiceListening = false;
+    updateVoiceUI(false);
+  };
+
+  return recognition;
+}
+
+function toggleVoiceBilling() {
+  if (!checkVoiceSupport()) {
+    alert("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+    return;
+  }
+
+  if (isVoiceListening) {
+    stopVoiceBilling();
+  } else {
+    startVoiceBilling();
+  }
+}
+
+function startVoiceBilling() {
+  try {
+    if (!voiceRecognition) {
+      voiceRecognition = initVoiceRecognition();
+    }
+    if (voiceRecognition) {
+      voiceRecognition.start();
+    }
+  } catch (err) {
+    console.warn("Could not start speech recognition:", err);
+    isVoiceListening = false;
+    updateVoiceUI(false);
+  }
+}
+
+function stopVoiceBilling() {
+  if (voiceRecognition && isVoiceListening) {
+    voiceRecognition.stop();
+  }
+  isVoiceListening = false;
+  updateVoiceUI(false);
+}
+
+function updateVoiceUI(isListening, statusText = "") {
+  const micBtn = document.getElementById('voice-billing-mic-btn');
+  const statusBar = document.getElementById('voice-status-bar');
+  const statusMsg = document.getElementById('voice-status-text');
+
+  if (micBtn) {
+    if (isListening) {
+      micBtn.classList.add('voice-listening-active');
+      micBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="22" height="22" stroke="#EF4444" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="6" fill="#EF4444" />
+        </svg>
+      `;
+    } else {
+      micBtn.classList.remove('voice-listening-active');
+      micBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="22" height="22" stroke="#2563EB" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      `;
+    }
+  }
+
+  if (statusBar) {
+    if (isListening) {
+      statusBar.style.display = 'flex';
+      if (statusMsg) statusMsg.textContent = statusText;
+    }
+  }
+}
+
+function showVoiceToast(msg, isSuccess = false) {
+  const statusBar = document.getElementById('voice-status-bar');
+  const statusMsg = document.getElementById('voice-status-text');
+  const pulseDot = document.getElementById('voice-pulse-dot');
+  if (statusBar && statusMsg) {
+    statusBar.style.display = 'flex';
+    statusBar.style.background = isSuccess ? '#ECFDF5' : '#EFF6FF';
+    statusBar.style.borderColor = isSuccess ? '#A7F3D0' : '#BFDBFE';
+    statusBar.style.color = isSuccess ? '#065F46' : '#1E40AF';
+    if (pulseDot) pulseDot.style.display = isSuccess ? 'none' : 'inline-block';
+    statusMsg.innerHTML = msg;
+    setTimeout(() => {
+      if (!isVoiceListening) {
+        dismissVoiceStatus();
+      }
+    }, 4500);
+  }
+}
+
+function dismissVoiceStatus() {
+  const statusBar = document.getElementById('voice-status-bar');
+  if (statusBar) statusBar.style.display = 'none';
+}
+
+function dismissVoiceChips() {
+  const chipsContainer = document.getElementById('voice-candidate-chips');
+  if (chipsContainer) chipsContainer.style.display = 'none';
+}
+
+let lastVoiceParsedCommand = null;
+
+function showVoiceConfirmationStrip(text) {
+  const strip = document.getElementById('voice-confirmation-strip');
+  const txt = document.getElementById('voice-confirmation-text');
+  if (strip && txt) {
+    txt.innerHTML = text;
+    strip.style.display = 'flex';
+  }
+}
+
+function dismissVoiceConfirmation() {
+  const strip = document.getElementById('voice-confirmation-strip');
+  if (strip) strip.style.display = 'none';
+}
+
+function editLastVoiceItem() {
+  const qtyInputs = document.querySelectorAll('.item-qty-input');
+  if (qtyInputs.length > 0) {
+    const lastQty = qtyInputs[qtyInputs.length - 1];
+    lastQty.focus();
+    lastQty.select();
+  }
+}
+
+// Intelligent Voice Matching Logic with Full Natural Command Parsing
+async function matchVoiceInputToItem(spokenText) {
+  const cleanSpoken = (spokenText || "").trim();
+  if (!cleanSpoken) return;
+
+  const parsed = (typeof parseVoiceCommand === 'function')
+    ? parseVoiceCommand(cleanSpoken)
+    : (window.parseVoiceCommand ? window.parseVoiceCommand(cleanSpoken) : { quantity: 1, unit: 'strip', itemNameGuess: cleanSpoken, rawText: cleanSpoken });
+
+  lastVoiceParsedCommand = parsed;
+  const searchQuery = parsed.itemNameGuess || cleanSpoken;
+
+  const searchInput = document.getElementById('bill-medicine-search-input');
+  if (searchInput) {
+    searchInput.value = searchQuery;
+  }
+
+  const unitLabel = parsed.unit === 'loose'
+    ? (parsed.quantity > 1 ? 'loose tablets' : 'loose tablet')
+    : (parsed.quantity > 1 ? 'strips' : 'strip');
+
+  showVoiceToast(`Heard: <strong>${parsed.quantity} ${unitLabel}</strong> of "<strong>${escapeHtml(parsed.itemNameGuess)}</strong>" • Finding match...`);
+
+  try {
+    // 1. Check if backend /items/search endpoint is available
+    let items = [];
+    if (window.api && typeof window.api.request === 'function') {
+      try {
+        const res = await window.api.request(`/items/search?q=${encodeURIComponent(searchQuery)}&limit=10`);
+        if (res && res.items) {
+          items = res.items;
+        }
+      } catch (e) {
+        console.warn("/items/search network error, falling back to local:", e);
+      }
+    }
+
+    // 2. Fallback to client-side availableInventoryCache if backend call didn't return
+    if (!items || items.length === 0) {
+      const hsnMatch = cleanSpoken.match(/\b\d{4,8}\b/);
+      if (hsnMatch) {
+        const hsn = hsnMatch[0];
+        items = availableInventoryCache.filter(p => (p.hsn_code || '').includes(hsn));
+      } else {
+        const lowerQ = searchQuery.toLowerCase();
+        items = availableInventoryCache.filter(p => {
+          const name = (p.name || p.product_name || '').toLowerCase();
+          return name.includes(lowerQ) || lowerQ.includes(name);
+        });
+      }
+    }
+
+    if (!items || items.length === 0) {
+      showVoiceToast(`No items found for "<strong>${escapeHtml(searchQuery)}</strong>"`);
+      handleMedicineSearchInput(searchQuery);
+      return;
+    }
+
+    // 3. Format matched items
+    const formattedList = items.map(p => ({
+      productId: p.id,
+      name: p.product_name || p.name,
+      brand: p.brand || p.manufacturer || 'General',
+      composition: p.composition || '',
+      hsnCode: p.hsn_code || '3004',
+      batchNumber: p.batch_number || 'BATCH-01',
+      expiryDate: p.expiry_date ? p.expiry_date.split('T')[0] : '2028-12-31',
+      stock: p.quantity || 10,
+      mrp: p.unit_price || 50.0,
+      pricePerUnit: p.price_per_unit || p.loose_tablet_price,
+      unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10,
+      gst: p.gst_percentage || p.gst_rate || 12.0,
+      similarity: p.similarity !== undefined ? p.similarity : 0.7,
+      isInventory: p.is_inventory !== false
+    }));
+
+    window._lastSearchResults = formattedList;
+    const topItem = formattedList[0];
+
+    // High confidence (>0.6): Auto-populate with parsed quantity and unit
+    if (topItem.similarity >= 0.6) {
+      dismissVoiceChips();
+      selectMedicineForBill(0, {
+        quantity: parsed.quantity,
+        unitType: parsed.unit
+      });
+      showVoiceConfirmationStrip(`Heard: <strong>${parsed.quantity} ${unitLabel}</strong> of <strong>${escapeHtml(topItem.name)}</strong>`);
+      showVoiceToast(`Added: <strong>${parsed.quantity} ${unitLabel}</strong> of <strong>${escapeHtml(topItem.name)}</strong> to bill`, true);
+    } else {
+      // Confidence low (<0.6): Present top 3 candidates as chips for manual confirmation
+      renderVoiceCandidateChips(formattedList.slice(0, 3));
+      showVoiceToast(`Please confirm your match for "<strong>${escapeHtml(searchQuery)}</strong>":`);
+    }
+  } catch (err) {
+    console.error("Error matching voice input:", err);
+    showVoiceToast(`Matching failed: ${err.message}`);
+  }
+}
+
+function renderVoiceCandidateChips(candidates) {
+  voiceCandidateResults = candidates;
+  const chipsContainer = document.getElementById('voice-candidate-chips');
+  const chipsList = document.getElementById('voice-candidate-chips-list');
+  if (!chipsContainer || !chipsList) return;
+
+  if (!candidates || candidates.length === 0) {
+    chipsContainer.style.display = 'none';
+    return;
+  }
+
+  const qty = (lastVoiceParsedCommand && lastVoiceParsedCommand.quantity) ? lastVoiceParsedCommand.quantity : 1;
+  const unit = (lastVoiceParsedCommand && lastVoiceParsedCommand.unit) ? lastVoiceParsedCommand.unit : 'strip';
+  const unitLabel = unit === 'loose'
+    ? (qty > 1 ? 'loose tablets' : 'loose tablet')
+    : (qty > 1 ? 'strips' : 'strip');
+
+  chipsList.innerHTML = candidates.map((item, idx) => `
+    <button type="button" class="btn btn-secondary" onclick="confirmVoiceCandidate(${idx})"
+            style="padding: 6px 12px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; border-color: #3B82F6; background: #F0FDF4;">
+      <span style="font-weight: 600; color: #166534;">${escapeHtml(item.name)}</span>
+      <span style="font-size: 11px; color: #4B5563;">₹${Number(item.mrp).toFixed(2)}</span>
+      <span class="badge badge-info" style="font-size: 10px; padding: 1px 5px;">+${qty} ${unit}</span>
+    </button>
+  `).join('') + `
+    <button type="button" class="btn btn-secondary" onclick="dismissVoiceChips()" style="padding: 6px 8px; font-size: 12px; color: #94A3B8;">
+      Dismiss ✕
+    </button>
+  `;
+
+  chipsContainer.style.display = 'flex';
+}
+
+function confirmVoiceCandidate(index) {
+  const item = voiceCandidateResults[index];
+  if (!item) return;
+  dismissVoiceChips();
+  const qty = (lastVoiceParsedCommand && lastVoiceParsedCommand.quantity) ? lastVoiceParsedCommand.quantity : 1;
+  const unit = (lastVoiceParsedCommand && lastVoiceParsedCommand.unit) ? lastVoiceParsedCommand.unit : 'strip';
+  const unitLabel = unit === 'loose'
+    ? (qty > 1 ? 'loose tablets' : 'loose tablet')
+    : (qty > 1 ? 'strips' : 'strip');
+
+  window._lastSearchResults = [item];
+  selectMedicineForBill(0, {
+    quantity: qty,
+    unitType: unit
+  });
+  showVoiceConfirmationStrip(`Heard: <strong>${qty} ${unitLabel}</strong> of <strong>${escapeHtml(item.name)}</strong>`);
+  showVoiceToast(`Confirmed: <strong>${qty} ${unitLabel}</strong> of <strong>${escapeHtml(item.name)}</strong>`, true);
+}
+
+// Attach Voice Billing methods to global scope
+window.toggleVoiceBilling = toggleVoiceBilling;
+window.dismissVoiceStatus = dismissVoiceStatus;
+window.dismissVoiceChips = dismissVoiceChips;
+window.confirmVoiceCandidate = confirmVoiceCandidate;
+window.dismissVoiceConfirmation = dismissVoiceConfirmation;
+window.editLastVoiceItem = editLastVoiceItem;
+
+// Attach Billing & Live Autocomplete methods to global scope
+window.handleMedicineSearchInput = handleMedicineSearchInput;
+window.selectMedicineForBill = selectMedicineForBill;
+window.setBillingSearchMode = setBillingSearchMode;
+window.renderSearchResultsDropdown = renderSearchResultsDropdown;
+window.initBillingEngine = initBillingEngine;
+
+// Auto-initialize if running directly on billing.html
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (document.getElementById('billing-page')) {
+        initBillingEngine();
+      }
+    });
+  } else {
+    if (document.getElementById('billing-page')) {
+      initBillingEngine();
+    }
+  }
+}
+
+

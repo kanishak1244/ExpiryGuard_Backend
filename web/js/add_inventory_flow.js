@@ -50,7 +50,7 @@ function createAddInventoryModalDOM() {
                onclick="triggerScanBillOption()" onmouseover="this.style.borderColor='var(--primary-green)'" onmouseout="this.style.borderColor='var(--border-color)'">
             <div style="font-size: 40px; margin-bottom: 8px;">📄</div>
             <h3 style="margin-bottom: 6px; font-size: 16px;">Scan / Upload Bill</h3>
-            <p style="font-size: 12.5px; color: var(--muted-text); margin: 0;">Upload supplier invoice image or PDF. Gemini AI vision extracts medicines, batches & prices.</p>
+            <p style="font-size: 12.5px; color: var(--muted-text); margin: 0;">Upload supplier invoice image or PDF. Dawaiflow AI extracts medicines, batches & prices.</p>
           </div>
 
           <!-- Option 2: Search Medicine -->
@@ -79,7 +79,7 @@ function createAddInventoryModalDOM() {
         </div>
       </div>
 
-      <!-- Step: Bulk Excel / CSV Direct Upload (No Gemini AI) -->
+      <!-- Step: Bulk Excel / CSV Direct Upload (No AI) -->
       <div id="inv-step-bulk-import" style="display: none; padding: 16px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="showChoiceStep()">← Back to Options</button>
@@ -454,17 +454,29 @@ async function uploadSpreadsheetFile(file) {
       res = await r.json();
     }
 
-    if (res.imported_count > 0) {
-      statusText.innerHTML = `✅ <strong>Success!</strong> ${res.imported_count} medicine batches imported directly into active inventory.`;
+    const totalImported = (res.rows_imported || 0) + (res.rows_updated || 0) + (res.imported_count || 0);
+    const totalSkipped = res.rows_skipped || 0;
+    const totalProcessed = res.total_rows_processed || (totalImported + totalSkipped);
+
+    if (totalImported > 0 || (res.success && totalProcessed > 0)) {
+      statusText.innerHTML = `✅ <strong>Success!</strong> Import completed: ${totalImported} records imported/updated (${totalSkipped} skipped).`;
       statusText.style.color = '#059669';
+    } else if (totalSkipped > 0) {
+      statusText.innerHTML = `ℹ️ <strong>Import Notice:</strong> All ${totalSkipped} records were already up to date or skipped.`;
+      statusText.style.color = '#2563EB';
     } else {
       statusText.innerHTML = `⚠️ <strong>Import Warning:</strong> No rows imported. Check errors below.`;
       statusText.style.color = '#D97706';
     }
 
     if (res.errors && res.errors.length > 0) {
-      errorList.innerHTML = `<strong>Issues encountered (${res.errors.length}):</strong><ul style="margin: 6px 0 0 16px; padding: 0;">` +
-        res.errors.map(e => `<li>${e}</li>`).join('') + `</ul>`;
+      errorList.innerHTML = `<strong>Issues encountered (${res.errors_count || res.errors.length}):</strong><ul style="margin: 6px 0 0 16px; padding: 0;">` +
+        res.errors.map(e => {
+          if (typeof e === 'object' && e !== null) {
+            return `<li>Row ${e.row || '?'}: ${e.reason || e.message || JSON.stringify(e)}</li>`;
+          }
+          return `<li>${e}</li>`;
+        }).join('') + `</ul>`;
     }
 
     // Refresh live inventory table if on inventory page

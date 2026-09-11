@@ -19,6 +19,29 @@ def purge_expired_inventory_job():
         db.close()
 
 
+def automated_backup_job():
+    """Daily scheduled backup job for all active pharmacies."""
+    import backup_service
+    import models
+    db = SessionLocal()
+    try:
+        shops = db.query(models.User).all()
+        for shop in shops:
+            try:
+                backup_service.create_backup(
+                    db=db,
+                    user_id=shop.id,
+                    backup_type="AUTOMATED",
+                    notes="Daily automated scheduled backup",
+                )
+            except Exception as shop_err:
+                print(f"[SCHEDULER ERROR] Automated backup failed for shop {shop.id}: {shop_err}")
+    except Exception as e:
+        print(f"[SCHEDULER ERROR] Automated backup job encountered error: {e}")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     scheduler.add_job(
         send_expiry_notifications,
@@ -36,6 +59,14 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        automated_backup_job,
+        trigger="interval",
+        hours=24,
+        id="daily_automated_backup",
+        replace_existing=True,
+    )
+
     scheduler.start()
 
-    print("[SCHEDULER] Notification & Soft-Delete Purge Scheduler Started")
+    print("[SCHEDULER] Notification, Soft-Delete Purge & Automated Backup Scheduler Started")

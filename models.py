@@ -9,7 +9,9 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -104,6 +106,9 @@ class Product(Base):
     __tablename__ = "products"
     __table_args__ = (
         Index("idx_products_user_name", "user_id", "product_name"),
+        Index("idx_products_user_deleted", "user_id", "is_deleted"),
+        Index("idx_products_user_name_prefix", "user_id", text("lower(product_name) varchar_pattern_ops")),
+        Index("idx_products_user_brand_prefix", "user_id", text("lower(brand) varchar_pattern_ops")),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -145,6 +150,7 @@ class Product(Base):
 
     image_path = Column(String, nullable=True)
     ocr_text = Column(String, nullable=True)
+    barcode = Column(String, nullable=True, index=True)
 
     # Data Trust & Master Verification Fields
     pack_size_label = Column(String, nullable=True)
@@ -220,8 +226,11 @@ class NotificationSettings(Base):
 
     enabled = Column(Boolean, default=True)
     notify_before_days = Column(Integer, default=7)
-    reminder_frequency = Column(String, default="daily")
-    notification_time = Column(String, default="08:00")
+    reminder_frequency = Column(String, default="twice_weekly")
+    notification_time = Column(String, default="09:00")
+    digest_enabled = Column(Boolean, default=True, nullable=False)
+    digest_days = Column(String, default="Tuesday,Friday", nullable=True)
+    digest_time = Column(String, default="09:00", nullable=True)
     sound = Column(Boolean, default=True)
     vibration = Column(Boolean, default=True)
 
@@ -287,21 +296,62 @@ class Sale(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    is_split_payment = Column(Boolean, default=False, nullable=False)
+
+    # Multi-User Staff Attribution
+    staff_id = Column(Integer, ForeignKey("staff_members.id", ondelete="SET NULL"), nullable=True, index=True)
+    staff_name = Column(String, nullable=True)
+
+    # Data Migration & Historical Billing
+    is_historical = Column(Boolean, default=False, nullable=False, index=True)
+    transaction_source = Column(String(50), default="LIVE_BILLING", nullable=False, index=True)  # LIVE_BILLING, IMPORTED_HISTORICAL
+    migration_id = Column(Integer, ForeignKey("data_migrations.id", ondelete="SET NULL"), nullable=True, index=True)
+    original_bill_number = Column(String(100), nullable=True, index=True)
+
+    # Export Status
+    is_exported = Column(Boolean, default=False, nullable=False, index=True)
+    exported_at = Column(DateTime, nullable=True, index=True)
+
+    # Concurrency & Idempotency Protection
+    idempotency_key = Column(String(128), nullable=True, index=True)
+
     # Relationships
     user = relationship("User", back_populates="sales")
+    staff = relationship("StaffMember")
+    migration = relationship("DataMigration", back_populates="sales")
     items = relationship("SaleItem", back_populates="sale", cascade="all, delete-orphan")
+    payments = relationship("SalePayment", back_populates="sale", cascade="all, delete-orphan")
     returns = relationship(
-    "SaleReturn",
-    back_populates="sale",
-    cascade="all, delete-orphan",
-)
+        "SaleReturn",
+        back_populates="sale",
+        cascade="all, delete-orphan",
+    )
+
+
+class SalePayment(Base):
+    """
+    Individual payment allocation for a sale (CASH, UPI, CARD, CREDIT).
+    Supports single payment and split-payment transactions atomically.
+    """
+    __tablename__ = "sale_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    payment_method = Column(String, nullable=False)  # CASH, UPI, CARD, CREDIT
+    amount = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    sale = relationship("Sale", back_populates="payments")
+    user = relationship("User")
+
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
 
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)  # Nullable for historical legacy imports
 
     # Frozen snapshot data
     product_name = Column(String, nullable=False)
@@ -330,9 +380,14 @@ class SaleItem(Base):
     igst_amount = Column(Float, nullable=False, default=0.0)
     total_with_tax = Column(Float, nullable=False, default=0.0)
 
+    # Historical Migration metadata
+    is_historical = Column(Boolean, default=False, nullable=False, index=True)
+    migration_id = Column(Integer, ForeignKey("data_migrations.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Relationships
     sale = relationship("Sale", back_populates="items")
     product = relationship("Product")
+    migration = relationship("DataMigration")
     return_items = relationship("SaleReturnItem", back_populates="sale_item")
 class SaleReturn(Base):
     __tablename__ = "sale_returns"
@@ -630,3 +685,349 @@ class PurchaseReturnItem(Base):
 
     purchase_return = relationship("PurchaseReturn", back_populates="items")
     product = relationship("Product")
+
+
+class StaffMember(Base):
+    __tablename__ = "staff_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    username = Column(String, nullable=True, index=True)
+    password = Column(String, nullable=True)  # bcrypt hashed password
+    encrypted_password = Column(Text, nullable=True)  # Fernet encrypted password for Owner-only retrieval
+    role = Column(String, nullable=False, default="PHARMACIST")  # OWNER, PHARMACIST, BILLING_STAFF, INVENTORY_STAFF
+    status = Column(String, nullable=False, default="ACTIVE")  # ACTIVE, INACTIVE
+    permissions_json = Column(Text, nullable=True)  # Optional JSON list of custom permission overrides
+    last_login = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class StoreBranch(Base):
+    __tablename__ = "store_branches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    branch_name = Column(String, nullable=False)
+    code = Column(String, nullable=True, default="BR-01")
+    address = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    is_main = Column(Boolean, default=False)
+    status = Column(String, nullable=False, default="ACTIVE")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class CaProfile(Base):
+    __tablename__ = "ca_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    ca_email = Column(String, nullable=False)
+    ca_name = Column(String, nullable=True)
+    ca_phone = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class CaShareLog(Base):
+    __tablename__ = "ca_share_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    sender_email = Column(String, nullable=True)
+    ca_email = Column(String, nullable=False)
+    reports_shared = Column(Text, nullable=False)  # JSON formatted list of report names
+    date_range_label = Column(String, nullable=False, default="Custom Range")
+    date_range_start = Column(DateTime, nullable=True)
+    date_range_end = Column(DateTime, nullable=True)
+    status = Column(String, nullable=False, default="SENT", index=True)  # SENT, FAILED
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    notes = Column(Text, nullable=True)
+
+    user = relationship("User")
+
+
+class UserGoogleOAuth(Base):
+    __tablename__ = "user_google_oauth"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    google_email = Column(String, nullable=False)
+    encrypted_refresh_token = Column(Text, nullable=False)
+    scopes = Column(Text, nullable=True)
+    connected_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class PrinterDevice(Base):
+    __tablename__ = "printer_devices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    device_name = Column(String, nullable=False)  # User-friendly label (e.g. "Counter 1 Thermal Printer")
+    printer_system_name = Column(String, nullable=False)  # OS spooler name (e.g. "POS-80", "XP-58", "Microsoft Print to PDF")
+    connection_type = Column(String, nullable=False, default="USB")  # USB, BLUETOOTH, NETWORK
+    paper_size = Column(String, nullable=False, default="80mm")  # 58mm, 80mm
+    is_default = Column(Boolean, nullable=False, default=True)
+    is_online = Column(Boolean, nullable=False, default=False)
+    last_seen_at = Column(DateTime, nullable=True)
+
+    # Detailed hardware configuration (JSON string)
+    # { "copies": 1, "cut_paper": true, "open_cash_drawer": false, "character_encoding": "CP437", "auto_print": false }
+    settings_json = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+    print_jobs = relationship("PrintJob", back_populates="printer", cascade="all, delete-orphan")
+
+
+class PrintJob(Base):
+    __tablename__ = "print_jobs"
+    __table_args__ = (
+        Index("idx_print_jobs_user_status", "user_id", "status"),
+        Index("idx_print_jobs_sale", "sale_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    printer_id = Column(Integer, ForeignKey("printer_devices.id"), nullable=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True, index=True)
+    invoice_number = Column(String, nullable=False, index=True)
+
+    # Statuses: PENDING, PRINTING, PRINTED, FAILED, CANCELLED
+    status = Column(String, nullable=False, default="PENDING", index=True)
+
+    copies = Column(Integer, nullable=False, default=1)
+    paper_size = Column(String, nullable=False, default="80mm")  # 58mm, 80mm
+
+    # Frozen JSON payload of finalized bill + shop details (guarantees zero recalculation discrepancies)
+    payload_json = Column(Text, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    claimed_at = Column(DateTime, nullable=True)
+    printed_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+
+    retry_count = Column(Integer, nullable=False, default=0)
+    error_message = Column(Text, nullable=True)
+
+    user = relationship("User")
+    printer = relationship("PrinterDevice", back_populates="print_jobs")
+    sale = relationship("Sale")
+
+
+class HeldBill(Base):
+    """
+    Temporarily parked draft bills allowing pharmacists to serve other customers.
+    Holding a bill NEVER deducts inventory, creates a Sale, or affects reports.
+    """
+    __tablename__ = "held_bills"
+    __table_args__ = (
+        Index("idx_held_bills_user_status", "user_id", "status"),
+        Index("idx_held_bills_created_at", "created_at"),
+        UniqueConstraint("user_id", "held_bill_number", name="uq_held_bills_user_bill_number"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    held_bill_number = Column(String, index=True, nullable=False)
+
+    # Statuses: HELD, RESUMED, COMPLETED, CANCELLED
+    status = Column(String, nullable=False, default="HELD", index=True)
+
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
+    customer_name = Column(String, nullable=True)
+    customer_phone = Column(String, nullable=True)
+
+    doctor_name = Column(String, nullable=True)
+    doctor_reg_no = Column(String, nullable=True)
+
+    payment_method = Column(String, default="CASH")
+    is_interstate = Column(Boolean, default=False)
+
+    discount_type = Column(String, nullable=True)  # "flat", "percent"
+    discount_value = Column(Float, nullable=False, default=0.0)
+
+    # Estimated figures (used for display, recalculated on resume)
+    estimated_subtotal = Column(Float, nullable=False, default=0.0)
+    estimated_discount = Column(Float, nullable=False, default=0.0)
+    estimated_tax = Column(Float, nullable=False, default=0.0)
+    estimated_total = Column(Float, nullable=False, default=0.0)
+
+    notes = Column(Text, nullable=True)
+
+    # Full cart state snapshot (raw JSON of cart items, customer, doctor, settings)
+    snapshot_json = Column(Text, nullable=True)
+    split_payments_json = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    resumed_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    completed_sale_id = Column(Integer, ForeignKey("sales.id"), nullable=True)
+
+    user = relationship("User")
+    customer = relationship("Customer")
+    items = relationship("HeldBillItem", back_populates="held_bill", cascade="all, delete-orphan")
+    completed_sale = relationship("Sale")
+
+    @property
+    def split_payments(self):
+        if self.split_payments_json:
+            try:
+                import json
+                return json.loads(self.split_payments_json)
+            except Exception:
+                return None
+        return None
+
+
+class HeldBillItem(Base):
+    """Line items preserved in a held bill for zero-loss restoration."""
+    __tablename__ = "held_bill_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    held_bill_id = Column(Integer, ForeignKey("held_bills.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+
+    product_name = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    unit_type = Column(String, nullable=False, default="strip")  # "strip", "loose_tablet"
+    unit_price = Column(Float, nullable=False)
+    discount = Column(Float, default=0.0)
+
+    tablets_per_strip = Column(Integer, nullable=True, default=10)
+    batch_number = Column(String, nullable=True)
+    expiry_date = Column(String, nullable=True)
+    hsn_code = Column(String, nullable=True, default="3004")
+    gst_percentage = Column(Float, default=0.0)
+
+    estimated_line_total = Column(Float, nullable=False, default=0.0)
+
+    held_bill = relationship("HeldBill", back_populates="items")
+    product = relationship("Product")
+
+
+class BackupRecord(Base):
+    """Metadata tracking for database snapshots and backups."""
+    __tablename__ = "backup_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    backup_id = Column(String, unique=True, index=True, nullable=False)  # UUID string
+    filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size_bytes = Column(Integer, default=0, nullable=False)
+    backup_type = Column(String, default="MANUAL", nullable=False)  # MANUAL, AUTOMATIC, PRE_RESTORE_SAFETY
+    status = Column(String, default="SUCCESS", nullable=False)  # SUCCESS, FAILED, RESTORED
+    backup_version = Column(Integer, default=1, nullable=False)
+    schema_version = Column(Integer, default=1, nullable=False)
+    app_version = Column(String, default="1.0.0", nullable=False)
+    checksum_sha256 = Column(String, nullable=False)
+    record_counts_json = Column(Text, nullable=True)  # JSON string of table counts
+    notes = Column(Text, nullable=True)
+    created_by_user_id = Column(Integer, nullable=True)
+    created_by_name = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    user = relationship("User")
+
+
+class RestoreLog(Base):
+    """Audit log tracking database restore operations."""
+    __tablename__ = "restore_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    backup_id = Column(String, nullable=False)
+    safety_backup_id = Column(String, nullable=True)
+    initiated_by_name = Column(String, nullable=True)
+    status = Column(String, default="STARTED", nullable=False)  # STARTED, VALIDATING, RESTORED, FAILED, ROLLED_BACK
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    verification_summary_json = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    user = relationship("User")
+
+
+class DataMigration(Base):
+    """Tracks historical data migration batches from legacy pharmacy software."""
+    __tablename__ = "data_migrations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    migration_code = Column(String(50), unique=True, index=True, nullable=False)  # e.g. MG-20260907-001
+    migration_type = Column(String(50), default="OLD_BILLS", nullable=False)  # OLD_BILLS, MEDICINES, SUPPLIERS, CUSTOMERS, INVENTORY
+    source_software = Column(String(50), default="OTHER")  # MARG, VYAPAR, TALLY, PHARMA_RACK, OTHER
+    file_name = Column(String(255), nullable=False)
+    file_format = Column(String(20), nullable=False)  # PDF, CSV, XLSX
+    file_size_bytes = Column(Integer, default=0)
+
+    status = Column(String(50), default="PREVIEW", nullable=False, index=True)  # PREVIEW, PROCESSING, COMPLETED, FAILED, ROLLED_BACK
+
+    # Real-Time Processing Stages & Live Progress
+    current_stage = Column(String(50), default="uploading", nullable=False)
+    current_stage_label = Column(String(100), default="Uploading document", nullable=False)
+    current_message = Column(String(255), default="DAWAI FLOW AI is preparing your document...", nullable=False)
+    processed_count = Column(Integer, default=0, nullable=False)
+    total_count = Column(Integer, default=0, nullable=False)
+    is_large_file = Column(Boolean, default=False, nullable=False)
+
+    total_records_detected = Column(Integer, default=0)
+    total_records_parsed = Column(Integer, default=0)
+    total_records_imported = Column(Integer, default=0)
+    total_duplicates_skipped = Column(Integer, default=0)
+    total_errors = Column(Integer, default=0)
+    total_amount_imported = Column(Float, default=0.0)
+
+    progress_percentage = Column(Integer, default=0)
+    preview_data_json = Column(Text, nullable=True)  # JSON snapshot of parsed preview
+    summary_notes = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    rolled_back_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    sales = relationship("Sale", back_populates="migration")
+    errors = relationship("MigrationError", back_populates="migration", cascade="all, delete-orphan")
+
+
+class MigrationError(Base):
+    """Detailed error / warning record for problematic migration rows."""
+    __tablename__ = "migration_errors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    migration_id = Column(Integer, ForeignKey("data_migrations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    row_number = Column(Integer, nullable=True)
+    bill_identifier = Column(String(100), nullable=True)
+    error_type = Column(String(50), default="PARSE_ERROR")  # PARSE_ERROR, DUPLICATE_BILL, INVALID_DATE, INVALID_AMOUNT, MEDICINE_NOT_FOUND
+    raw_record_json = Column(Text, nullable=True)
+    reason = Column(Text, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    migration = relationship("DataMigration", back_populates="errors")
+    user = relationship("User")
+
+
+

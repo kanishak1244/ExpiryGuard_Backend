@@ -16,7 +16,7 @@ class TabularCurrency extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      '₹\',
+      '₹${amount.toStringAsFixed(2)}',
       style: style ?? AppTypography.numericPrice,
     );
   }

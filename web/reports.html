@@ -3,101 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports & Analytics — ExpiryGuard</title>
+  <title>Reports & Analytics — ExpiryGuard ERP</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
   <link rel="stylesheet" href="css/styles.css?v=9.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+  <style>
+    .filter-bar-container {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md, 8px);
+      padding: 12px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .period-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--color-surface-bg);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+    }
+    .period-tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--color-text-secondary);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .period-tab-btn:hover {
+      color: var(--color-text-primary);
+    }
+    .period-tab-btn.active {
+      background: var(--color-brand-deep, #10B981);
+      color: #FFFFFF !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .custom-date-inputs {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .custom-date-inputs.active {
+      display: flex;
+    }
+    .custom-date-inputs input[type="date"] {
+      padding: 5px 10px;
+      font-size: 12.5px;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      background: var(--color-surface-bg);
+      color: var(--color-text-primary);
+    }
+    .metric-grid-6 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .chart-container {
+      background: var(--color-surface-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md, 8px);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .trend-bars-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 180px;
+      padding-top: 20px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--color-border);
+      overflow-x: auto;
+    }
+    .trend-bar-col {
+      flex: 1;
+      min-width: 32px;
+      max-width: 48px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      position: relative;
+    }
+    .trend-bar-fill {
+      width: 100%;
+      border-radius: 4px 4px 0 0;
+      background: var(--primary-green, #10B981);
+      transition: height 0.3s ease;
+      min-height: 2px;
+    }
+    .trend-bar-purchases {
+      background: #3B82F6;
+    }
+    .trend-bar-label {
+      position: absolute;
+      bottom: -20px;
+      font-size: 10.5px;
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+    .payment-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--color-surface-bg);
+      overflow: hidden;
+      display: flex;
+      margin-top: 8px;
+    }
+    .payment-segment {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+    .seg-cash { background: #10B981; }
+    .seg-upi { background: #3B82F6; }
+    .seg-card { background: #8B5CF6; }
+    .seg-credit { background: #F59E0B; }
+    .insight-alert-box {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
 </head>
 <body>
   <div class="app-container" id="reports-page">
-    
     <!-- Canonical Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <a href="index.html" class="brand-logo">
-          <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
-        </a>
-      </div>
-
-      <nav class="sidebar-menu">
-        <div class="menu-category">Main Menu</div>
-        <a href="index.html" class="nav-item" data-nav-id="dashboard">
-          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-          <span class="nav-text">Dashboard</span>
-        </a>
-        <a href="billing.html" class="nav-item" data-nav-id="billing">
-          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
-          <span class="nav-text">Create New Bill</span>
-        </a>
-        <a href="sales.html" class="nav-item" data-nav-id="sales">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          <span class="nav-text">Billing / Live Sales</span>
-        </a>
-        <a href="ai_billing.html" class="nav-item" data-nav-id="ai-billing">
-          <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          <span class="nav-text">AI Camera Billing</span>
-        </a>
-        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
-          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-          <span class="nav-text">Live Inventory</span>
-        </a>
-        <a href="restock.html" class="nav-item" data-nav-id="restock">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-          <span class="nav-text">Restock Suggestions</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          <span class="nav-text">+ Add Inventory</span>
-        </a>
-        <a href="documents.html" class="nav-item" data-nav-id="documents">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-          <span class="nav-text">Documents & OCR</span>
-        </a>
-        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
-          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          <span class="nav-text">Suppliers</span>
-        </a>
-        <a href="returns.html" class="nav-item" data-nav-id="returns">
-          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          <span class="nav-text">Today's Returns</span>
-        </a>
-        <a href="reports.html" class="nav-item active" data-nav-id="reports">
-          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          <span class="nav-text">Reports & Analytics</span>
-        </a>
-        <a href="settings.html" class="nav-item" data-nav-id="settings">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          <span class="nav-text">Settings</span>
-        </a>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="user-profile-badge">
-          <div class="user-avatar">P</div>
-          <div class="user-info">
-            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
-            <span class="user-role">Owner / Pharmacist</span>
-          </div>
-        </div>
-      </div>
-    </aside>
+    <aside class="sidebar"></aside>
 
     <!-- Main Content -->
     <div class="main-wrapper">
       <header class="topbar">
         <div>
           <h1 class="page-title">Reports & Analytics</h1>
-          <p style="font-size: 13px; color: var(--color-text-muted);">Sales performance trends, revenue breakdowns, top-selling formulations, and expiring stock reports.</p>
+          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
+            Comprehensive sales turnover, purchase analysis, profit margins, inventory valuation, and GST overview.
+          </p>
         </div>
         
         <div class="topbar-right">
-          <a href="/reports/export/sales" download="sales_report.csv" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Sales Report CSV">
+          <button onclick="api.exportSalesCsv(false).then(r => alert(r.count > 0 ? `Exported ${r.count} bill(s). Live feed updated.` : 'No unexported bills.')).catch(e => alert(e.message))" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Download Sales Report CSV and mark exported">
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Sales CSV</span>
-          </a>
+          </button>
           <a href="/reports/export/inventory" download="inventory_report.csv" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Inventory Valuation CSV">
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Inventory CSV</span>
@@ -106,39 +201,166 @@
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
             <span>Print</span>
           </button>
-          <div class="live-indicator">
-            <div class="pulse-dot"></div>
-            <span>REAL-TIME SYNC</span>
-          </div>
         </div>
       </header>
 
       <main class="content-body">
-        
-        <!-- Summary KPI Cards -->
-        <div class="reports-kpi-grid">
-          <div class="kpi-card">
-            <span class="kpi-title">Today's Revenue</span>
-            <div class="kpi-num" id="rep-kpi-today-rev" style="color: var(--status-safe);">₹0.00</div>
-            <div class="kpi-desc">Gross counter sales today</div>
+        <!-- Date Period Filter Bar -->
+        <div class="filter-bar-container">
+          <div class="period-tabs">
+            <button class="period-tab-btn active" data-period="today" onclick="ReportsApp.selectPeriod('today')">Today</button>
+            <button class="period-tab-btn" data-period="yesterday" onclick="ReportsApp.selectPeriod('yesterday')">Yesterday</button>
+            <button class="period-tab-btn" data-period="this_week" onclick="ReportsApp.selectPeriod('this_week')">This Week</button>
+            <button class="period-tab-btn" data-period="this_month" onclick="ReportsApp.selectPeriod('this_month')">This Month</button>
+            <button class="period-tab-btn" data-period="last_month" onclick="ReportsApp.selectPeriod('last_month')">Last Month</button>
+            <button class="period-tab-btn" data-period="custom" onclick="ReportsApp.selectPeriod('custom')">Custom Range</button>
           </div>
-          <div class="kpi-card">
-            <span class="kpi-title">7-Day Total Sales</span>
-            <div class="kpi-num" id="rep-kpi-7d-rev">₹0.00</div>
-            <div class="kpi-desc">Weekly turnover sum</div>
+
+          <div class="custom-date-inputs" id="custom-date-inputs">
+            <input type="date" id="rep-start-date">
+            <span style="color: var(--color-text-muted); font-size: 12px;">to</span>
+            <input type="date" id="rep-end-date">
+            <button class="btn btn-primary" style="padding: 5px 12px; font-size: 12.5px;" onclick="ReportsApp.applyCustomDates()">Apply</button>
           </div>
-          <div class="kpi-card">
-            <span class="kpi-title">Total Orders Today</span>
-            <div class="kpi-num" id="rep-kpi-orders">0</div>
-            <div class="kpi-desc">Completed patient bills</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-title">Expiring Soon (≤60d)</span>
-            <div class="kpi-num" id="rep-kpi-expiring" style="color: var(--status-warning);">0</div>
-            <div class="kpi-desc">Batches nearing expiry</div>
+
+          <div style="font-size: 12.5px; color: var(--color-text-muted); display: flex; align-items: center; gap: 6px;">
+            <span id="period-display-label">Today</span>
+            <button class="btn-xs" onclick="ReportsApp.refresh()" title="Reload Data">🔄</button>
           </div>
         </div>
 
+        <!-- Actionable Insights Banner (if alerts exist) -->
+        <div class="insight-alert-box" id="insights-banner" style="display: none;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">💡</span>
+            <div>
+              <strong id="insight-title" style="color: var(--color-text-primary); font-size: 13.5px;"></strong>
+              <div id="insight-message" style="font-size: 12.5px; color: var(--color-text-secondary); margin-top: 2px;"></div>
+            </div>
+          </div>
+          <a id="insight-action-link" href="#" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">View</a>
+        </div>
+
+        <!-- High-Level Financial & Operational KPI Grid -->
+        <div class="metric-grid-6">
+          <div class="kpi-card">
+            <span class="kpi-title">Gross Sales Revenue</span>
+            <div class="kpi-num" id="rep-total-sales" style="color: var(--status-safe, #10B981);">₹0.00</div>
+            <div class="kpi-desc" id="rep-bills-sub">0 Bills (Avg ₹0)</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Gross Profit</span>
+            <div class="kpi-num" id="rep-gross-profit" style="color: #3B82F6;">₹0.00</div>
+            <div class="kpi-desc" id="rep-margin-sub">Margin: 0.0%</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Total Purchases</span>
+            <div class="kpi-num" id="rep-total-purchases">₹0.00</div>
+            <div class="kpi-desc" id="rep-purchases-sub">0 Purchase Invoices</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Inventory Valuation (Cost)</span>
+            <div class="kpi-num" id="rep-stock-cost">₹0.00</div>
+            <div class="kpi-desc" id="rep-stock-mrp-sub">MRP: ₹0.00</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Expiring Soon (≤30d)</span>
+            <div class="kpi-num" id="rep-expiring-count" style="color: var(--status-warning, #F59E0B);">0</div>
+            <div class="kpi-desc" id="rep-expiry-risk-sub">₹0 at Risk</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-title">Khata Receivables</span>
+            <div class="kpi-num" id="rep-receivables">₹0.00</div>
+            <div class="kpi-desc" id="rep-payables-sub">Payables: ₹0.00</div>
+          </div>
+        </div>
+
+        <!-- Sales & Purchases Trend Visualizer -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <h3 style="font-size: 15px; font-weight: 700; margin: 0;">Sales & Purchases Daily Trend</h3>
+              <p style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">Daily turnover comparison across active date range</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 12px;">
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 10px; height: 10px; background: #10B981; border-radius: 2px;"></span> Sales
+              </span>
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <span style="display: inline-block; width: 10px; height: 10px; background: #3B82F6; border-radius: 2px;"></span> Purchases
+              </span>
+            </div>
+          </div>
+          <div class="trend-bars-wrapper" id="trend-bars-container">
+            <div style="margin: auto; color: var(--color-text-muted); font-size: 13px;">Loading trend metrics...</div>
+          </div>
+        </div>
+
+        <!-- Payment Breakdown & GST Quick Summary -->
+        <div class="grid-2" style="margin-bottom: 20px;">
+          <!-- Payment Split Card -->
+          <div class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">Payment Collections Breakdown</h2>
+            </div>
+            <div style="padding: 16px;">
+              <div class="payment-bar" id="payment-split-bar">
+                <div class="payment-segment seg-cash" id="seg-cash" style="width: 25%;" title="Cash"></div>
+                <div class="payment-segment seg-upi" id="seg-upi" style="width: 25%;" title="UPI"></div>
+                <div class="payment-segment seg-card" id="seg-card" style="width: 25%;" title="Card"></div>
+                <div class="payment-segment seg-credit" id="seg-credit" style="width: 25%;" title="Credit / Khata"></div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13px; color: var(--color-text-secondary);">💵 Cash Counter</span>
+                  <strong class="num-currency" id="pay-cash-val">₹0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13px; color: var(--color-text-secondary);">📱 UPI / QR</span>
+                  <strong class="num-currency" id="pay-upi-val">₹0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13px; color: var(--color-text-secondary);">💳 Card POS</span>
+                  <strong class="num-currency" id="pay-card-val">₹0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 13px; color: var(--color-text-secondary);">📒 Khata Credit</span>
+                  <strong class="num-currency" id="pay-credit-val">₹0.00</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GST & Tax Overview Card -->
+          <div class="panel">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <h2 class="panel-title">GST & Compliance Snapshot</h2>
+              <a href="ca_connect.html" style="font-size: 12px; color: var(--color-brand-deep); text-decoration: none; font-weight: 600;">CA Connect →</a>
+            </div>
+            <div style="padding: 16px;">
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
+                  <span style="color: var(--color-text-secondary);">Estimated Output GST (Sales)</span>
+                  <strong class="num-currency" id="rep-gst-output">₹0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
+                  <span style="color: var(--color-text-secondary);">Estimated Input Tax Credit (Purchases)</span>
+                  <strong class="num-currency" id="rep-gst-itc" style="color: #3B82F6;">₹0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; padding-top: 4px;">
+                  <span>Net Estimated GST Payable</span>
+                  <span class="num-currency" id="rep-gst-net" style="color: var(--status-safe, #10B981);">₹0.00</span>
+                </div>
+                <p style="font-size: 11.5px; color: var(--color-text-muted); margin-top: 4px;">
+                  Calculated automatically based on tax slabs. For detailed GSTR-1 and HSN returns, visit <a href="ca_connect.html" style="color: var(--color-brand-deep);">CA Connect</a>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Product Performance Tables (Top Selling & Slow Moving) -->
         <div class="grid-2">
           <!-- Top Selling Products -->
           <div class="panel">
@@ -150,8 +372,8 @@
                 <thead>
                   <tr>
                     <th>Medicine Name</th>
-                    <th>Packs Sold</th>
-                    <th>Revenue Generated</th>
+                    <th>Units Sold</th>
+                    <th style="text-align: right;">Revenue Generated</th>
                   </tr>
                 </thead>
                 <tbody id="top-selling-body">
@@ -161,24 +383,23 @@
             </div>
           </div>
 
-          <!-- Expiring Stock Report -->
+          <!-- Slow Moving Stock Report -->
           <div class="panel">
             <div class="panel-header">
-              <h2 class="panel-title">Expiring Stock Alert Report</h2>
+              <h2 class="panel-title">Slow Moving / Zero Sales Stock</h2>
             </div>
             <div class="table-responsive">
               <table class="data-table">
                 <thead>
                   <tr>
                     <th>Medicine</th>
-                    <th>Batch</th>
-                    <th>Qty</th>
-                    <th>Expiry</th>
+                    <th>Stock Qty</th>
+                    <th>Unit MRP</th>
                     <th>Status</th>
                   </tr>
                 </thead>
-                <tbody id="expiring-report-body">
-                  <tr><td colspan="5" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading expiring stock...</td></tr>
+                <tbody id="slow-moving-body">
+                  <tr><td colspan="4" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading slow stock...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -190,10 +411,10 @@
   </div>
 
   <script src="js/api.js?v=9.0"></script>
+  <script src="js/app_preloader.js?v=9.0"></script>
   <script src="js/nav.js?v=9.0"></script>
   <script src="js/confirm_modal.js?v=9.0"></script>
   <script src="js/app.js?v=9.0"></script>
-  <script src="js/add_inventory_flow.js?v=9.0"></script>
-  <script src="js/billing_flow.js?v=9.0"></script>
+  <script src="js/reports.js?v=9.0"></script>
 </body>
 </html>

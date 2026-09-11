@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Literal, Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, model_validator, field_validator
 
 
@@ -10,6 +10,9 @@ class UserCreate(BaseModel):
     owner_name: str
     email: str
     password: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    gstin: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -43,6 +46,13 @@ class User(BaseModel):
     auto_save_enabled: bool = True
     preferred_language: str = "en"
     preferred_theme: str = "light"
+    
+    # Session & RBAC metadata
+    staff_id: Optional[int] = None
+    role: Optional[str] = "OWNER"
+    name: Optional[str] = None
+    is_owner: bool = True
+    permissions: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
@@ -98,7 +108,7 @@ class ProductBase(BaseModel):
     gst_rate: Optional[float] = 12.0
 
     batch_number: Optional[str] = None
-    quantity: int = Field(gt=0)
+    quantity: int = Field(default=0)
 
     # Retail selling price (support both unit_price and price aliases)
     unit_price: float = Field(default=0, ge=0)
@@ -132,6 +142,7 @@ class ProductBase(BaseModel):
     supplier_id: Optional[int] = None
     document_id: Optional[int] = None
     invoice_number: Optional[str] = None
+    barcode: Optional[str] = None
 
 
 class ProductCreate(ProductBase):
@@ -142,6 +153,7 @@ class ProductUpdate(BaseModel):
     product_name: Optional[str] = None
     brand: Optional[str] = None
     category: Optional[str] = None
+    barcode: Optional[str] = None
 
     hsn_code: Optional[str] = None
     gst_rate: Optional[float] = None
@@ -364,8 +376,12 @@ class SaleItemCreate(BaseModel):
     # A pharmacist may override it at the counter.
     unit_price: Optional[float] = Field(default=None, ge=0.0)
 
-    # "strip" means whole strip/pack; "loose" / "loose_tablet" means individual tablets.
-    unit_type: Literal["strip", "loose_tablet", "loose", "pack", "unit"] = "strip"
+    # "strip" means whole strip/pack; "loose_tablet" / "pill" means individual tablets.
+    unit_type: Literal["strip", "loose_tablet", "loose", "pack", "unit", "pill"] = "strip"
+
+    # Number of loose tablets/units contained in 1 full strip/pack.
+    tablets_per_strip: Optional[int] = Field(default=None, gt=0)
+    units_per_pack: Optional[int] = Field(default=None, gt=0)
 
     # Optional batch selection. Backend will confirm that it belongs to this shop.
     batch_number: Optional[str] = None
@@ -379,7 +395,7 @@ class SaleItemCreate(BaseModel):
 
 class SaleItemResponse(BaseModel):
     id: int
-    product_id: int
+    product_id: Optional[int] = None
     product_name: str
     hsn_code: Optional[str] = "3004"
     quantity: int
@@ -403,10 +419,36 @@ class SaleItemResponse(BaseModel):
         from_attributes = True
 
 
+class PaymentAllocation(BaseModel):
+    payment_method: Literal["CASH", "UPI", "CARD", "CREDIT"]
+    amount: float = Field(gt=0.0)
+
+    @field_validator('payment_method', mode='before')
+    @classmethod
+    def normalize_method(cls, v):
+        if isinstance(v, str):
+            v_clean = v.strip().upper()
+            if v_clean == "PENDING":
+                return "CREDIT"
+            return v_clean
+        return v
+
+
+class PaymentAllocationResponse(BaseModel):
+    id: Optional[int] = None
+    payment_method: str
+    amount: float
+
+    class Config:
+        from_attributes = True
+
+
 class SaleCreate(BaseModel):
     items: List[SaleItemCreate] = Field(min_length=1)
 
-    payment_method: Literal["CASH", "UPI", "CARD", "CREDIT", "PENDING"] = "CASH"
+    payment_method: Literal["CASH", "UPI", "CARD", "CREDIT", "PENDING", "SPLIT"] = "CASH"
+    payments: Optional[List[PaymentAllocation]] = None
+    customer_id: Optional[int] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     notes: Optional[str] = None
@@ -421,6 +463,12 @@ class SaleCreate(BaseModel):
     # Optional prescription details. They are printed only when supplied.
     doctor_name: Optional[str] = None
     doctor_reg_no: Optional[str] = None
+
+    # Optional held bill reference to mark completed upon checkout
+    held_bill_id: Optional[int] = None
+
+    # Concurrency & Idempotency Key (e.g. df_sale_1725849200_abc123)
+    idempotency_key: Optional[str] = None
 
     @field_validator('payment_method', mode='before')
     @classmethod
@@ -474,19 +522,32 @@ class SaleResponse(BaseModel):
     discount_value: float
 
     payment_method: str
+    is_split_payment: bool = False
+    payments: Optional[List[PaymentAllocationResponse]] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     notes: Optional[str] = None
     doctor_name: Optional[str] = None
     doctor_reg_no: Optional[str] = None
 
+    # Multi-User Staff Attribution
+    staff_id: Optional[int] = None
+    staff_name: Optional[str] = None
+
     items: Optional[List[SaleItemResponse]] = None
 
     # completed, partially_returned, or returned
     return_status: str
     created_at: datetime
-    created_at: datetime
-    items: List[SaleItemResponse]
+    is_exported: bool = False
+    exported_at: Optional[datetime] = None
+
+    # Historical Migration metadata
+    is_historical: bool = False
+    transaction_source: str = "LIVE_BILLING"
+    migration_id: Optional[int] = None
+    original_bill_number: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -629,6 +690,8 @@ from datetime import date, datetime
 class SellItemRequest(BaseModel):
     product_id: int
     quantity: int = Field(gt=0, default=1)
+    unit_type: Optional[str] = "strip"
+    tablets_per_strip: Optional[int] = None
 
 class SellTransactionRequest(BaseModel):
     items: List[SellItemRequest]
@@ -677,11 +740,39 @@ class MultiScanItemResponse(BaseModel):
     brand: Optional[str] = None
     matched_inventory_id: Optional[int] = None
     price: Optional[float] = None
+    strip_price: Optional[float] = None
+    tablets_per_strip: Optional[int] = None
+    units_per_pack: Optional[int] = None
+    loose_tablet_price: Optional[float] = None
     quantity: int = 1
     confidence: float = 0.0
     matched: bool = False
     needs_review: bool = True
     reason: Optional[str] = None
+    match_status: str = "NOT_FOUND"  # MATCHED, MULTIPLE_MATCHES, NOT_FOUND, LOW_CONFIDENCE
+    match_type: Optional[str] = "NONE"  # EXACT_CODE, EXACT_NAME_SPECS, FUZZY_NAME, NONE
+    detected_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    generic_name: Optional[str] = None
+    detected_code: Optional[str] = None
+    detected_strength: Optional[str] = None
+    detected_form: Optional[str] = None
+    detected_pack_size: Optional[str] = None
+    detected_batch: Optional[str] = None
+    detected_expiry: Optional[str] = None
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    days_remaining: Optional[int] = None
+    stock: Optional[int] = None
+    loose_tablet_stock: Optional[int] = 0
+    total_tablets: Optional[int] = None
+    requires_batch_selection: bool = False
+    batches_available: List[Dict[str, Any]] = []
+    possible_matches: List[Dict[str, Any]] = []
+    batch_confidence: Optional[float] = 0.0
+    engine: Optional[str] = "GEMINI_AI"
+    engine_label: Optional[str] = "Dawaiflow AI"
+    engine_performance: Optional[str] = None
 
 
 class MultiScanResponse(BaseModel):
@@ -689,7 +780,13 @@ class MultiScanResponse(BaseModel):
     items: List[MultiScanItemResponse]
     total_price: float
     needs_review: bool
+    detected_barcodes: List[str] = []
     error: Optional[str] = None
+    primary_engine: Optional[str] = "Dawaiflow AI"
+    gemini_latency: Optional[float] = 0.0
+    ocr_latency: Optional[float] = 0.0
+    total_latency: Optional[float] = 0.0
+    performance_breakdown: Optional[Dict[str, float]] = None
 
 
 # ---------------- INVENTORY IMPORT SCHEMAS ---------------- #
@@ -751,6 +848,7 @@ class CustomerUpdate(BaseModel):
 class CustomerResponse(CustomerBase):
     id: int
     user_id: int
+    pending_amount: float = 0.0
     created_at: datetime
 
     class Config:
@@ -764,7 +862,7 @@ class SaleReturnItemCreate(BaseModel):
     quantity: int = Field(gt=0)
 
 class SaleReturnCreate(BaseModel):
-    sale_id: int = Field(gt=0)
+    sale_id: Optional[int] = Field(default=None, gt=0)
     reason: Optional[str] = "Customer Return"
     items: List[SaleReturnItemCreate] = Field(min_length=1)
 
@@ -837,6 +935,16 @@ class SupplierResponse(SupplierBase):
         from_attributes = True
 
 
+class SupplierMatchResponse(BaseModel):
+    status: str  # "exact_match", "multiple_matches", "no_match"
+    extracted_name: Optional[str] = None
+    extracted_gstin: Optional[str] = None
+    match_type: Optional[str] = None
+    matched_supplier: Optional[SupplierResponse] = None
+    candidate_matches: List[SupplierResponse] = []
+    message: str
+
+
 # ---------------- DOCUMENT SCHEMAS ---------------- #
 
 class DocumentBase(BaseModel):
@@ -863,6 +971,8 @@ class DocumentResponse(DocumentBase):
     ocr_raw_json: Optional[str] = None
     ocr_status: str = "Processing"
     supplier_name: Optional[str] = None
+    extracted_supplier_name: Optional[str] = None
+    supplier_match: Optional[Union[SupplierMatchResponse, Dict[str, Any]]] = None
     created_at: datetime
 
     class Config:
@@ -889,68 +999,6 @@ class DocumentConfirmRequest(BaseModel):
     invoice_date: Optional[str] = None
     total_amount: Optional[float] = 0.0
     items: List[DocumentItemVerify] = Field(min_length=1)
-
-
-# ---------------- RESTOCK SUGGESTIONS SCHEMAS ---------------- #
-
-class RestockBatchInfo(BaseModel):
-    batch_number: str
-    quantity: int
-    expiry_date: str
-    is_expired: bool
-
-
-class RestockSuggestionItem(BaseModel):
-    id: Optional[int] = None
-    product_name: str
-    brand: Optional[str] = None
-    category: Optional[str] = "allopathy"
-    composition: Optional[str] = None
-    pack_size_label: Optional[str] = None
-    unit_price: float = 0.0
-    units_per_pack: int = 10
-
-    # Stock states
-    sellable_stock: int = 0
-    expired_stock: int = 0
-    total_stock: int = 0
-    nearest_expiry: Optional[str] = None
-
-    # Demand & sales velocity metrics
-    sales_30d: float = 0.0
-    bill_count_30d: int = 0
-    avg_daily_sales: float = 0.0
-    avg_weekly_sales: float = 0.0
-    days_of_stock_remaining: Optional[float] = None
-
-    # Suggestion categorization & reorder
-    reason: str  # OUT_OF_STOCK, EXPIRED, LOW_STOCK
-    reason_label: str
-    urgency_level: str  # Critical, High, Moderate
-    urgency_score: float = 0.0
-    suggested_reorder_qty: int = 10
-    estimated_reorder_cost: float = 0.0
-    batches: List[RestockBatchInfo] = []
-
-
-class RestockSummaryMetrics(BaseModel):
-    total_suggestions: int = 0
-    out_of_stock_count: int = 0
-    expired_count: int = 0
-    low_stock_count: int = 0
-    total_reorder_units: int = 0
-    estimated_reorder_value: float = 0.0
-    multiplier: float = 3.0
-    total_products_evaluated: int = 0
-    has_sales_history: bool = True
-    total_30d_sales_units: float = 0.0
-    total_30d_bill_count: int = 0
-
-
-class RestockSuggestionsResponse(BaseModel):
-    success: bool = True
-    summary: RestockSummaryMetrics
-    suggestions: List[RestockSuggestionItem] = []
 
 
 class PilotLeadCreate(BaseModel):
@@ -1120,3 +1168,479 @@ class PurchaseReturnResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StaffMemberCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: str = "PHARMACIST"
+    status: str = "ACTIVE"
+    permissions: Optional[List[str]] = None
+
+
+class StaffMemberUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+
+class StaffPasswordReset(BaseModel):
+    new_password: str = Field(min_length=4)
+
+
+class StaffMemberResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    role: str
+    status: str
+    permissions: Optional[List[str]] = None
+    last_login: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StaffCredentialResponse(BaseModel):
+    staff_id: int
+    name: str
+    username: str
+    password: Optional[str] = None
+    role: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+class StaffCredentialUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class StoreBranchCreate(BaseModel):
+    branch_name: str
+    code: Optional[str] = "BR-01"
+    address: Optional[str] = None
+    city: Optional[str] = None
+    phone: Optional[str] = None
+    is_main: bool = False
+    status: str = "ACTIVE"
+
+
+class StoreBranchUpdate(BaseModel):
+    branch_name: Optional[str] = None
+    code: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    phone: Optional[str] = None
+    is_main: Optional[bool] = None
+    status: Optional[str] = None
+
+
+class StoreBranchResponse(BaseModel):
+    id: int
+    user_id: int
+    branch_name: str
+    code: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    phone: Optional[str] = None
+    is_main: bool = False
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------- SMART RESTOCK & INVENTORY INTELLIGENCE SCHEMAS ---------------- #
+
+class SmartRestockSummary(BaseModel):
+    critical_restock: int = 0
+    restock_soon: int = 0
+    expiry_risk: int = 0
+    slow_moving: int = 0
+    dead_stock: int = 0
+    overstock: int = 0
+    healthy: int = 0
+    total_at_risk_value: float = 0.0
+
+
+class SmartRestockItem(BaseModel):
+    rank: int
+    product_id: int
+    product_name: str
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    batch_number: Optional[str] = None
+    supplier_id: Optional[int] = None
+    supplier_name: Optional[str] = None
+    
+    priority_level: str  # CRITICAL_RESTOCK, RESTOCK_SOON, EXPIRY_RISK, SLOW_MOVING, DEAD_STOCK, OVERSTOCK, HEALTHY
+    priority_score: int  # 0 to 100
+    recommendation_type: str  # RESTOCK_NOW, RESTOCK_SOON, RETURN_DISTRIBUTOR, PRIORITIZE_FEFO, CLEARANCE_DISCOUNT, STOP_PURCHASING, REDUCE_ORDER, MONITOR
+    
+    current_stock: int
+    daily_demand: float
+    days_of_stock: Optional[float] = None
+    
+    supplier_lead_time_days: int = 5
+    safety_stock: int = 0
+    reorder_point: int = 0
+    suggested_order_quantity: int = 0
+    
+    unit_price: float = 0.0
+    purchase_price: float = 0.0
+    inventory_value: float = 0.0
+    at_risk_value: float = 0.0
+    
+    expiry_date: Optional[str] = None
+    days_to_expiry: Optional[int] = None
+    at_risk_expiry_qty: int = 0
+    
+    confidence: str = "HIGH"  # HIGH, MEDIUM, LOW
+    confidence_reason: Optional[str] = None
+    reason: str
+    recommended_action: str
+    debug_info: Optional[Dict[str, Any]] = None
+
+
+class InventoryIntelligenceResponse(BaseModel):
+    generated_at: str
+    summary: SmartRestockSummary
+    recommendations: List[SmartRestockItem]
+    needs_attention: List[Dict[str, Any]] = []
+    
+    # Backward compatibility fields for legacy clients
+    total_products: int = 0
+    total_stock_value: float = 0.0
+    expired_count: int = 0
+    expired_value: float = 0.0
+    expiring_7d_count: int = 0
+    expiring_30d_count: int = 0
+    expiring_30d_value: float = 0.0
+    expiring_60d_count: int = 0
+    expiring_90d_count: int = 0
+    expiring_90d_value: float = 0.0
+    low_stock_count: int = 0
+    out_of_stock_count: int = 0
+    dead_stock_count: int = 0
+    dead_stock_value: float = 0.0
+    low_stock_items: List[Dict[str, Any]] = []
+    expiring_items: List[Dict[str, Any]] = []
+    expired_items: List[Dict[str, Any]] = []
+    dead_stock_items: List[Dict[str, Any]] = []
+
+
+class SmartRestockConfigUpdate(BaseModel):
+    safety_stock_days: Optional[int] = 5
+    default_lead_time_days: Optional[int] = 5
+    target_coverage_days: Optional[int] = 30
+    weight_urgency: Optional[float] = 0.35
+    weight_velocity: Optional[float] = 0.25
+    weight_lead_time: Optional[float] = 0.15
+    weight_sales_importance: Optional[float] = 0.10
+    weight_consistency: Optional[float] = 0.10
+    weight_impact: Optional[float] = 0.05
+
+
+# ---------------- CA CONNECT SCHEMAS ---------------- #
+
+class CaProfileCreate(BaseModel):
+    ca_email: str
+    ca_name: Optional[str] = None
+    ca_phone: Optional[str] = None
+
+    @field_validator('ca_email', mode='before')
+    @classmethod
+    def clean_email(cls, v):
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+class CaProfileResponse(BaseModel):
+    id: int
+    user_id: int
+    ca_email: str
+    ca_name: Optional[str] = None
+    ca_phone: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_shared_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CaShareRequest(BaseModel):
+    ca_email: Optional[str] = None
+    reports: List[str] = Field(min_length=1, description="List of report keys to include: gst_summary, sales_register, purchase_register, hsn_summary, input_output_gst, pnl_summary")
+    date_range_preset: Optional[str] = Field(default="this_month", description="today, this_week, this_month, previous_month, this_quarter, financial_year, custom")
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    custom_message: Optional[str] = None
+
+
+class CaShareLogResponse(BaseModel):
+    id: int
+    user_id: int
+    sender_email: Optional[str] = None
+    ca_email: str
+    reports_shared: List[str]
+    date_range_label: str
+    date_range_start: Optional[datetime] = None
+    date_range_end: Optional[datetime] = None
+    status: str
+    sent_at: datetime
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GstFinancialReportResponse(BaseModel):
+    pharmacy_name: str
+    owner_name: str
+    gstin: Optional[str] = None
+    date_range_label: str
+    start_date: str
+    end_date: str
+    total_sales: float = 0.0
+    total_purchases: float = 0.0
+    total_taxable_value: float = 0.0
+    total_output_gst: float = 0.0
+    total_input_gst: float = 0.0
+    net_gst_payable: float = 0.0
+    total_bills: int = 0
+    total_purchase_invoices: int = 0
+    gross_profit: float = 0.0
+    gst_rate_breakdown: List[Dict[str, Any]] = []
+    hsn_summary: List[Dict[str, Any]] = []
+    recent_sales_register: List[Dict[str, Any]] = []
+    recent_purchase_register: List[Dict[str, Any]] = []
+
+
+# ==========================================
+# THERMAL POS PRINTING SCHEMAS
+# ==========================================
+
+class PrinterDeviceCreate(BaseModel):
+    device_name: str = Field(..., min_length=1, max_length=100)
+    printer_system_name: str = Field(..., min_length=1, max_length=150)
+    connection_type: str = "USB"  # USB, BLUETOOTH, NETWORK
+    paper_size: str = "80mm"      # 58mm, 80mm
+    is_default: bool = True
+    settings_json: Optional[str] = None
+
+
+class PrinterDeviceUpdate(BaseModel):
+    device_name: Optional[str] = None
+    printer_system_name: Optional[str] = None
+    connection_type: Optional[str] = None
+    paper_size: Optional[str] = None
+    is_default: Optional[bool] = None
+    settings_json: Optional[str] = None
+
+
+class PrinterDeviceResponse(BaseModel):
+    id: int
+    user_id: int
+    device_name: str
+    printer_system_name: str
+    connection_type: str
+    paper_size: str
+    is_default: bool
+    is_online: bool
+    last_seen_at: Optional[datetime] = None
+    settings_json: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PrintJobCreate(BaseModel):
+    sale_id: int
+    printer_id: Optional[int] = None
+    copies: int = 1
+    force_print_again: bool = False
+    paper_size: Optional[str] = None
+
+
+class PrintJobResponse(BaseModel):
+    id: int
+    user_id: int
+    printer_id: Optional[int] = None
+    sale_id: Optional[int] = None
+    invoice_number: str
+    status: str
+    copies: int
+    paper_size: str
+    created_at: datetime
+    claimed_at: Optional[datetime] = None
+    printed_at: Optional[datetime] = None
+    failed_at: Optional[datetime] = None
+    retry_count: int = 0
+    error_message: Optional[str] = None
+    printer_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PrintJobStatusUpdate(BaseModel):
+    job_id: int
+    status: str  # PRINTING, PRINTED, FAILED
+    error_message: Optional[str] = None
+
+
+class PrinterStatusSummaryResponse(BaseModel):
+    has_printer: bool
+    has_online_printer: bool
+    default_printer: Optional[PrinterDeviceResponse] = None
+    online_count: int
+    pending_jobs_count: int
+    status_label: str  # "Ready", "Print Pending", "Printer Offline", "No Printer Setup"
+    status_color: str  # "green", "yellow", "red", "grey"
+
+
+# ---------------- HELD BILL SCHEMAS ---------------- #
+
+class HeldBillItemCreate(BaseModel):
+    product_id: int = Field(gt=0)
+    product_name: Optional[str] = None
+    quantity: int = Field(gt=0, default=1)
+    unit_type: Optional[str] = "strip"
+    unit_price: Optional[float] = Field(default=None, ge=0.0)
+    discount: float = Field(default=0.0, ge=0.0)
+    tablets_per_strip: Optional[int] = Field(default=None, gt=0)
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    hsn_code: Optional[str] = None
+    gst_percentage: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    estimated_line_total: Optional[float] = None
+
+    @field_validator("unit_type", mode="before")
+    @classmethod
+    def normalize_unit_type(cls, v):
+        if not v:
+            return "strip"
+        v_clean = str(v).strip().lower()
+        if v_clean in ["strip", "pack"]:
+            return "strip"
+        if v_clean in ["loose", "loose_tablet", "loose_tablets", "tablet", "tablets", "unit", "pill", "pills"]:
+            return "loose_tablet"
+        return v_clean
+
+
+class HeldBillItemResponse(BaseModel):
+    id: int
+    held_bill_id: int
+    product_id: int
+    product_name: str
+    quantity: int
+    unit_type: str
+    unit_price: float
+    discount: float
+    tablets_per_strip: Optional[int] = None
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    hsn_code: Optional[str] = None
+    gst_percentage: float
+    estimated_line_total: float
+
+    class Config:
+        from_attributes = True
+
+
+class HeldBillCreate(BaseModel):
+    customer_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    doctor_name: Optional[str] = None
+    doctor_reg_no: Optional[str] = None
+    payment_method: Optional[str] = "CASH"
+    split_payments: Optional[List[PaymentAllocation]] = None
+    is_interstate: bool = False
+    discount_type: Optional[str] = None
+    discount_value: float = Field(default=0.0, ge=0.0)
+    notes: Optional[str] = None
+    items: List[HeldBillItemCreate] = Field(min_length=1)
+
+    @field_validator("discount_type", mode="before")
+    @classmethod
+    def normalize_discount_type(cls, v):
+        if not v:
+            return None
+        v_clean = str(v).strip().lower()
+        if v_clean in ["flat", "percent"]:
+            return v_clean
+        return None
+
+
+class HeldBillResponse(BaseModel):
+    id: int
+    held_bill_number: str
+    status: str
+    customer_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    doctor_name: Optional[str] = None
+    doctor_reg_no: Optional[str] = None
+    payment_method: Optional[str] = None
+    split_payments: Optional[List[PaymentAllocationResponse]] = None
+    is_interstate: bool = False
+    discount_type: Optional[str] = None
+    discount_value: float = 0.0
+    estimated_subtotal: float = 0.0
+    estimated_discount: float = 0.0
+    estimated_tax: float = 0.0
+    estimated_total: float = 0.0
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: Optional[datetime] = None
+    completed_sale_id: Optional[int] = None
+    items: List[HeldBillItemResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class HeldBillResumeItem(BaseModel):
+    product_id: int
+    product_name: str
+    requested_quantity: int
+    available_stock: int  # in requested unit_type (strips or loose tablets)
+    is_sufficient: bool
+    unit_type: str
+    unit_price: float
+    discount: float
+    tablets_per_strip: Optional[int] = None
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    hsn_code: Optional[str] = None
+    gst_percentage: float
+    estimated_line_total: float
+
+
+class HeldBillResumeResponse(BaseModel):
+    held_bill: HeldBillResponse
+    items: List[HeldBillResumeItem]
+    has_stock_shortage: bool
+
+
+
