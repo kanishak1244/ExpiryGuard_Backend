@@ -11,7 +11,21 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required. Please set it in .env.")
+    raise RuntimeError("DATABASE_URL environment variable is required. Please set it in Railway variables.")
+
+# Sanitize common input mistakes (accidental quotes, whitespace, or KEY= prefix)
+DATABASE_URL = DATABASE_URL.strip().strip("'\"")
+if DATABASE_URL.startswith("DATABASE_URL="):
+    DATABASE_URL = DATABASE_URL[len("DATABASE_URL="):].strip().strip("'\"")
+
+if DATABASE_URL.startswith("<") or "your_supabase" in DATABASE_URL.lower():
+    raise RuntimeError("DATABASE_URL contains an example placeholder (<your_supabase_postgresql_connection_string>). Please paste your real Supabase connection string.")
+
+# Auto-normalize standard postgresql scheme
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+psycopg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Supabase Pooler optimization:
 # If connecting through Supabase pooler (pooler.supabase.com),
