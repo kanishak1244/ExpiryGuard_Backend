@@ -352,20 +352,18 @@ def warmup_database():
 
         # Check and log Email Service readiness
         try:
-            smtp_status = check_smtp_health()
+            smtp_status = check_smtp_health(probe_network=False)
             if smtp_status.get("is_configured"):
                 logger.info(
                     f"[Startup] Email alert engine active for {smtp_status.get('recipient')} "
-                    f"via {smtp_status.get('host')}:{smtp_status.get('primary_port')} "
-                    f"(port 587 reachable: {smtp_status.get('port_587', {}).get('reachable')}, "
-                    f"port 465 reachable: {smtp_status.get('port_465', {}).get('reachable')})."
+                    f"via {smtp_status.get('host')}:{smtp_status.get('primary_port')}."
                 )
             else:
                 logger.warning("[Startup WARNING] Email service not configured! Set SMTP_USER and SMTP_PASS (Gmail App Password).")
         except Exception as smtp_err:
             logger.warning(f"[Startup] SMTP health check notice: {smtp_err}")
 
-        # Pre-warm caches, OCR, and retry un-notified pilot leads in background thread
+        # Pre-warm caches and OCR in background thread
         def _background_warmup():
             try:
                 from database import SessionLocal
@@ -381,14 +379,6 @@ def warmup_database():
                         except Exception:
                             pass
                     print(f"[Startup] Background cache warming complete for {len(active_user_ids)} users.")
-
-                    # Automatically retry pending/un-notified pilot leads on startup
-                    try:
-                        retry_res = retry_pending_pilot_leads(limit=10)
-                        if retry_res.get("retried", 0) > 0:
-                            logger.info(f"[Startup] Retried {retry_res.get('retried')} pilot leads: {retry_res.get('succeeded')} succeeded, {retry_res.get('failed')} failed.")
-                    except Exception as retry_err:
-                        logger.warning(f"[Startup] Pilot leads retry notice: {retry_err}")
                 finally:
                     bg_db.close()
             except Exception as bg_err:
