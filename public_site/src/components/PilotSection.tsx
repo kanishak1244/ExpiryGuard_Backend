@@ -10,7 +10,7 @@ interface PilotSectionProps {
 
 export const PilotSection: React.FC<PilotSectionProps> = ({ onOpenPilot }) => {
   const pilotBenefits = [
-    'Free data import from Marg / existing ERP',
+    'Free data import from any software or Excel',
     'On-site or video counter onboarding for your staff',
     'Full access to mobile scanner + counter billing',
     'Zero disruption to your daily counter operations',

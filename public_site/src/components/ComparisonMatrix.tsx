@@ -49,7 +49,7 @@ export const ComparisonMatrix: React.FC<ComparisonMatrixProps> = ({ onOpenPilot 
     {
       icon: FileSpreadsheet,
       title: 'Zero Software Lock-in',
-      desc: 'Import from Marg / Excel seamlessly and export your complete store data anytime',
+      desc: 'Import from any software or Excel seamlessly and export your complete store data anytime',
     },
     {
       icon: Lock,

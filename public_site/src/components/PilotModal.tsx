@@ -16,7 +16,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
     phone: '',
     email: '',
     city: '',
-    currentBillingMethod: 'Marg ERP',
+    currentBillingMethod: 'Any Existing Software',
     estimatedDailyBills: '50–100',
     numPharmacies: '1 Outlet',
     notes: '',
@@ -60,7 +60,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
       pharmacy_name: formData.pharmacyName.trim(),
       city: formData.city.trim(),
       phone: cleanPhone,
-      current_billing_method: formData.currentBillingMethod || 'Marg ERP',
+      current_billing_method: formData.currentBillingMethod || 'Any Existing Software',
       bills_per_day: formData.estimatedDailyBills || '50–100',
       biggest_problem: combinedDetails.trim() || undefined,
     };
@@ -233,8 +233,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                   onChange={(e) => setFormData({ ...formData, currentBillingMethod: e.target.value })}
                   className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] focus:outline-none focus:border-[#526B5A]"
                 >
-                  <option value="Marg ERP">Marg ERP</option>
-                  <option value="MargBooks">MargBooks</option>
+                  <option value="Any Existing Software">Any Existing Software</option>
                   <option value="Paper / Manual">Paper / Manual Billing</option>
                   <option value="Other">Other Software</option>
                 </select>

@@ -31,7 +31,7 @@ export const FaqSection: React.FC = () => {
     {
       num: '05',
       q: 'How can my pharmacy join the pilot program?',
-      a: 'Click "Request a Pilot" or reach out on WhatsApp. Our onboarding team will configure DawaiFlow for your store, import your existing inventory from Marg or other software, and train your staff at zero cost.',
+      a: 'Click "Request a Pilot" or reach out on WhatsApp. Our onboarding team will configure DawaiFlow for your store, import your existing inventory from any software, and train your staff at zero cost.',
     },
   ];
 
