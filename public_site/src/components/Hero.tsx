@@ -11,23 +11,35 @@ export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
       id="product"
       className="relative w-full overflow-hidden bg-[#F8F7F3] border-b border-[#DCDDD5]/60 min-h-[580px] sm:min-h-[620px] md:min-h-[660px] lg:min-h-[700px] xl:min-h-[720px] flex items-center"
     >
-      {/* FULL-WIDTH PHARMACY PHOTOGRAPH BACKGROUND (Mobile, Tablet & Desktop) */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none select-none z-0">
+      {/* FULL-WIDTH PHARMACY PHOTOGRAPH BACKGROUND */}
+      {/* 1. Mobile Background Photo (Dedicated portrait orientation photo) */}
+      <div className="md:hidden absolute inset-0 w-full h-full pointer-events-none select-none z-0">
         <img
-          src="/assets/dawaiflow-pharmacy-hero.jpg"
+          src="/assets/dawaiflow-pharmacy-hero-mobile.jpg"
           alt="Pharmacist assisting customers at a modern pharmacy counter using DawaiFlow"
-          className="w-full h-full object-cover object-[72%_center] sm:object-[75%_center] md:object-[78%_center] lg:object-[82%_center] xl:object-[84%_center]"
+          className="w-full h-full object-cover object-center"
           loading="eager"
           decoding="async"
         />
-        {/* Mobile-only subtle neutral readability overlay: softens background for crisp text legibility while keeping pharmacy scene recognizable */}
+        {/* Subtle neutral readability overlay on mobile: ensures crisp typography while keeping pharmacy environment visible */}
         <div
-          className="md:hidden absolute inset-0 bg-gradient-to-b from-[#F8F7F3]/92 via-[#F8F7F3]/82 to-[#F8F7F3]/90"
+          className="absolute inset-0 bg-gradient-to-b from-[#F8F7F3]/92 via-[#F8F7F3]/82 to-[#F8F7F3]/90"
           aria-hidden="true"
+        />
+      </div>
+
+      {/* 2. Desktop/Laptop Background Photo (Landscape photo) - UNCHANGED FOR LAPTOP/DESKTOP */}
+      <div className="hidden md:block absolute inset-0 w-full h-full pointer-events-none select-none z-0">
+        <img
+          src="/assets/dawaiflow-pharmacy-hero.jpg"
+          alt="Pharmacist assisting customers at a modern pharmacy counter using DawaiFlow"
+          className="w-full h-full object-cover object-[78%_center] lg:object-[82%_center] xl:object-[84%_center]"
+          loading="eager"
+          decoding="async"
         />
         {/* Desktop/Tablet natural left-side neutral gradient: ensures 100% text readability over the left 45% while keeping the pharmacist and customers completely visible on the right */}
         <div
-          className="hidden md:block absolute inset-0 bg-gradient-to-r from-[#F8F7F3] via-[#F8F7F3]/95 via-35% md:via-42% lg:via-48% to-transparent to-75% lg:to-82%"
+          className="absolute inset-0 bg-gradient-to-r from-[#F8F7F3] via-[#F8F7F3]/95 via-35% md:via-42% lg:via-48% to-transparent to-75% lg:to-82%"
           aria-hidden="true"
         />
       </div>
