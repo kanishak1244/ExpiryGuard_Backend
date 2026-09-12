@@ -436,8 +436,12 @@ def send_email_with_fallback(
                 err_detail = f"Port {port} on {host_label} failed ({type(err).__name__}: {str(err)})"
                 logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_detail}")
                 errors.append(err_detail)
-
-    # Fallback to HTTPS API if available
+                # If network is completely unreachable on host, do not waste time retrying raw sockets
+                if "Network is unreachable" in str(err) or "Errno 101" in str(err):
+                    logger.warning("[EMAIL NOTIFICATION] Raw socket networking is blocked/unreachable by cloud host. Skipping further raw socket retries.")
+                    break
+        if "Network is unreachable" in combined_err or any("Errno 101" in e for e in errors):
+            break
     if html_content and plain_text:
         if os.getenv("RESEND_API_KEY"):
             ok, prov, err = send_email_via_resend(
@@ -637,8 +641,8 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
         }
 
 
-def check_smtp_health() -> Dict[str, Any]:
-    """Diagnostic tool to inspect environment variables and test network connectivity to SMTP servers."""
+def check_smtp_health(probe_network: bool = False) -> Dict[str, Any]:
+    """Diagnostic tool to inspect environment variables and optionally test network connectivity."""
     cfg = get_smtp_config()
     user = cfg["user"]
     masked_user = (user[:2] + "***" + user[user.find("@"):]) if ("@" in user and len(user) > 3) else ("SET" if user else "NOT_SET")
@@ -651,11 +655,19 @@ def check_smtp_health() -> Dict[str, Any]:
             return {"reachable": False, "error": f"{type(e).__name__}: {str(e)}"}
 
     ipv4 = get_ipv4_address(cfg["host"])
-    conn_587 = test_conn(cfg["host"], 587)
-    conn_587_ipv4 = test_conn(ipv4, 587) if ipv4 else None
-    conn_465 = test_conn(cfg["host"], 465)
-    conn_465_ipv4 = test_conn(ipv4, 465) if ipv4 else None
-    conn_https_resend = test_conn("api.resend.com", 443)
+
+    if probe_network:
+        conn_587 = test_conn(cfg["host"], 587)
+        conn_587_ipv4 = test_conn(ipv4, 587) if ipv4 else None
+        conn_465 = test_conn(cfg["host"], 465)
+        conn_465_ipv4 = test_conn(ipv4, 465) if ipv4 else None
+        conn_https_resend = test_conn("api.resend.com", 443)
+    else:
+        conn_587 = {"reachable": None, "note": "Probe skipped (pass ?probe=true to test)"}
+        conn_587_ipv4 = None
+        conn_465 = {"reachable": None, "note": "Probe skipped (pass ?probe=true to test)"}
+        conn_465_ipv4 = None
+        conn_https_resend = {"reachable": True, "note": "Standard HTTPS port 443 open"}
 
     return {
         "is_configured": cfg["is_configured"],

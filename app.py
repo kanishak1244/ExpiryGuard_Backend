@@ -5845,6 +5845,7 @@ def test_notification_endpoint(
 def email_diagnostics_endpoint(
     request: Request,
     secret: Optional[str] = None,
+    probe: bool = False,
     send_test: bool = False,
     retry_pending: bool = False,
     recipient: Optional[str] = None,
@@ -5863,7 +5864,7 @@ def email_diagnostics_endpoint(
             detail="Forbidden. Valid X-Admin-Secret header or secret query parameter required."
         )
 
-    health = check_smtp_health()
+    health = check_smtp_health(probe_network=probe)
 
     test_result = None
     if send_test:
