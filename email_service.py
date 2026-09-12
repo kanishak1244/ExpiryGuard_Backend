@@ -645,7 +645,7 @@ def check_smtp_health() -> Dict[str, Any]:
 
     def test_conn(h: str, p: int) -> Dict[str, Any]:
         try:
-            with socket.create_connection((h, p), timeout=5):
+            with socket.create_connection((h, p), timeout=2):
                 return {"reachable": True, "error": None}
         except Exception as e:
             return {"reachable": False, "error": f"{type(e).__name__}: {str(e)}"}
