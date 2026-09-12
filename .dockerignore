@@ -26,3 +26,5 @@ uploads/*
 backups/*
 !backups/.gitkeep
 scratch
+_backup
+**/node_modules

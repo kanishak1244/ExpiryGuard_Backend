@@ -1,0 +1,6 @@
+{
+  "name": "DawaiFlow",
+  "description": "More time for your pharmacy. Less time managing software. DawaiFlow reduces repetitive work across billing, inventory, purchases and everyday pharmacy operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

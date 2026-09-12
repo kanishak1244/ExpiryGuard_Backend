@@ -59,6 +59,8 @@ import migration_service
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
 PUBLIC_SITE_DIR = BASE_DIR / "public_site"
+PUBLIC_SITE_DIST = PUBLIC_SITE_DIR / "dist"
+PUBLIC_SERVE_DIR = PUBLIC_SITE_DIST if (PUBLIC_SITE_DIST / "index.html").exists() else PUBLIC_SITE_DIR
 os.makedirs(WEB_DIR, exist_ok=True)
 os.makedirs(PUBLIC_SITE_DIR, exist_ok=True)
 load_dotenv(dotenv_path=BASE_DIR / ".env")
@@ -693,7 +695,7 @@ def api_health(db: Session = Depends(get_db)):
 @app.get("/robots.txt")
 def robots_txt():
     from fastapi.responses import FileResponse
-    robots_path = PUBLIC_SITE_DIR / "robots.txt"
+    robots_path = PUBLIC_SERVE_DIR / "robots.txt"
     if robots_path.exists():
         return FileResponse(robots_path)
     raise HTTPException(status_code=404)
@@ -702,7 +704,7 @@ def robots_txt():
 @app.get("/favicon.svg")
 def favicon():
     from fastapi.responses import FileResponse
-    fav_path = PUBLIC_SITE_DIR / "favicon.svg"
+    fav_path = PUBLIC_SERVE_DIR / "favicon.svg"
     if fav_path.exists():
         return FileResponse(fav_path)
     raise HTTPException(status_code=404)
@@ -717,9 +719,12 @@ async def custom_404_handler(request: Request, exc: HTTPException):
     ])
     if request.method == "GET" and is_html_request and not is_api_path:
         from fastapi.responses import FileResponse
-        custom_404_page = PUBLIC_SITE_DIR / "404.html"
+        custom_404_page = PUBLIC_SERVE_DIR / "404.html"
         if custom_404_page.exists():
             return FileResponse(custom_404_page, status_code=404)
+        landing_index = PUBLIC_SERVE_DIR / "index.html"
+        if landing_index.exists():
+            return FileResponse(landing_index, status_code=200)
     return JSONResponse(
         status_code=404,
         content={"detail": exc.detail if hasattr(exc, "detail") else "Not Found"}
@@ -727,62 +732,71 @@ async def custom_404_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 def home(request: Request):
-    """Serve ExpiryGuard Public SaaS Landing Page"""
+    """Serve DawaiFlow Public Landing Page"""
     from fastapi.responses import FileResponse
-    user_agent = request.headers.get("user-agent", "").lower()
-    is_mobile = any(keyword in user_agent for keyword in ["mobile", "android", "iphone", "ipad", "ipod", "webos", "iemobile", "opera mini"])
-    
-    if is_mobile:
-        mobile_page = PUBLIC_SITE_DIR / "mobile.html"
-        if mobile_page.exists():
-            return FileResponse(mobile_page)
-            
-    landing_index = PUBLIC_SITE_DIR / "index.html"
+    landing_index = PUBLIC_SERVE_DIR / "index.html"
     if landing_index.exists():
-         return FileResponse(landing_index)
-    return {"message": "ExpiryGuard Backend Running"}
+        return FileResponse(landing_index)
+    return {"message": "DawaiFlow Backend Running"}
 
 
 @app.get("/index.html")
 def get_index_html():
     from fastapi.responses import FileResponse
-    return FileResponse(PUBLIC_SITE_DIR / "index.html")
+    landing_index = PUBLIC_SERVE_DIR / "index.html"
+    if landing_index.exists():
+        return FileResponse(landing_index)
+    return {"message": "DawaiFlow Backend Running"}
 
 
 @app.get("/mobile.html")
 def get_mobile_html():
-    from fastapi.responses import FileResponse
-    return FileResponse(PUBLIC_SITE_DIR / "mobile.html")
+    return RedirectResponse(url="/", status_code=301)
 
 
 @app.get("/terms")
+@app.get("/terms.html")
 def terms():
-    """Serve Terms of Use Page"""
-    from fastapi.responses import FileResponse
-    terms_page = PUBLIC_SITE_DIR / "terms.html"
-    if terms_page.exists():
-        return FileResponse(terms_page)
-    raise HTTPException(status_code=404, detail="Terms of Use page not found")
+    """Serve Terms of Use via DawaiFlow modal or page"""
+    return RedirectResponse(url="/#terms", status_code=302)
 
 
 @app.get("/privacy")
+@app.get("/privacy.html")
 def privacy():
-    """Serve Privacy Policy Page"""
-    from fastapi.responses import FileResponse
-    privacy_page = PUBLIC_SITE_DIR / "privacy.html"
-    if privacy_page.exists():
-        return FileResponse(privacy_page)
-    raise HTTPException(status_code=404, detail="Privacy Policy page not found")
+    """Serve Privacy Policy via DawaiFlow modal or page"""
+    return RedirectResponse(url="/#privacy", status_code=302)
 
 
 @app.get("/data-policy")
+@app.get("/data-policy.html")
 def data_policy():
-    """Serve Data & App Information Page"""
+    """Serve Data & App Information via DawaiFlow modal or page"""
+    return RedirectResponse(url="/#data-policy", status_code=302)
+
+
+@app.get("/disclaimer")
+@app.get("/medical-disclaimer")
+def disclaimer():
+    """Serve Medical Disclaimer via DawaiFlow modal or page"""
+    return RedirectResponse(url="/#disclaimer", status_code=302)
+
+
+@app.get("/contact")
+@app.get("/grievance")
+@app.get("/support")
+def contact():
+    """Serve Contact & Grievance via DawaiFlow modal or page"""
+    return RedirectResponse(url="/#contact", status_code=302)
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
     from fastapi.responses import FileResponse
-    data_policy_page = PUBLIC_SITE_DIR / "data-policy.html"
-    if data_policy_page.exists():
-        return FileResponse(data_policy_page)
-    raise HTTPException(status_code=404, detail="Data & App Information page not found")
+    sitemap_path = PUBLIC_SERVE_DIR / "sitemap.xml"
+    if sitemap_path.exists():
+        return FileResponse(sitemap_path, media_type="application/xml")
+    raise HTTPException(status_code=404, detail="sitemap.xml not found")
 
 
 @app.get("/ca-connect", include_in_schema=False)
@@ -7621,13 +7635,13 @@ def redirect_deprecated_web_ai_billing():
 app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
 
 # Mount Public Landing Website Asset Directories (for root / access)
-if (PUBLIC_SITE_DIR / "css").exists():
-    app.mount("/css", StaticFiles(directory=PUBLIC_SITE_DIR / "css"), name="public_css")
-if (PUBLIC_SITE_DIR / "js").exists():
-    app.mount("/js", StaticFiles(directory=PUBLIC_SITE_DIR / "js"), name="public_js")
-if (PUBLIC_SITE_DIR / "assets").exists():
-    app.mount("/assets", StaticFiles(directory=PUBLIC_SITE_DIR / "assets"), name="public_assets")
+if (PUBLIC_SERVE_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=PUBLIC_SERVE_DIR / "assets"), name="public_assets")
+if (PUBLIC_SERVE_DIR / "css").exists():
+    app.mount("/css", StaticFiles(directory=PUBLIC_SERVE_DIR / "css"), name="public_css")
+if (PUBLIC_SERVE_DIR / "js").exists():
+    app.mount("/js", StaticFiles(directory=PUBLIC_SERVE_DIR / "js"), name="public_js")
 
 # Mount Public Landing Website
-app.mount("/site", StaticFiles(directory=PUBLIC_SITE_DIR, html=True), name="site")
-app.mount("/public_site", StaticFiles(directory=PUBLIC_SITE_DIR, html=True), name="public_site")
+app.mount("/site", StaticFiles(directory=PUBLIC_SERVE_DIR, html=True), name="site")
+app.mount("/public_site", StaticFiles(directory=PUBLIC_SERVE_DIR, html=True), name="public_site")

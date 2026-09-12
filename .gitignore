@@ -45,8 +45,23 @@ Expiryguard1/
 backups/
 desktop_agent/
 
-# Un-ignore assets needed for web/public site
+# Node modules & site backups
+node_modules/
+_backup/
+
+# Un-ignore assets & build artifacts needed for web/public site
+!public_site/package.json
+!public_site/tsconfig.json
+!public_site/metadata.json
+!public_site/dist/**
+!public_site/public/**
 !public_site/assets/**
+!public_site/src/**
+!public_site/**/*.json
+!public_site/**/*.png
+!public_site/**/*.jpg
+!public_site/**/*.jpeg
+!public_site/**/*.svg
 !web/assets/**
 
 # OS Artifacts

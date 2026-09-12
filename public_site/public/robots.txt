@@ -1,0 +1,6 @@
+# robots.txt for DawaiFlow (https://api.dawaiflow.com/)
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://api.dawaiflow.com/sitemap.xml
