@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { StatsSection } from './components/StatsSection';
 import { ProblemSection } from './components/ProblemSection';
+import { ProcessSequence } from './components/ProcessSequence';
 import { ScrollWorkflowSection } from './components/ScrollWorkflowSection';
 import { RealProductVisual } from './components/RealProductVisual';
 import { SecondaryFeatures } from './components/SecondaryFeatures';
@@ -100,6 +101,9 @@ export default function App() {
 
         {/* 3b. High-Impact Stats Bar inspired by template StatsSection */}
         <StatsSection onOpenPilot={openPilot} />
+
+        {/* 3c. How DawaiFlow Works: 4-Step Process Sequence inspired by template ProcessTimeline */}
+        <ProcessSequence />
 
         {/* 4. Interactive Scroll-Driven Workflow: SCAN → IDENTIFY → BILL → CONFIRM → DONE */}
         <ScrollWorkflowSection />

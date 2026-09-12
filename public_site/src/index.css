@@ -1,22 +1,30 @@
 @import "tailwindcss";
 
+@theme {
+  --font-display: 'Clash Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 @layer base {
   :root {
-    --font-display: 'Clash Display', 'Inter', -apple-system, sans-serif;
-    --font-body: 'Cabinet Grotesk', 'Inter', -apple-system, sans-serif;
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Clash Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-sans: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
   }
 
   body {
-    font-family: var(--font-body);
+    font-family: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: #F5F4EF;
     color: #202522;
     -webkit-font-smoothing: antialiased;
   }
 
-  h1, h2, h3, .font-display {
-    font-family: var(--font-display);
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Clash Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.025em;
   }
 }
 

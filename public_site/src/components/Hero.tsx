@@ -106,6 +106,29 @@ export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
               <span>Request a Pilot</span>
             </button>
           </motion.div>
+
+          {/* Micro Metrics Pill Stream */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-8 pt-6 border-t border-[#DCDDD5]/70 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[#5E625D]"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
+              <span className="font-medium text-[#202522]">100% FEFO Auto-Matching</span>
+            </div>
+            <span className="text-[#DCDDD5] hidden sm:inline">•</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
+              <span className="font-medium text-[#202522]">&lt; 3s Billing Speed</span>
+            </div>
+            <span className="text-[#DCDDD5] hidden sm:inline">•</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
+              <span className="font-medium text-[#202522]">Zero Data Lock-in</span>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>
