@@ -7,62 +7,66 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
   return (
-    <section id="product" className="pt-8 pb-12 sm:pt-12 sm:pb-16 lg:pt-14 lg:pb-20 bg-[#F5F4EF] overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-center">
-          {/* LEFT SIDE: DawaiFlow Hero Content (Full width on mobile, left column on desktop) */}
-          <div className="w-full lg:col-span-7 xl:col-span-6 flex flex-col justify-center items-start text-left py-2 lg:py-4">
-            {/* Existing badge */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs text-[#5E625D] mb-5 sm:mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
-              <span>Accepting select pharmacies for pilot onboarding</span>
-            </div>
+    <section
+      id="product"
+      className="relative w-full overflow-hidden bg-[#F8F7F3] border-b border-[#DCDDD5]/60 min-h-[580px] sm:min-h-[620px] md:min-h-[660px] lg:min-h-[700px] xl:min-h-[720px] flex items-center"
+    >
+      {/* FULL-WIDTH PHARMACY PHOTOGRAPH BACKGROUND (Desktop & Tablet) */}
+      <div className="hidden md:block absolute inset-0 w-full h-full pointer-events-none select-none z-0">
+        <img
+          src="/assets/dawaiflow-pharmacy-hero.jpg"
+          alt="Pharmacist assisting customers at a modern pharmacy counter using DawaiFlow"
+          className="w-full h-full object-cover object-[78%_center] lg:object-[82%_center] xl:object-[84%_center]"
+          loading="eager"
+          decoding="async"
+        />
+        {/* Subtle, natural left-side neutral gradient: ensures 100% text readability over the left 45% while keeping the pharmacist and customers completely visible on the right */}
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-[#F8F7F3] via-[#F8F7F3]/95 via-35% md:via-42% lg:via-48% to-transparent to-75% lg:to-82%"
+          aria-hidden="true"
+        />
+      </div>
 
-            {/* Existing headline: Unchanged */}
-            <h1 className="text-[32px] sm:text-[42px] lg:text-[44px] xl:text-[50px] font-semibold text-[#202522] tracking-tight leading-[1.18] sm:leading-[1.15]">
-              More time for your pharmacy.{' '}
-              <span className="text-[#526B5A] block mt-1">Less time managing software.</span>
-            </h1>
-
-            {/* Existing supporting paragraph: Unchanged */}
-            <p className="mt-4 sm:mt-5 text-[15px] sm:text-[17px] text-[#5E625D] leading-relaxed max-w-xl">
-              DawaiFlow reduces repetitive pharmacy work with faster billing, intelligent scanning, and simpler inventory management.
-            </p>
-
-            {/* Existing CTA Buttons */}
-            <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-              <button
-                id="hero-get-started-btn"
-                type="button"
-                onClick={onOpenPilot}
-                className="w-full sm:w-auto px-6 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-[15px] font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
-              >
-                <span>Get Started</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                id="hero-request-pilot-btn"
-                type="button"
-                onClick={onOpenPilot}
-                className="w-full sm:w-auto px-6 py-3.5 bg-transparent hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] rounded-lg text-[15px] font-medium transition-colors flex items-center justify-center cursor-pointer"
-              >
-                <span>Request a Pilot</span>
-              </button>
-            </div>
+      {/* HERO CONTENT: Layered over the LEFT portion */}
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 relative z-10 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="max-w-xl lg:max-w-[520px] xl:max-w-[560px] flex flex-col justify-center items-start text-left">
+          {/* Small Pilot Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs text-[#5E625D] mb-5 sm:mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
+            <span>Accepting select pharmacies for pilot onboarding</span>
           </div>
 
-          {/* RIGHT SIDE: LARGE Pharmacy Photograph (HIDDEN ON MOBILE, visible on desktop lg+) */}
-          <div className="hidden lg:block lg:col-span-5 xl:col-span-6 w-full">
-            <div className="relative w-full rounded-2xl overflow-hidden border border-[#DCDDD5] shadow-sm bg-[#EDECE6]">
-              <img
-                src="/assets/dawaiflow-pharmacy-hero.jpg"
-                alt="Pharmacist assisting customers at a modern pharmacy counter using DawaiFlow"
-                className="w-full h-full max-h-[500px] object-cover object-center block rounded-2xl select-none"
-                loading="eager"
-                decoding="async"
-              />
-            </div>
+          {/* Main Headline */}
+          <h1 className="text-[32px] sm:text-[40px] md:text-[44px] lg:text-[48px] xl:text-[52px] font-semibold text-[#202522] tracking-tight leading-[1.18] sm:leading-[1.14]">
+            More time for your pharmacy.{' '}
+            <span className="text-[#526B5A] block mt-1">Less time managing software.</span>
+          </h1>
+
+          {/* Supporting Paragraph */}
+          <p className="mt-4 sm:mt-5 text-[15px] sm:text-[17px] text-[#5E625D] leading-relaxed max-w-lg">
+            DawaiFlow reduces repetitive pharmacy work with faster billing, intelligent scanning, and simpler inventory management.
+          </p>
+
+          {/* Action Buttons */}
+          <div className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <button
+              id="hero-get-started-btn"
+              type="button"
+              onClick={onOpenPilot}
+              className="w-full sm:w-auto px-6 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-[15px] font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+            >
+              <span>Get Started</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              id="hero-request-pilot-btn"
+              type="button"
+              onClick={onOpenPilot}
+              className="w-full sm:w-auto px-6 py-3.5 bg-white/80 hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] rounded-lg text-[15px] font-medium transition-colors flex items-center justify-center cursor-pointer"
+            >
+              <span>Request a Pilot</span>
+            </button>
           </div>
         </div>
       </div>

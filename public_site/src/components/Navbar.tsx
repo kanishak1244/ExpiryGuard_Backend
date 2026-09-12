@@ -38,8 +38,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPilot }) => {
       id="main-navbar"
       className={`sticky top-0 z-50 w-full transition-colors duration-150 ${
         isScrolled
-          ? 'bg-[#F5F4EF]/95 backdrop-blur-xs border-b border-[#DCDDD5] shadow-xs'
-          : 'bg-[#F5F4EF] border-b border-[#DCDDD5]/70'
+          ? 'bg-[#F8F7F3]/95 backdrop-blur-xs border-b border-[#DCDDD5] shadow-xs'
+          : 'bg-[#F8F7F3] border-b border-[#DCDDD5]/70'
       }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
