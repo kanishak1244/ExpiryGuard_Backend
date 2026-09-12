@@ -1,33 +1,65 @@
 """
-email_service.py - ExpiryGuard Instant Email Notification Engine
-Sends immediate email notifications for new pilot lead requests via SMTP (e.g. Gmail App Password).
+email_service.py - DawaiFlow / ExpiryGuard Instant Email Notification Engine
+Sends immediate email notifications for new pilot lead requests via SMTP (Gmail App Password) with dual-port failover.
 """
 
 import os
+import socket
+import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, List
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger("expiryguard.email")
+
 
 def get_smtp_config() -> Dict[str, Any]:
-    """Reads SMTP configuration from environment variables with sensible defaults."""
+    """
+    Reads SMTP configuration from environment variables with aliases and sensible defaults.
+    Supports:
+    - User: SMTP_USER, SMTP_USERNAME, MAIL_USERNAME
+    - Pass: SMTP_PASS, SMTP_PASSWORD, MAIL_PASSWORD, GMAIL_APP_PASSWORD
+    - Recipient: MY_EMAIL, ADMIN_EMAIL, ADMIN_NOTIFICATION_EMAIL, NOTIFICATION_RECIPIENT, defaulting to vashistkanishak9@gmail.com
+    - Host: SMTP_HOST (default smtp.gmail.com)
+    - Port: SMTP_PORT (default 587)
+    """
     load_dotenv(override=True)
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
-    port_str = os.getenv("SMTP_PORT", "587").strip()
+    host = (os.getenv("SMTP_HOST") or os.getenv("MAIL_HOST") or "smtp.gmail.com").strip().strip("'\"")
+    port_str = str(os.getenv("SMTP_PORT") or os.getenv("MAIL_PORT") or "587").strip().strip("'\"")
     try:
         port = int(port_str)
     except ValueError:
         port = 587
-    user = os.getenv("SMTP_USER", "").strip()
-    password = os.getenv("SMTP_PASS", "").strip().replace(" ", "")
-    # Founder recipient email defaults to MY_EMAIL, or SMTP_USER if not set
-    recipient = os.getenv("MY_EMAIL", os.getenv("NOTIFICATION_RECIPIENT", user)).strip()
-    from_name = os.getenv("SMTP_FROM_NAME", "ExpiryGuard Pilot Alerts").strip()
+
+    user = (
+        os.getenv("SMTP_USER")
+        or os.getenv("SMTP_USERNAME")
+        or os.getenv("MAIL_USERNAME")
+        or ""
+    ).strip().strip("'\"")
+
+    password = (
+        os.getenv("SMTP_PASS")
+        or os.getenv("SMTP_PASSWORD")
+        or os.getenv("MAIL_PASSWORD")
+        or os.getenv("GMAIL_APP_PASSWORD")
+        or ""
+    ).strip().strip("'\"").replace(" ", "")
+
+    recipient = (
+        os.getenv("MY_EMAIL")
+        or os.getenv("ADMIN_EMAIL")
+        or os.getenv("ADMIN_NOTIFICATION_EMAIL")
+        or os.getenv("NOTIFICATION_RECIPIENT")
+        or "vashistkanishak9@gmail.com"
+    ).strip().strip("'\"")
+
+    from_name = (os.getenv("SMTP_FROM_NAME") or "DawaiFlow Pilot Alerts").strip().strip("'\"")
 
     return {
         "host": host,
@@ -200,17 +232,102 @@ Automated alert sent by ExpiryGuard Platform.
 """
 
 
-def send_pilot_lead_notification(lead_data: Dict[str, Any]) -> bool:
+def send_email_with_fallback(
+    msg: MIMEMultipart,
+    cfg: Dict[str, Any],
+    timeout: int = 12
+) -> Tuple[bool, str, str]:
+    """
+    Sends email via SMTP with automatic failover between Port 587 (STARTTLS) and Port 465 (Direct SSL).
+    Returns (success: bool, provider_label: str, error_details: str).
+    """
+    host = cfg["host"]
+    user = cfg["user"]
+    password = cfg["password"]
+    recipient = cfg.get("recipient") or msg.get("To", "unknown")
+
+    # Determine order: configured port first, then alternative port
+    primary_port = cfg.get("port", 587)
+    secondary_port = 465 if primary_port == 587 else 587
+    ports_to_try = [primary_port, secondary_port]
+
+    errors: List[str] = []
+
+    for port in ports_to_try:
+        try:
+            logger.info(f"[EMAIL NOTIFICATION] Connecting to SMTP server {host}:{port}...")
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=timeout) as server:
+                    server.login(user, password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=timeout) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(user, password)
+                    server.send_message(msg)
+
+            provider_label = f"smtp:{port}"
+            logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert to {recipient} via {provider_label}.")
+            return True, provider_label, ""
+        except Exception as err:
+            err_detail = f"Port {port} failed ({type(err).__name__}: {str(err)})"
+            logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_detail}")
+            errors.append(err_detail)
+
+    combined_err = " | ".join(errors)
+    logger.error(f"[EMAIL NOTIFICATION ERROR] All SMTP attempts failed for recipient {recipient}: {combined_err}")
+    return False, "none", combined_err
+
+
+def _update_lead_status(
+    lead_id: int,
+    status: str,
+    error: Optional[str] = None,
+    provider: Optional[str] = None
+) -> None:
+    """Updates database record for a pilot lead with its email notification outcome."""
+    if not lead_id:
+        return
+    try:
+        import database
+        import models
+        with database.SessionLocal() as db:
+            lead = db.query(models.PilotLead).filter(models.PilotLead.id == lead_id).first()
+            if lead:
+                lead.notification_status = status
+                lead.notified_at = datetime.utcnow()
+                lead.notification_error = error
+                lead.notification_provider = provider
+                db.commit()
+    except Exception as db_err:
+        logger.warning(f"[EMAIL DB LOG ERROR] Could not update lead #{lead_id} status in DB: {db_err}")
+
+
+def send_pilot_lead_notification(lead_data: Dict[str, Any], lead_id: Optional[int] = None) -> bool:
     """
     Sends an immediate email notification via SMTP (Gmail) to the founder.
-    Designed to run inside a background task so it never blocks or fails lead submission.
+    Designed to run inside a background task or standalone caller.
+    Automatically logs status and error details to the pilot_leads table.
     """
     cfg = get_smtp_config()
+    target_lead_id = lead_id or lead_data.get("id")
     pharmacy_name = lead_data.get("pharmacy_name", "New Pharmacy")
     subject = f"New Pilot Request: {pharmacy_name}"
 
     if not cfg["is_configured"]:
-        print(f"[EMAIL NOTIFICATION] SMTP credentials not configured (SMTP_USER or SMTP_PASS missing). Notification for '{pharmacy_name}' skipped.")
+        missing = []
+        if not cfg["user"]:
+            missing.append("SMTP_USER/SMTP_USERNAME")
+        if not cfg["password"]:
+            missing.append("SMTP_PASS/SMTP_PASSWORD")
+        if not cfg["recipient"]:
+            missing.append("MY_EMAIL/ADMIN_EMAIL")
+        err_msg = f"SMTP unconfigured: missing {', '.join(missing)}"
+        logger.warning(f"[EMAIL NOTIFICATION] {err_msg}. Notification for '{pharmacy_name}' skipped.")
+        if target_lead_id:
+            _update_lead_status(target_lead_id, "SKIPPED_NOT_CONFIGURED", error=err_msg)
         return False
 
     try:
@@ -226,31 +343,27 @@ def send_pilot_lead_notification(lead_data: Dict[str, Any]) -> bool:
         msg.attach(part_plain)
         msg.attach(part_html)
 
-        print(f"[EMAIL NOTIFICATION] Connecting to SMTP server {cfg['host']}:{cfg['port']}...")
-        if cfg["port"] == 465:
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
+        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        if success:
+            if target_lead_id:
+                _update_lead_status(target_lead_id, "SENT", provider=provider)
+            return True
         else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
-
-        print(f"[EMAIL NOTIFICATION] Successfully sent new pilot request alert to {cfg['recipient']} for '{pharmacy_name}'.")
-        return True
+            if target_lead_id:
+                _update_lead_status(target_lead_id, "FAILED", error=err_details)
+            return False
 
     except Exception as e:
-        print(f"[EMAIL NOTIFICATION ERROR] Failed to send pilot request email: {str(e)}")
+        logger.error(f"[EMAIL NOTIFICATION ERROR] Unexpected error for lead #{target_lead_id}: {e}", exc_info=True)
+        if target_lead_id:
+            _update_lead_status(target_lead_id, "FAILED", error=str(e))
         return False
 
 
 def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
     """
     Sends a test email to verify SMTP credentials and network connectivity.
-    Returns diagnostic results.
+    Returns diagnostic results including port used and failover status.
     """
     cfg = get_smtp_config()
     recipient = (test_recipient or cfg["recipient"]).strip()
@@ -258,32 +371,32 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
     if not cfg["user"] or not cfg["password"]:
         return {
             "success": False,
-            "error": "SMTP_USER or SMTP_PASS is missing in your .env file.",
-            "help": "Please set SMTP_USER and SMTP_PASS (16-character Gmail App Password) in .env"
+            "error": "SMTP_USER or SMTP_PASS is missing in environment variables.",
+            "help": "Please set SMTP_USER (e.g. your Gmail) and SMTP_PASS (16-character Gmail App Password)."
         }
 
     if not recipient:
         return {
             "success": False,
             "error": "Recipient email (MY_EMAIL or SMTP_USER) is not configured.",
-            "help": "Set MY_EMAIL in your .env file with your personal receiving email address."
+            "help": "Set MY_EMAIL in environment variables with your personal receiving email address."
         }
 
     test_lead = {
         "id": 999,
-        "full_name": "Dr. Rajesh Kumar (Sample Lead)",
-        "pharmacy_name": "City Medicos & Healthcare",
+        "full_name": "Dr. Rajesh Kumar (Diagnostic Test Lead)",
+        "pharmacy_name": "DawaiFlow System Diagnostics",
         "city": "New Delhi",
-        "phone": "+91 9876543210",
+        "phone": "+91 9817066533",
         "current_billing_method": "Marg ERP",
         "bills_per_day": "100–200",
-        "biggest_problem": "Manual bill typing is too slow during peak rush hours and inventory counts frequently get mismatched.",
+        "biggest_problem": "System diagnostic verification test of email alert delivery engine.",
         "created_at": datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC"),
     }
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🧪 [TEST] ExpiryGuard Notification Setup Verified: {test_lead['pharmacy_name']}"
+        msg["Subject"] = f"🧪 [TEST] DawaiFlow Email Delivery Verified: {test_lead['pharmacy_name']}"
         msg["From"] = f"{cfg['from_name']} <{cfg['user']}>"
         msg["To"] = recipient
 
@@ -293,31 +406,130 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
         msg.attach(part_plain)
         msg.attach(part_html)
 
-        if cfg["port"] == 465:
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
+        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        if success:
+            return {
+                "success": True,
+                "message": f"Test email sent successfully to {recipient} via {provider}.",
+                "recipient": recipient,
+                "sender": cfg["user"],
+                "provider": provider,
+                "timestamp": datetime.utcnow().isoformat()
+            }
         else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
-
-        return {
-            "success": True,
-            "message": f"Test email sent successfully to {recipient} via {cfg['host']}:{cfg['port']}.",
-            "recipient": recipient,
-            "sender": cfg["user"],
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            return {
+                "success": False,
+                "error": err_details,
+                "help": "Ensure your 16-character Gmail App Password is correct without spaces, 2-Step Verification is enabled, and your server can reach smtp.gmail.com."
+            }
 
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
-            "help": "Ensure your 16-character Gmail App Password is correct without spaces, 2-Step Verification is enabled on your Google account, and your server can reach smtp.gmail.com:587."
+            "help": "An unexpected exception occurred during test email delivery."
+        }
+
+
+def check_smtp_health() -> Dict[str, Any]:
+    """Diagnostic tool to inspect environment variables and test network connectivity to SMTP servers."""
+    cfg = get_smtp_config()
+    user = cfg["user"]
+    masked_user = (user[:2] + "***" + user[user.find("@"):]) if ("@" in user and len(user) > 3) else ("SET" if user else "NOT_SET")
+
+    def test_conn(p: int) -> Dict[str, Any]:
+        try:
+            with socket.create_connection((cfg["host"], p), timeout=5):
+                return {"reachable": True, "error": None}
+        except Exception as e:
+            return {"reachable": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+    conn_587 = test_conn(587)
+    conn_465 = test_conn(465)
+
+    return {
+        "is_configured": cfg["is_configured"],
+        "host": cfg["host"],
+        "primary_port": cfg["port"],
+        "has_user": bool(cfg["user"]),
+        "user_masked": masked_user,
+        "has_password": bool(cfg["password"]),
+        "password_length": len(cfg["password"]),
+        "recipient": cfg["recipient"],
+        "from_name": cfg["from_name"],
+        "port_587": conn_587,
+        "port_465": conn_465,
+        "environment_vars_detected": {
+            "SMTP_USER": bool(os.getenv("SMTP_USER")),
+            "SMTP_USERNAME": bool(os.getenv("SMTP_USERNAME")),
+            "MAIL_USERNAME": bool(os.getenv("MAIL_USERNAME")),
+            "SMTP_PASS": bool(os.getenv("SMTP_PASS")),
+            "SMTP_PASSWORD": bool(os.getenv("SMTP_PASSWORD")),
+            "MAIL_PASSWORD": bool(os.getenv("MAIL_PASSWORD")),
+            "GMAIL_APP_PASSWORD": bool(os.getenv("GMAIL_APP_PASSWORD")),
+            "MY_EMAIL": bool(os.getenv("MY_EMAIL")),
+            "ADMIN_EMAIL": bool(os.getenv("ADMIN_EMAIL")),
+            "ADMIN_NOTIFICATION_EMAIL": bool(os.getenv("ADMIN_NOTIFICATION_EMAIL")),
+        }
+    }
+
+
+def retry_pending_pilot_leads(limit: int = 20) -> Dict[str, Any]:
+    """Retries notifications for leads that are pending, failed, or were skipped due to unconfigured SMTP."""
+    cfg = get_smtp_config()
+    if not cfg["is_configured"]:
+        return {"success": False, "message": "SMTP not configured, retry skipped", "retried": 0}
+
+    import database
+    import models
+
+    retried_count = 0
+    succeeded_count = 0
+    failed_count = 0
+
+    try:
+        with database.SessionLocal() as db:
+            pending_leads = (
+                db.query(models.PilotLead)
+                .filter(models.PilotLead.notification_status.in_(["PENDING", "FAILED", "SKIPPED_NOT_CONFIGURED", None]))
+                .order_by(models.PilotLead.id.desc())
+                .limit(limit)
+                .all()
+            )
+
+            for lead in pending_leads:
+                retried_count += 1
+                lead_dict = {
+                    "id": lead.id,
+                    "full_name": lead.full_name,
+                    "pharmacy_name": lead.pharmacy_name,
+                    "city": lead.city,
+                    "phone": lead.phone,
+                    "current_billing_method": lead.current_billing_method,
+                    "bills_per_day": lead.bills_per_day,
+                    "biggest_problem": lead.biggest_problem,
+                    "created_at": lead.created_at.strftime("%d %b %Y, %I:%M %p UTC") if lead.created_at else datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC"),
+                }
+                ok = send_pilot_lead_notification(lead_dict, lead_id=lead.id)
+                if ok:
+                    succeeded_count += 1
+                else:
+                    failed_count += 1
+
+        return {
+            "success": True,
+            "retried": retried_count,
+            "succeeded": succeeded_count,
+            "failed": failed_count,
+        }
+    except Exception as e:
+        logger.error(f"[EMAIL RETRY ERROR] Failed during lead notification retry: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "retried": retried_count,
+            "succeeded": succeeded_count,
+            "failed": failed_count,
         }
 
 
@@ -511,24 +723,20 @@ def send_ca_report_email(
                 attachment.add_header("Content-Disposition", f'attachment; filename="{filename}"')
                 msg.attach(attachment)
 
-        if cfg["port"] == 465:
-            with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
+        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        if success:
+            return {
+                "success": True,
+                "message": f"Reports successfully emailed to {ca_email} via {provider}.",
+                "ca_email": ca_email,
+                "provider": provider,
+                "timestamp": datetime.utcnow().isoformat()
+            }
         else:
-            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(cfg["user"], cfg["password"])
-                server.send_message(msg)
-
-        return {
-            "success": True,
-            "message": f"Reports successfully emailed to {ca_email}.",
-            "ca_email": ca_email,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            return {
+                "success": False,
+                "error": f"Delivery failed: {err_details}"
+            }
 
     except Exception as e:
         return {

@@ -577,6 +577,10 @@ class PilotLead(Base):
     bills_per_day = Column(String, nullable=False)  # Under 50, 50–100, 100–200, 200+
     biggest_problem = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    notification_status = Column(String, default="PENDING")
+    notification_error = Column(Text, nullable=True)
+    notified_at = Column(DateTime, nullable=True)
+    notification_provider = Column(String, nullable=True)
 
 
 # ==========================================

@@ -1037,6 +1037,10 @@ class PilotLeadResponse(BaseModel):
     bills_per_day: str
     biggest_problem: Optional[str] = None
     created_at: datetime
+    notification_status: Optional[str] = "PENDING"
+    notification_error: Optional[str] = None
+    notified_at: Optional[datetime] = None
+    notification_provider: Optional[str] = None
 
     class Config:
         from_attributes = True

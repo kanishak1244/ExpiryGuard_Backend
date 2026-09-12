@@ -46,7 +46,12 @@ import permissions
 from database import engine, Base, SessionLocal
 from scheduler import start_scheduler
 from notification_service import send_expiry_notifications
-from email_service import send_pilot_lead_notification, send_test_email
+from email_service import (
+    send_pilot_lead_notification,
+    send_test_email,
+    check_smtp_health,
+    retry_pending_pilot_leads,
+)
 from ai.invoice_service import scan_invoice
 from crypto_utils import encrypt_staff_password, decrypt_staff_password
 import backup_service
@@ -331,6 +336,11 @@ def warmup_database():
             db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES staff_members(id);"))
             db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_name VARCHAR;"))
             db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_staff_id ON sales(staff_id);"))
+            # Pilot leads notification tracking schema
+            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'PENDING';"))
+            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_error TEXT;"))
+            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notified_at TIMESTAMP WITHOUT TIME ZONE;"))
+            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_provider VARCHAR(50);"))
             db.commit()
             print("[Startup] Permanent GIN Trigram search indexes, composite performance indexes & RBAC schema verified/created.")
         except Exception as idx_err:
@@ -340,7 +350,22 @@ def warmup_database():
         db.close()
         print("[Startup] Database pre-warmed and ready.")
 
-        # Pre-warm caches and OCR in a non-blocking background thread so Uvicorn starts immediately
+        # Check and log Email Service readiness
+        try:
+            smtp_status = check_smtp_health()
+            if smtp_status.get("is_configured"):
+                logger.info(
+                    f"[Startup] Email alert engine active for {smtp_status.get('recipient')} "
+                    f"via {smtp_status.get('host')}:{smtp_status.get('primary_port')} "
+                    f"(port 587 reachable: {smtp_status.get('port_587', {}).get('reachable')}, "
+                    f"port 465 reachable: {smtp_status.get('port_465', {}).get('reachable')})."
+                )
+            else:
+                logger.warning("[Startup WARNING] Email service not configured! Set SMTP_USER and SMTP_PASS (Gmail App Password).")
+        except Exception as smtp_err:
+            logger.warning(f"[Startup] SMTP health check notice: {smtp_err}")
+
+        # Pre-warm caches, OCR, and retry un-notified pilot leads in background thread
         def _background_warmup():
             try:
                 from database import SessionLocal
@@ -356,6 +381,14 @@ def warmup_database():
                         except Exception:
                             pass
                     print(f"[Startup] Background cache warming complete for {len(active_user_ids)} users.")
+
+                    # Automatically retry pending/un-notified pilot leads on startup
+                    try:
+                        retry_res = retry_pending_pilot_leads(limit=10)
+                        if retry_res.get("retried", 0) > 0:
+                            logger.info(f"[Startup] Retried {retry_res.get('retried')} pilot leads: {retry_res.get('succeeded')} succeeded, {retry_res.get('failed')} failed.")
+                    except Exception as retry_err:
+                        logger.warning(f"[Startup] Pilot leads retry notice: {retry_err}")
                 finally:
                     bg_db.close()
             except Exception as bg_err:
@@ -5759,7 +5792,7 @@ def create_pilot_lead(
             "biggest_problem": new_lead.biggest_problem,
             "created_at": new_lead.created_at.strftime("%d %b %Y, %I:%M %p UTC") if new_lead.created_at else datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC"),
         }
-        background_tasks.add_task(send_pilot_lead_notification, lead_data=lead_dict)
+        background_tasks.add_task(send_pilot_lead_notification, lead_data=lead_dict, lead_id=new_lead.id)
 
         return new_lead
     except Exception as e:
@@ -5770,27 +5803,106 @@ def create_pilot_lead(
 
 @app.post("/test-notification")
 @app.post("/api/test-notification")
-@limiter.limit("2/minute")
+@limiter.limit("5/minute")
 def test_notification_endpoint(
     request: Request,
     recipient: Optional[str] = None,
-    current_user: models.User = Depends(get_current_user),
 ):
     """
     Test endpoint to verify SMTP configuration and send a sample pilot lead alert email.
     Usage: POST /test-notification (or POST /test-notification?recipient=your_email@gmail.com)
+    Authorized via authenticated session or X-Admin-Secret header.
     """
+    admin_secret = request.headers.get("X-Admin-Secret")
+    configured_secret = os.getenv("SECRET_KEY", "").strip()
     is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
-    if is_prod:
+
+    is_authenticated = False
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            token = auth_header.split(" ")[1]
+            jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            is_authenticated = True
+        except Exception:
+            pass
+
+    if is_prod and not (admin_secret and admin_secret == configured_secret) and not is_authenticated:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Test notification endpoint is disabled in the production environment."
+            detail="Test notification endpoint requires authentication or X-Admin-Secret in production."
         )
 
     result = send_test_email(test_recipient=recipient)
     if not result.get("success"):
         return JSONResponse(status_code=400, content=result)
     return result
+
+
+@app.get("/api/admin/email-diagnostics")
+@app.post("/api/admin/email-diagnostics")
+@limiter.limit("10/minute")
+def email_diagnostics_endpoint(
+    request: Request,
+    secret: Optional[str] = None,
+    send_test: bool = False,
+    retry_pending: bool = False,
+    recipient: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Secure diagnostic endpoint to verify SMTP configuration and delivery health on production.
+    Accepts authentication via X-Admin-Secret header or ?secret= query parameter matching SECRET_KEY.
+    """
+    admin_secret = request.headers.get("X-Admin-Secret") or secret
+    configured_secret = os.getenv("SECRET_KEY", "").strip()
+
+    if not admin_secret or admin_secret != configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Valid X-Admin-Secret header or secret query parameter required."
+        )
+
+    health = check_smtp_health()
+
+    test_result = None
+    if send_test:
+        test_result = send_test_email(test_recipient=recipient)
+
+    retry_result = None
+    if retry_pending:
+        retry_result = retry_pending_pilot_leads(limit=20)
+
+    recent_leads = (
+        db.query(models.PilotLead)
+        .order_by(models.PilotLead.id.desc())
+        .limit(10)
+        .all()
+    )
+
+    leads_summary = [
+        {
+            "id": l.id,
+            "pharmacy_name": l.pharmacy_name,
+            "full_name": l.full_name,
+            "city": l.city,
+            "phone": l.phone,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "notification_status": l.notification_status or "PENDING",
+            "notification_provider": l.notification_provider,
+            "notified_at": l.notified_at.isoformat() if l.notified_at else None,
+            "notification_error": l.notification_error,
+        }
+        for l in recent_leads
+    ]
+
+    return {
+        "status": "healthy" if health.get("is_configured") else "unconfigured",
+        "smtp_health": health,
+        "test_email_result": test_result,
+        "retry_leads_result": retry_result,
+        "recent_leads": leads_summary,
+    }
 
 
 # ---------------- STAFF & BRANCHES MANAGEMENT ENDPOINTS ---------------- #
