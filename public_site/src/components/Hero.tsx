@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
+import { MagneticButton } from './ui/MagneticButton';
 
 interface HeroProps {
   onOpenPilot: () => void;
@@ -87,15 +88,14 @@ export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
             transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto"
           >
-            <button
+            <MagneticButton
               id="hero-get-started-btn"
-              type="button"
               onClick={onOpenPilot}
-              className="group w-full sm:w-auto px-6 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-[15px] font-medium transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+              className="group w-full sm:w-auto px-6 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-[15px] font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
             >
               <span>Get Started</span>
               <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </button>
+            </MagneticButton>
 
             <button
               id="hero-request-pilot-btn"

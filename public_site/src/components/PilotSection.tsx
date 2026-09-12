@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, ArrowRight, MessageCircle } from 'lucide-react';
 import { getWhatsAppInquiryUrl } from '../config/appConfig';
 import { ScrollReveal } from './ui/ScrollReveal';
+import { MagneticButton } from './ui/MagneticButton';
 
 interface PilotSectionProps {
   onOpenPilot: () => void;
@@ -44,15 +45,14 @@ export const PilotSection: React.FC<PilotSectionProps> = ({ onOpenPilot }) => {
                 </p>
 
                 <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 w-full sm:w-auto">
-                  <button
+                  <MagneticButton
                     id="pilot-request-btn"
-                    type="button"
                     onClick={onOpenPilot}
-                    className="group w-full sm:w-auto px-8 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-base font-medium transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+                    className="group w-full sm:w-auto px-8 py-3.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
                   >
                     <span>Request a Pilot</span>
                     <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-                  </button>
+                  </MagneticButton>
 
                   <a
                     id="pilot-whatsapp-btn"

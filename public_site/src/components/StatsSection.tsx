@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { ScrollReveal } from './ui/ScrollReveal';
+import { AnimatedCounter } from './ui/AnimatedCounter';
 
 interface StatItem {
   value: number;
@@ -51,9 +52,12 @@ export const StatsSection: React.FC<StatsSectionProps> = () => {
               <div className="group p-6 rounded-2xl bg-[#FFFFFF] border border-[#DCDDD5] hover:border-[#526B5A]/50 hover:shadow-xs hover:-translate-y-1 transition-all duration-300 h-full flex flex-col justify-between shadow-2xs">
                 <div>
                   <div className="font-display text-5xl sm:text-6xl font-bold text-[#526B5A] tracking-tight mb-2">
-                    <span>{stat.prefix || ''}</span>
-                    <span>{stat.value}</span>
-                    <span className="text-3xl sm:text-4xl font-semibold">{stat.suffix || ''}</span>
+                    <AnimatedCounter
+                      value={stat.value}
+                      prefix={stat.prefix || ''}
+                      suffix={stat.suffix || ''}
+                      duration={1.8}
+                    />
                   </div>
                   <h3 className="font-display text-base sm:text-lg font-semibold text-[#202522] mb-1.5">
                     {stat.label}

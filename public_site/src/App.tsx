@@ -8,12 +8,15 @@ import { ProblemSection } from './components/ProblemSection';
 import { ProcessSequence } from './components/ProcessSequence';
 import { ScrollWorkflowSection } from './components/ScrollWorkflowSection';
 import { RealProductVisual } from './components/RealProductVisual';
+import { ComparisonMatrix } from './components/ComparisonMatrix';
 import { SecondaryFeatures } from './components/SecondaryFeatures';
 import { WhoIsItFor } from './components/WhoIsItFor';
 import { PilotSection } from './components/PilotSection';
 import { FaqSection } from './components/FaqSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
+import { NoiseBg } from './components/ui/NoiseBg';
+import { MobileFloatingBar } from './components/ui/MobileFloatingBar';
 import { PilotModal } from './components/PilotModal';
 import { LegalModal, LegalDocType } from './components/legal/LegalModal';
 
@@ -74,6 +77,9 @@ export default function App() {
       {/* Scroll Progress Bar inspired by template */}
       <ScrollProgressBar />
 
+      {/* Tactile Noise Texture Overlay */}
+      <NoiseBg />
+
       {/* 1. Navbar */}
       <Navbar onOpenPilot={openPilot} />
 
@@ -111,6 +117,9 @@ export default function App() {
         {/* 5. Real Product Visuals: Laptop (Web App) + Phone (Mobile App) */}
         <RealProductVisual onOpenPilot={openPilot} />
 
+        {/* 5b. Comparison Matrix: Legacy Software vs DawaiFlow + Hardware Trust */}
+        <ComparisonMatrix onOpenPilot={openPilot} />
+
         {/* 6. Supporting Features (Compact 17 Essentials) */}
         <SecondaryFeatures />
 
@@ -126,6 +135,9 @@ export default function App() {
         {/* 10. Get in Touch: WhatsApp, Support, Grievances */}
         <ContactSection />
       </main>
+
+      {/* Floating Quick Action Bar for Mobile */}
+      <MobileFloatingBar onOpenPilot={openPilot} />
 
       {/* 10. Footer with Full Compliance & Legal Links */}
       <Footer onOpenPilot={openPilot} onOpenLegal={openLegal} />
