@@ -232,52 +232,241 @@ Automated alert sent by ExpiryGuard Platform.
 """
 
 
+def get_ipv4_address(host: str) -> Optional[str]:
+    """Resolves a hostname strictly to an IPv4 address to avoid broken IPv6 routes."""
+    try:
+        results = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+        if results:
+            return results[0][4][0]
+    except Exception:
+        pass
+    return None
+
+
+def send_email_via_resend(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str,
+    from_name: str = "DawaiFlow Pilot Alerts",
+    reply_to: Optional[str] = None,
+) -> Tuple[bool, str, str]:
+    """
+    Sends email via Resend HTTPS REST API (port 443).
+    Bypasses cloud platform SMTP port restrictions.
+    """
+    api_key = (os.getenv("RESEND_API_KEY") or "").strip()
+    if not api_key:
+        return False, "resend", "RESEND_API_KEY not configured"
+
+    import urllib.request
+    import json
+
+    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
+    payload: Dict[str, Any] = {
+        "from": f"{from_name} <{from_email}>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content,
+        "text": plain_text,
+    }
+    if reply_to:
+        payload["reply_to"] = reply_to
+
+    try:
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "DawaiFlow-Backend/1.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            resp_body = response.read().decode("utf-8")
+            resp_json = json.loads(resp_body)
+            msg_id = resp_json.get("id", "ok")
+            logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert via Resend HTTPS API (id={msg_id}) to {to_email}")
+            return True, "resend:https", ""
+    except Exception as e:
+        err_msg = f"Resend API error: {type(e).__name__}: {str(e)}"
+        logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_msg}")
+        return False, "resend:https", err_msg
+
+
+def send_email_via_brevo(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str,
+    from_name: str = "DawaiFlow Pilot Alerts",
+    reply_to: Optional[str] = None,
+) -> Tuple[bool, str, str]:
+    """
+    Sends email via Brevo (Sendinblue) HTTPS REST API (port 443).
+    Bypasses cloud platform SMTP port restrictions.
+    """
+    api_key = (os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY") or "").strip()
+    if not api_key:
+        return False, "brevo", "BREVO_API_KEY not configured"
+
+    import urllib.request
+    import json
+
+    sender_email = (
+        os.getenv("BREVO_SENDER_EMAIL")
+        or os.getenv("SMTP_USER")
+        or "hello@dawaiflow.com"
+    ).strip()
+    payload: Dict[str, Any] = {
+        "sender": {"name": from_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content,
+        "textContent": plain_text,
+    }
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
+
+    try:
+        req = urllib.request.Request(
+            "https://api.brevo.com/v3/smtp/email",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "api-key": api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            resp_body = response.read().decode("utf-8")
+            logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert via Brevo HTTPS API to {to_email}")
+            return True, "brevo:https", ""
+    except Exception as e:
+        err_msg = f"Brevo API error: {type(e).__name__}: {str(e)}"
+        logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_msg}")
+        return False, "brevo:https", err_msg
+
+
 def send_email_with_fallback(
     msg: MIMEMultipart,
     cfg: Dict[str, Any],
-    timeout: int = 12
+    timeout: int = 12,
+    subject: Optional[str] = None,
+    html_content: Optional[str] = None,
+    plain_text: Optional[str] = None,
 ) -> Tuple[bool, str, str]:
     """
-    Sends email via SMTP with automatic failover between Port 587 (STARTTLS) and Port 465 (Direct SSL).
+    Sends email with multi-layer resilience:
+    1. Direct SMTP with both DNS hostname and forced IPv4 resolution (Port 587 STARTTLS & Port 465 Direct SSL).
+    2. Automatic HTTPS API fallback (Resend, Brevo) if cloud firewall blocks SMTP sockets.
     Returns (success: bool, provider_label: str, error_details: str).
     """
     host = cfg["host"]
     user = cfg["user"]
     password = cfg["password"]
     recipient = cfg.get("recipient") or msg.get("To", "unknown")
+    email_subject = subject or msg.get("Subject", "DawaiFlow Notification")
 
-    # Determine order: configured port first, then alternative port
+    # If HTTPS API is explicitly configured, try it first to avoid blocked socket delays
+    if os.getenv("RESEND_API_KEY"):
+        if html_content and plain_text:
+            ok, prov, err = send_email_via_resend(
+                to_email=recipient,
+                subject=email_subject,
+                html_content=html_content,
+                plain_text=plain_text,
+                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+                reply_to=cfg.get("user") or None,
+            )
+            if ok:
+                return True, prov, ""
+
+    if os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY"):
+        if html_content and plain_text:
+            ok, prov, err = send_email_via_brevo(
+                to_email=recipient,
+                subject=email_subject,
+                html_content=html_content,
+                plain_text=plain_text,
+                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+                reply_to=cfg.get("user") or None,
+            )
+            if ok:
+                return True, prov, ""
+
+    # SMTP Attempts: Ports 587 and 465
     primary_port = cfg.get("port", 587)
     secondary_port = 465 if primary_port == 587 else 587
     ports_to_try = [primary_port, secondary_port]
 
+    # Resolve IPv4 to bypass broken IPv6 routes on Linux containers
+    ipv4_address = get_ipv4_address(host)
+    hosts_to_try = [host]
+    if ipv4_address and ipv4_address != host:
+        hosts_to_try.append(ipv4_address)
+
     errors: List[str] = []
 
     for port in ports_to_try:
-        try:
-            logger.info(f"[EMAIL NOTIFICATION] Connecting to SMTP server {host}:{port}...")
-            if port == 465:
-                with smtplib.SMTP_SSL(host, port, timeout=timeout) as server:
-                    server.login(user, password)
-                    server.send_message(msg)
-            else:
-                with smtplib.SMTP(host, port, timeout=timeout) as server:
-                    server.ehlo()
-                    server.starttls()
-                    server.ehlo()
-                    server.login(user, password)
-                    server.send_message(msg)
+        for target_host in hosts_to_try:
+            is_ip = target_host == ipv4_address
+            host_label = f"{target_host} ({'IPv4' if is_ip else 'DNS'})"
+            try:
+                logger.info(f"[EMAIL NOTIFICATION] Connecting to SMTP server {host_label}:{port}...")
+                if port == 465:
+                    with smtplib.SMTP_SSL(target_host, port, timeout=timeout) as server:
+                        server.login(user, password)
+                        server.send_message(msg)
+                else:
+                    with smtplib.SMTP(target_host, port, timeout=timeout) as server:
+                        server.ehlo()
+                        server.starttls()
+                        server.ehlo()
+                        server.login(user, password)
+                        server.send_message(msg)
 
-            provider_label = f"smtp:{port}"
-            logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert to {recipient} via {provider_label}.")
-            return True, provider_label, ""
-        except Exception as err:
-            err_detail = f"Port {port} failed ({type(err).__name__}: {str(err)})"
-            logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_detail}")
-            errors.append(err_detail)
+                provider_label = f"smtp:{port}:{('ipv4' if is_ip else 'dns')}"
+                logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert to {recipient} via {provider_label}.")
+                return True, provider_label, ""
+            except Exception as err:
+                err_detail = f"Port {port} on {host_label} failed ({type(err).__name__}: {str(err)})"
+                logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_detail}")
+                errors.append(err_detail)
+
+    # Fallback to HTTPS API if available
+    if html_content and plain_text:
+        if os.getenv("RESEND_API_KEY"):
+            ok, prov, err = send_email_via_resend(
+                to_email=recipient,
+                subject=email_subject,
+                html_content=html_content,
+                plain_text=plain_text,
+                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+                reply_to=cfg.get("user") or None,
+            )
+            if ok:
+                return True, prov, ""
+            errors.append(err)
+
+        if os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY"):
+            ok, prov, err = send_email_via_brevo(
+                to_email=recipient,
+                subject=email_subject,
+                html_content=html_content,
+                plain_text=plain_text,
+                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+                reply_to=cfg.get("user") or None,
+            )
+            if ok:
+                return True, prov, ""
+            errors.append(err)
 
     combined_err = " | ".join(errors)
-    logger.error(f"[EMAIL NOTIFICATION ERROR] All SMTP attempts failed for recipient {recipient}: {combined_err}")
+    logger.error(f"[EMAIL NOTIFICATION ERROR] All delivery methods failed for recipient {recipient}: {combined_err}")
     return False, "none", combined_err
 
 
@@ -337,13 +526,21 @@ def send_pilot_lead_notification(lead_data: Dict[str, Any], lead_id: Optional[in
         msg["To"] = cfg["recipient"]
         msg["Reply-To"] = cfg["user"]
 
-        part_plain = MIMEText(format_pilot_lead_plain_text(lead_data), "plain", "utf-8")
-        part_html = MIMEText(format_pilot_lead_html(lead_data), "html", "utf-8")
+        part_plain_text = format_pilot_lead_plain_text(lead_data)
+        part_html_content = format_pilot_lead_html(lead_data)
+
+        part_plain = MIMEText(part_plain_text, "plain", "utf-8")
+        part_html = MIMEText(part_html_content, "html", "utf-8")
 
         msg.attach(part_plain)
         msg.attach(part_html)
 
-        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        success, provider, err_details = send_email_with_fallback(
+            msg, cfg,
+            subject=subject,
+            html_content=part_html_content,
+            plain_text=part_plain_text
+        )
         if success:
             if target_lead_id:
                 _update_lead_status(target_lead_id, "SENT", provider=provider)
@@ -396,17 +593,26 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🧪 [TEST] DawaiFlow Email Delivery Verified: {test_lead['pharmacy_name']}"
+        subject = f"🧪 [TEST] DawaiFlow Email Delivery Verified: {test_lead['pharmacy_name']}"
+        msg["Subject"] = subject
         msg["From"] = f"{cfg['from_name']} <{cfg['user']}>"
         msg["To"] = recipient
 
-        part_plain = MIMEText(format_pilot_lead_plain_text(test_lead), "plain", "utf-8")
-        part_html = MIMEText(format_pilot_lead_html(test_lead), "html", "utf-8")
+        plain_text = format_pilot_lead_plain_text(test_lead)
+        html_content = format_pilot_lead_html(test_lead)
+
+        part_plain = MIMEText(plain_text, "plain", "utf-8")
+        part_html = MIMEText(html_content, "html", "utf-8")
 
         msg.attach(part_plain)
         msg.attach(part_html)
 
-        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        success, provider, err_details = send_email_with_fallback(
+            msg, cfg,
+            subject=subject,
+            html_content=html_content,
+            plain_text=plain_text
+        )
         if success:
             return {
                 "success": True,
@@ -420,7 +626,7 @@ def send_test_email(test_recipient: Optional[str] = None) -> Dict[str, Any]:
             return {
                 "success": False,
                 "error": err_details,
-                "help": "Ensure your 16-character Gmail App Password is correct without spaces, 2-Step Verification is enabled, and your server can reach smtp.gmail.com."
+                "help": "Ensure your 16-character Gmail App Password is correct without spaces, 2-Step Verification is enabled, and your server can reach smtp.gmail.com or configure RESEND_API_KEY."
             }
 
     except Exception as e:
@@ -437,19 +643,24 @@ def check_smtp_health() -> Dict[str, Any]:
     user = cfg["user"]
     masked_user = (user[:2] + "***" + user[user.find("@"):]) if ("@" in user and len(user) > 3) else ("SET" if user else "NOT_SET")
 
-    def test_conn(p: int) -> Dict[str, Any]:
+    def test_conn(h: str, p: int) -> Dict[str, Any]:
         try:
-            with socket.create_connection((cfg["host"], p), timeout=5):
+            with socket.create_connection((h, p), timeout=5):
                 return {"reachable": True, "error": None}
         except Exception as e:
             return {"reachable": False, "error": f"{type(e).__name__}: {str(e)}"}
 
-    conn_587 = test_conn(587)
-    conn_465 = test_conn(465)
+    ipv4 = get_ipv4_address(cfg["host"])
+    conn_587 = test_conn(cfg["host"], 587)
+    conn_587_ipv4 = test_conn(ipv4, 587) if ipv4 else None
+    conn_465 = test_conn(cfg["host"], 465)
+    conn_465_ipv4 = test_conn(ipv4, 465) if ipv4 else None
+    conn_https_resend = test_conn("api.resend.com", 443)
 
     return {
         "is_configured": cfg["is_configured"],
         "host": cfg["host"],
+        "ipv4_resolved": ipv4,
         "primary_port": cfg["port"],
         "has_user": bool(cfg["user"]),
         "user_masked": masked_user,
@@ -457,8 +668,11 @@ def check_smtp_health() -> Dict[str, Any]:
         "password_length": len(cfg["password"]),
         "recipient": cfg["recipient"],
         "from_name": cfg["from_name"],
-        "port_587": conn_587,
-        "port_465": conn_465,
+        "port_587_dns": conn_587,
+        "port_587_ipv4": conn_587_ipv4,
+        "port_465_dns": conn_465,
+        "port_465_ipv4": conn_465_ipv4,
+        "https_api_reachable": conn_https_resend,
         "environment_vars_detected": {
             "SMTP_USER": bool(os.getenv("SMTP_USER")),
             "SMTP_USERNAME": bool(os.getenv("SMTP_USERNAME")),
@@ -470,6 +684,8 @@ def check_smtp_health() -> Dict[str, Any]:
             "MY_EMAIL": bool(os.getenv("MY_EMAIL")),
             "ADMIN_EMAIL": bool(os.getenv("ADMIN_EMAIL")),
             "ADMIN_NOTIFICATION_EMAIL": bool(os.getenv("ADMIN_NOTIFICATION_EMAIL")),
+            "RESEND_API_KEY": bool(os.getenv("RESEND_API_KEY")),
+            "BREVO_API_KEY": bool(os.getenv("BREVO_API_KEY")),
         }
     }
 
