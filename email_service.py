@@ -440,7 +440,7 @@ def send_email_with_fallback(
                 if "Network is unreachable" in str(err) or "Errno 101" in str(err):
                     logger.warning("[EMAIL NOTIFICATION] Raw socket networking is blocked/unreachable by cloud host. Skipping further raw socket retries.")
                     break
-        if "Network is unreachable" in combined_err or any("Errno 101" in e for e in errors):
+        if any("Errno 101" in e or "Network is unreachable" in e for e in errors):
             break
     if html_content and plain_text:
         if os.getenv("RESEND_API_KEY"):
