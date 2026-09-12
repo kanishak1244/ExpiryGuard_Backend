@@ -1,76 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Upload, Camera } from 'lucide-react';
+import React from 'react';
+import { ArrowRight } from 'lucide-react';
 
 interface HeroProps {
   onOpenPilot: () => void;
 }
 
-const CANDIDATE_IMAGE_SOURCES = [
-  '/assets/hero-pharmacy.jpg',
-  '/assets/WhatsApp Image 2026-09-12 at 5.53.19 PM.jpeg',
-  '/assets/WhatsApp%20Image%202026-09-12%20at%205.53.19%20PM.jpeg',
-  '/assets/pharmacy-hero.jpg',
-  '/assets/pharmacy.jpeg',
-  '/assets/pharmacy.jpg',
-];
-
-const LOCAL_STORAGE_KEY = 'dawaiflow_custom_hero_photo';
-
 export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
-  const [sourceIndex, setSourceIndex] = useState(0);
-  const [customPhoto, setCustomPhoto] = useState<string | null>(null);
-  const [isAllFailed, setIsAllFailed] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        setCustomPhoto(saved);
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
-
-  const handleImageError = () => {
-    if (sourceIndex < CANDIDATE_IMAGE_SOURCES.length - 1) {
-      setSourceIndex((prev) => prev + 1);
-    } else {
-      setIsAllFailed(true);
-    }
-  };
-
-  const handleFileSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        setCustomPhoto(result);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, result);
-        } catch {
-          // localStorage might be full for very large images
-        }
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  const currentSrc = customPhoto || CANDIDATE_IMAGE_SOURCES[sourceIndex];
-
   return (
     <section id="product" className="pt-8 pb-12 sm:pt-12 sm:pb-16 lg:pt-14 lg:pb-20 bg-[#F5F4EF] overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-12 items-center">
           {/* LEFT SIDE: DawaiFlow Hero Content (Full width on mobile, left column on desktop) */}
           <div className="w-full lg:col-span-7 xl:col-span-6 flex flex-col justify-center items-start text-left py-2 lg:py-4">
             {/* Existing badge */}
@@ -114,63 +53,15 @@ export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
           </div>
 
           {/* RIGHT SIDE: LARGE Pharmacy Photograph (HIDDEN ON MOBILE, visible on desktop lg+) */}
-          <div className="hidden lg:flex lg:col-span-5 xl:col-span-6 w-full items-stretch">
-            <div
-              className="relative w-full h-full min-h-[480px] xl:min-h-[520px] rounded-2xl overflow-hidden bg-[#EDECE6] flex items-stretch"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-            >
-              {/* Hidden file input for seamless photo attachment */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleFileSelect(e.target.files[0]);
-                  }
-                }}
+          <div className="hidden lg:block lg:col-span-5 xl:col-span-6 w-full">
+            <div className="relative w-full rounded-2xl overflow-hidden border border-[#DCDDD5] shadow-sm bg-[#EDECE6]">
+              <img
+                src="/assets/dawaiflow-pharmacy-hero.jpg"
+                alt="Pharmacist assisting customers at a modern pharmacy counter using DawaiFlow"
+                className="w-full h-full max-h-[500px] object-cover object-center block rounded-2xl select-none"
+                loading="eager"
+                decoding="async"
               />
-
-              {!isAllFailed || customPhoto ? (
-                <div className="relative w-full h-full group flex items-stretch">
-                  <img
-                    src={currentSrc}
-                    onError={handleImageError}
-                    alt="Pharmacist assisting customers at a modern pharmacy counter"
-                    className="w-full h-full min-h-[480px] xl:min-h-[520px] object-cover object-[center_32%] block rounded-2xl"
-                    loading="eager"
-                    decoding="async"
-                  />
-                  {/* Subtle hover option to update or replace photo */}
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Change attached photograph"
-                    className="absolute bottom-3 right-3 px-3 py-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 backdrop-blur-xs cursor-pointer"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Change Photo</span>
-                  </button>
-                </div>
-              ) : (
-                /* Fallback frame if file has not yet been placed on disk or selected */
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-full min-h-[480px] xl:min-h-[520px] rounded-2xl border-2 border-dashed border-[#DCDDD5] hover:border-[#526B5A] flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-colors"
-                >
-                  <div className="w-12 h-12 rounded-full bg-[#E2E1DA] flex items-center justify-center text-[#526B5A] mb-3">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <p className="text-sm font-medium text-[#202522]">
-                    Click to load your attached pharmacy photograph
-                  </p>
-                  <p className="text-xs text-[#5E625D] mt-1 max-w-xs">
-                    Select <span className="font-mono text-[#202522]">WhatsApp Image 2026-09-12 at 5.53.19 PM.jpeg</span> or drag and drop it here.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>
