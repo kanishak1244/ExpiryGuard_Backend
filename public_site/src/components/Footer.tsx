@@ -102,6 +102,15 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPilot, onOpenLegal }) => {
                 </a>
               </li>
               <li>
+                <a
+                  href="#contact"
+                  onClick={(e) => handleNavClick(e, '#contact')}
+                  className="hover:text-[#202522] transition-colors"
+                >
+                  Get in Touch
+                </a>
+              </li>
+              <li>
                 <button
                   type="button"
                   onClick={onOpenPilot}

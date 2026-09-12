@@ -8,6 +8,7 @@ import { SecondaryFeatures } from './components/SecondaryFeatures';
 import { WhoIsItFor } from './components/WhoIsItFor';
 import { PilotSection } from './components/PilotSection';
 import { FaqSection } from './components/FaqSection';
+import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { PilotModal } from './components/PilotModal';
 import { LegalModal, LegalDocType } from './components/legal/LegalModal';
@@ -33,7 +34,7 @@ export default function App() {
       } else if (hash === 'disclaimer' || hash === 'medical-disclaimer') {
         setActiveLegalDoc('disclaimer');
         setIsLegalModalOpen(true);
-      } else if (hash === 'contact' || hash === 'grievance' || hash === 'support') {
+      } else if (hash === 'contact-grievance' || hash === 'grievance' || hash === 'officer') {
         setActiveLegalDoc('contact-grievance');
         setIsLegalModalOpen(true);
       }
@@ -94,6 +95,9 @@ export default function App() {
 
         {/* 9. FAQ */}
         <FaqSection />
+
+        {/* 10. Get in Touch: WhatsApp, Support, Grievances */}
+        <ContactSection />
       </main>
 
       {/* 10. Footer with Full Compliance & Legal Links */}

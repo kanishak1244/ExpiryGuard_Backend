@@ -1,6 +1,11 @@
 // Configuration for DawaiFlow compliance, contact, and product details
 // Sourced and verified from official project records (https://api.dawaiflow.com/)
 
+// WhatsApp configuration - centralized constant for easy updates
+// Default configured business WhatsApp number: '919817066533'
+// Set to 'YOUR_WHATSAPP_NUMBER' if number is pending configuration
+export const WHATSAPP_NUMBER = '919817066533';
+
 export const APP_CONFIG = {
   productName: 'DawaiFlow',
   brandName: 'DawaiFlow (Powered by ExpiryGuard)',
@@ -13,12 +18,13 @@ export const APP_CONFIG = {
   founderAndOfficer: 'Kanishak Vashist',
 
   // Contact Channels
-  supportEmail: 'contact@dawaiflow.com',
-  grievanceEmail: 'vashistkanishak9@gmail.com',
+  contactEmail: 'hello@dawaiflow.com',
+  supportEmail: 'hello@dawaiflow.com',
+  grievanceEmail: 'hello@dawaiflow.com',
   supportPhone: '+91 98170 66533',
   supportPhoneFormatted: '+91 98170 66533',
-  whatsAppNumber: '919817066533',
-  whatsAppUrl: 'https://wa.me/919817066533?text=Hi%2C%20my%20name%20is%20____.%20I%20want%20to%20make%20an%20inquiry%20about%20DawaiFlow%20and%20would%20like%20to%20know%20more%20about%20the%20pilot.',
+  whatsAppNumber: WHATSAPP_NUMBER,
+  whatsAppUrl: `https://wa.me/${WHATSAPP_NUMBER}?text=Hi%2C%20my%20name%20is%20____.%20I%20want%20to%20make%20an%20inquiry%20about%20DawaiFlow%20and%20would%20like%20to%20know%20more%20about%20the%20pilot.`,
 
   // Location & Corporate Details (with explicit placeholders where statutory formal incorporation is pending)
   location: 'Sonipat, Haryana, India',
@@ -54,5 +60,15 @@ export const getWhatsAppInquiryUrl = (name?: string): string => {
   const message = cleanName
     ? `Hi, my name is ${cleanName}. I want to make an inquiry about DawaiFlow and would like to know more about the pilot.`
     : `Hi, my name is ____. I want to make an inquiry about DawaiFlow and would like to know more about the pilot.`;
-  return `https://wa.me/919817066533?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+};
+
+/**
+ * Generates direct WhatsApp chat URL with optional pre-filled message using centralized number
+ */
+export const getDirectWhatsAppUrl = (message?: string): string => {
+  if (message) {
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  }
+  return `https://wa.me/${WHATSAPP_NUMBER}`;
 };
