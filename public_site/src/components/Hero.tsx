@@ -64,10 +64,10 @@ export const Hero: React.FC<HeroProps> = ({ onOpenPilot }) => {
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="text-[32px] sm:text-[40px] md:text-[44px] lg:text-[48px] xl:text-[52px] font-semibold text-[#202522] tracking-tight leading-[1.18] sm:leading-[1.14]"
+            className="font-display text-[34px] sm:text-[44px] md:text-[50px] lg:text-[56px] xl:text-[62px] font-bold text-[#202522] tracking-tight leading-[1.08] sm:leading-[1.06]"
           >
             More time for your pharmacy.{' '}
-            <span className="text-[#526B5A] block mt-1">Less time managing software.</span>
+            <span className="text-[#526B5A] block mt-1.5 font-bold">Less time managing software.</span>
           </motion.h1>
 
           {/* Supporting Paragraph */}

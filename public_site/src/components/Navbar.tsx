@@ -56,9 +56,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPilot }) => {
                 <span className="absolute inset-y-0.5 inset-x-0 bg-white rounded-xs" />
               </div>
             </div>
-            <span className="text-base font-semibold tracking-tight text-[#202522]">
-              DawaiFlow
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-display text-lg font-bold tracking-tight text-[#202522]">
+                DawaiFlow
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A] animate-pulse" />
+            </div>
           </a>
 
           {/* Desktop Navigation Links */}

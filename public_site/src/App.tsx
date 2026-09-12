@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollProgressBar } from './components/ui/ScrollProgressBar';
+import { MarqueeTicker } from './components/ui/MarqueeTicker';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
+import { StatsSection } from './components/StatsSection';
 import { ProblemSection } from './components/ProblemSection';
 import { ScrollWorkflowSection } from './components/ScrollWorkflowSection';
 import { RealProductVisual } from './components/RealProductVisual';
@@ -79,8 +81,25 @@ export default function App() {
         {/* 2. Hero: "More time for your pharmacy. Less time managing software." */}
         <Hero onOpenPilot={openPilot} />
 
-        {/* 3. "Pharmacy work is already busy." -> "Built to save your time." */}
+        {/* 2b. Marquee Ticker: Key capabilities stream inspired by template LogoCloud marquee */}
+        <MarqueeTicker
+          items={[
+            'Multi-Medicine Strip Camera Scan',
+            'Sub-3-Second Retail Counter Checkout',
+            'First-Expiry First-Out (FEFO) Dispensing',
+            'Barcode Scanner & Thermal Printer Ready',
+            'Loose Tablet Fractional Math',
+            'Customer Credit Khata with WhatsApp Receipts',
+            'GST B2B & B2C Compliant Invoices',
+            'Direct Supplier Purchase Entry',
+          ]}
+        />
+
+        {/* 3. Editorial Story Chapters: "Pharmacy work is already busy." -> "Built to save your time." */}
         <ProblemSection />
+
+        {/* 3b. High-Impact Stats Bar inspired by template StatsSection */}
+        <StatsSection onOpenPilot={openPilot} />
 
         {/* 4. Interactive Scroll-Driven Workflow: SCAN → IDENTIFY → BILL → CONFIRM → DONE */}
         <ScrollWorkflowSection />
