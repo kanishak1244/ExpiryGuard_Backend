@@ -244,18 +244,18 @@ class MedicineCatalogResponse(BaseModel):
     id: int
     product_name: str
     brand: Optional[str] = None
-    category: str = "allopathy"
-    hsn_code: str = "3004"
-    gst_rate: float = 12.0
-    default_price: float = 0.0
+    category: Optional[str] = "allopathy"
+    hsn_code: Optional[str] = "3004"
+    gst_rate: Optional[float] = 12.0
+    default_price: Optional[float] = 0.0
     tablets_per_strip: Optional[int] = 10
     units_per_pack: Optional[int] = None
     price_per_unit: Optional[float] = None
-    is_countable: bool = True
-    needs_review: bool = False
+    is_countable: Optional[bool] = True
+    needs_review: Optional[bool] = False
     pack_size_label: Optional[str] = None
     composition: Optional[str] = None
-    verified: bool = False
+    verified: Optional[bool] = False
 
     class Config:
         from_attributes = True

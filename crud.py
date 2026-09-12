@@ -2400,68 +2400,117 @@ def search_products_ranked(db: Session, query: str, user_id: int, limit: int = 1
 # ===========================
 
 _CATALOG_CACHE = {}
+_CATALOG_CACHE_MAX_SIZE = 500
 
 def search_medicine_catalog(db: Session, query: str, limit: int = 20):
-    clean_q = query.strip()
+    clean_q = (query or "").strip()
     if not clean_q or len(clean_q) < 2:
         return []
 
-    cache_key = (clean_q.lower(), limit)
+    clamped_limit = max(1, min(limit, 100))
+    cache_key = (clean_q.lower(), clamped_limit)
     now = time.time()
+
     if cache_key in _CATALOG_CACHE:
         cached_res, ts = _CATALOG_CACHE[cache_key]
         if now - ts < 600:
             return cached_res
 
     prefix = f"{clean_q.lower()}%"
+    contains = f"%{clean_q}%"
+    results = []
+    found_ids = set()
 
-    # Step 1: Ultra-fast index scan using idx_catalog_name_lower (~5ms on DB)
-    rows = db.execute(text("""
-        SELECT id, product_name, brand, composition, hsn_code, gst_rate, 
-               default_price, tablets_per_strip, units_per_pack, price_per_unit, verified
+    # Step 1: Ultra-fast index prefix scan using idx_catalog_name_lower (<1ms on DB)
+    sql_prefix = text("""
+        SELECT id, product_name, brand, category, hsn_code, gst_rate, 
+               default_price, tablets_per_strip, units_per_pack, price_per_unit, 
+               verified, is_countable, needs_review, pack_size_label, composition
         FROM medicine_catalog
         WHERE lower(product_name) LIKE :prefix
         LIMIT :limit;
-    """), {"prefix": prefix, "limit": limit}).fetchall()
+    """)
+    rows1 = db.execute(sql_prefix, {"prefix": prefix, "limit": clamped_limit}).fetchall()
 
-    results = [
-        models.MedicineCatalog(
-            id=r[0], product_name=r[1], brand=r[2], composition=r[3],
-            hsn_code=r[4], gst_rate=r[5], default_price=r[6],
-            tablets_per_strip=r[7], units_per_pack=r[8], price_per_unit=r[9],
-            verified=r[10]
-        ) for r in rows
-    ]
-
-    # In-memory sort by verified first (0.01 ms)
-    results.sort(key=lambda x: (0 if x.verified else 1, x.product_name or ""))
+    for r in rows1:
+        found_ids.add(r[0])
+        results.append({
+            "id": r[0],
+            "product_name": r[1],
+            "brand": r[2],
+            "category": r[3] or "allopathy",
+            "hsn_code": r[4] or "3004",
+            "gst_rate": float(r[5] if r[5] is not None else 12.0),
+            "default_price": float(r[6] if r[6] is not None else 0.0),
+            "tablets_per_strip": int(r[7]) if r[7] is not None else 10,
+            "units_per_pack": int(r[8]) if r[8] is not None else None,
+            "price_per_unit": float(r[9]) if r[9] is not None else None,
+            "verified": bool(r[10]) if r[10] is not None else False,
+            "is_countable": bool(r[11]) if r[11] is not None else True,
+            "needs_review": bool(r[12]) if r[12] is not None else False,
+            "pack_size_label": r[13],
+            "composition": r[14],
+        })
 
     # Step 2: Fallback if prefix search alone returned fewer than requested limit
-    if len(results) < limit:
-        found_ids = [r.id for r in results]
-        rem = limit - len(results)
-        contains = f"%{clean_q}%"
-        extra_rows = db.execute(text("""
-            SELECT id, product_name, brand, composition, hsn_code, gst_rate, 
-                   default_price, tablets_per_strip, units_per_pack, price_per_unit, verified
-            FROM medicine_catalog
-            WHERE NOT (id = ANY(:found_ids))
-              AND (product_name ILIKE :contains OR brand ILIKE :contains)
-            LIMIT :rem;
-        """), {"contains": contains, "found_ids": found_ids, "rem": rem}).fetchall()
+    if len(results) < clamped_limit:
+        rem = clamped_limit - len(results)
+        if found_ids:
+            sql_fallback = text("""
+                SELECT id, product_name, brand, category, hsn_code, gst_rate, 
+                       default_price, tablets_per_strip, units_per_pack, price_per_unit, 
+                       verified, is_countable, needs_review, pack_size_label, composition
+                FROM medicine_catalog
+                WHERE NOT (id = ANY(:found_ids))
+                  AND (product_name ILIKE :contains OR brand ILIKE :contains OR composition ILIKE :contains)
+                LIMIT :rem;
+            """)
+            rows2 = db.execute(sql_fallback, {"contains": contains, "found_ids": list(found_ids), "rem": rem}).fetchall()
+        else:
+            sql_fallback = text("""
+                SELECT id, product_name, brand, category, hsn_code, gst_rate, 
+                       default_price, tablets_per_strip, units_per_pack, price_per_unit, 
+                       verified, is_countable, needs_review, pack_size_label, composition
+                FROM medicine_catalog
+                WHERE product_name ILIKE :contains OR brand ILIKE :contains OR composition ILIKE :contains
+                LIMIT :rem;
+            """)
+            rows2 = db.execute(sql_fallback, {"contains": contains, "rem": rem}).fetchall()
 
-        for r in extra_rows:
-            results.append(
-                models.MedicineCatalog(
-                    id=r[0], product_name=r[1], brand=r[2], composition=r[3],
-                    hsn_code=r[4], gst_rate=r[5], default_price=r[6],
-                    tablets_per_strip=r[7], units_per_pack=r[8], price_per_unit=r[9],
-                    verified=r[10]
-                )
-            )
+        for r in rows2:
+            results.append({
+                "id": r[0],
+                "product_name": r[1],
+                "brand": r[2],
+                "category": r[3] or "allopathy",
+                "hsn_code": r[4] or "3004",
+                "gst_rate": float(r[5] if r[5] is not None else 12.0),
+                "default_price": float(r[6] if r[6] is not None else 0.0),
+                "tablets_per_strip": int(r[7]) if r[7] is not None else 10,
+                "units_per_pack": int(r[8]) if r[8] is not None else None,
+                "price_per_unit": float(r[9]) if r[9] is not None else None,
+                "verified": bool(r[10]) if r[10] is not None else False,
+                "is_countable": bool(r[11]) if r[11] is not None else True,
+                "needs_review": bool(r[12]) if r[12] is not None else False,
+                "pack_size_label": r[13],
+                "composition": r[14],
+            })
 
-    _CATALOG_CACHE[cache_key] = (results, now)
-    return results
+    # Sort: verified first, then alphabetically by product_name
+    results.sort(key=lambda x: (0 if x["verified"] else 1, x["product_name"] or ""))
+
+    # Validate against Pydantic schema model
+    validated = [schemas.MedicineCatalogResponse.model_validate(item) for item in results]
+
+    # Bounded cache storage
+    if len(_CATALOG_CACHE) >= _CATALOG_CACHE_MAX_SIZE:
+        # Evict oldest 20% entries
+        to_remove = list(_CATALOG_CACHE.keys())[:int(_CATALOG_CACHE_MAX_SIZE * 0.2)]
+        for k in to_remove:
+            _CATALOG_CACHE.pop(k, None)
+    _CATALOG_CACHE[cache_key] = (validated, now)
+
+    return validated
 
 
 

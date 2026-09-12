@@ -3335,6 +3335,8 @@ def delete_document(
 
 
 @app.get("/catalog/search", response_model=List[schemas.MedicineCatalogResponse])
+@app.get("/api/catalog/search", response_model=List[schemas.MedicineCatalogResponse])
+@app.get("/api/medicines/search", response_model=List[schemas.MedicineCatalogResponse])
 def search_medicine_catalog(
     query: Optional[str] = None,
     q: Optional[str] = None,
@@ -3342,12 +3344,27 @@ def search_medicine_catalog(
     db: Session = Depends(get_db),
 ):
     """
-    Search the reference medicine_catalog (240k+ Indian medicines).
+    Search the reference medicine_catalog (490k+ Indian medicines).
     Returns autocomplete suggestions (Name, Brand, Salt/Composition, HSN, Default Price, Pack Size).
     Used for pre-filling when purchasing/adding stock or billing.
     """
     search_str = (query or q or "").strip()
-    return crud.search_medicine_catalog(db, query=search_str, limit=limit)
+    if not search_str or len(search_str) < 2:
+        return []
+
+    clamped_limit = max(1, min(limit, 100))
+    try:
+        results = crud.search_medicine_catalog(db, query=search_str, limit=clamped_limit)
+        return results
+    except Exception as e:
+        logger.error(
+            f"[Catalog Search Error] Endpoint: /catalog/search | Query: '{search_str}' | Limit: {clamped_limit} | DB Error: {e}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search medicine catalog. Please try again with a different query."
+        )
 
 
 @app.get("/sales/pending")

@@ -552,10 +552,13 @@ function escapeHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+window._catalogResultsMap = new Map();
+
 function renderAutocompleteResults(results, searchVal) {
   const resultsList = document.getElementById('inv-search-results-list');
+  const items = Array.isArray(results) ? results : (results && Array.isArray(results.results) ? results.results : []);
 
-  if (!results || results.length === 0) {
+  if (!items || items.length === 0) {
     resultsList.innerHTML = `
       <div style="text-align: center; padding: 24px; background: var(--bg-main); border-radius: var(--radius-md);">
         <p style="margin-bottom: 8px; font-weight: 500;">No medicines found matching "${escapeHtml(searchVal)}"</p>
@@ -565,11 +568,14 @@ function renderAutocompleteResults(results, searchVal) {
     return;
   }
 
-  resultsList.innerHTML = results.map(item => {
-    const escapedItem = JSON.stringify(item).replace(/'/g, "&#39;");
+  // Store in memory map to avoid broken quotes/apostrophes in inline HTML onclick handlers
+  window._catalogResultsMap.clear();
+  items.forEach(item => window._catalogResultsMap.set(String(item.id), item));
+
+  resultsList.innerHTML = items.map(item => {
     return `
       <div class="card" style="padding: 12px 16px; cursor: pointer; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"
-           onclick='selectCatalogMedicine(${escapedItem})'
+           onclick="selectCatalogMedicineById('${item.id}')"
            onmouseover="this.style.borderColor='var(--color-brand-deep)'" onmouseout="this.style.borderColor='var(--border-color)'">
         <div>
           <strong style="font-size: 14px; color: var(--dark-text);">${escapeHtml(item.product_name)}</strong>
@@ -584,6 +590,13 @@ function renderAutocompleteResults(results, searchVal) {
       </div>
     `;
   }).join('');
+}
+
+function selectCatalogMedicineById(id) {
+  const med = window._catalogResultsMap.get(String(id));
+  if (med) {
+    selectCatalogMedicine(med);
+  }
 }
 
 function selectCatalogMedicine(med) {
