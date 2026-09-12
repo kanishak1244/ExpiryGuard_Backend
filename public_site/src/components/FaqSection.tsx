@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ScrollReveal } from './ui/ScrollReveal';
 
 export const FaqSection: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -30,43 +32,56 @@ export const FaqSection: React.FC = () => {
   return (
     <section id="faq" className="py-20 bg-[#F5F4EF] border-b border-[#DCDDD5]">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
+        <ScrollReveal yOffset={16} className="text-center mb-10">
           <h2 className="text-2xl sm:text-3xl lg:text-[36px] font-semibold text-[#202522] tracking-tight">
             Frequently asked questions
           </h2>
           <p className="mt-2 text-xs sm:text-sm text-[#5E625D]">
             Clear answers about DawaiFlow and everyday counter use.
           </p>
-        </div>
+        </ScrollReveal>
 
         <div className="space-y-2.5">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
-              <div
-                key={faq.q}
-                className="rounded-xl bg-[#FFFFFF] border border-[#DCDDD5] overflow-hidden transition-colors shadow-2xs"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="w-full px-5 py-4 text-left font-medium text-[#202522] flex items-center justify-between gap-4 hover:text-[#526B5A] focus:outline-none transition-colors cursor-pointer"
-                  aria-expanded={isOpen}
+              <ScrollReveal key={faq.q} delay={index * 0.04} yOffset={12}>
+                <div
+                  className={`rounded-xl bg-[#FFFFFF] border transition-all duration-200 shadow-2xs overflow-hidden ${
+                    isOpen ? 'border-[#526B5A]/50 shadow-xs' : 'border-[#DCDDD5] hover:border-[#C4C5BC]'
+                  }`}
                 >
-                  <span className="text-[15px] sm:text-base">{faq.q}</span>
-                  <ChevronDown
-                    className={`w-4 h-4 text-[#5E625D] shrink-0 transition-transform duration-150 ${
-                      isOpen ? 'rotate-180 text-[#526B5A]' : ''
-                    }`}
-                  />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    className="w-full px-5 py-4 text-left font-medium text-[#202522] flex items-center justify-between gap-4 hover:text-[#526B5A] focus:outline-none transition-colors cursor-pointer"
+                    aria-expanded={isOpen}
+                  >
+                    <span className="text-[15px] sm:text-base">{faq.q}</span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-[#5E625D] shrink-0 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180 text-[#526B5A]' : ''
+                      }`}
+                    />
+                  </button>
 
-                {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-[14px] sm:text-[15px] text-[#5E625D] leading-relaxed border-t border-[#DCDDD5]/60 bg-[#FAF9F5]">
-                    {faq.a}
-                  </div>
-                )}
-              </div>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-5 pb-5 pt-1 text-[14px] sm:text-[15px] text-[#5E625D] leading-relaxed border-t border-[#DCDDD5]/60 bg-[#FAF9F5]">
+                          {faq.a}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </ScrollReveal>
             );
           })}
         </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ScrollProgressBar } from './components/ui/ScrollProgressBar';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { ProblemSection } from './components/ProblemSection';
@@ -67,6 +68,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F5F4EF] text-[#202522] flex flex-col font-sans selection:bg-[#526B5A] selection:text-white">
+      {/* Scroll Progress Bar inspired by template */}
+      <ScrollProgressBar />
+
       {/* 1. Navbar */}
       <Navbar onOpenPilot={openPilot} />
 

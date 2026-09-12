@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, ArrowRight } from 'lucide-react';
+import { ScrollReveal } from './ui/ScrollReveal';
 
 interface RealProductVisualProps {
   onOpenPilot: () => void;
@@ -10,8 +11,9 @@ export const RealProductVisual: React.FC<RealProductVisualProps> = ({ onOpenPilo
     <section className="py-16 sm:py-24 bg-[#F5F4EF] border-b border-[#DCDDD5]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#526B5A] mb-3">
+        <ScrollReveal yOffset={16} className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#526B5A] mb-3 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A] animate-pulse" />
             <span>Web &amp; Mobile Synchronized</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-[36px] font-semibold text-[#202522] tracking-tight">
@@ -20,7 +22,7 @@ export const RealProductVisual: React.FC<RealProductVisualProps> = ({ onOpenPilo
           <p className="mt-2.5 text-[15px] sm:text-base text-[#5E625D] leading-relaxed">
             Use DawaiFlow across web and mobile without changing the way you work.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* Product Showcase Composition: Laptop / Web App + Phone / Mobile App */}
         {/* DESKTOP LAYOUT (1024px+) */}
@@ -142,16 +144,16 @@ export const RealProductVisual: React.FC<RealProductVisualProps> = ({ onOpenPilo
         </div>
 
         {/* Request Pilot Call to Action */}
-        <div className="mt-10 sm:mt-12 text-center">
+        <ScrollReveal delay={0.15} yOffset={16} className="mt-10 sm:mt-12 text-center">
           <button
             type="button"
             onClick={onOpenPilot}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer active:scale-[0.99]"
+            className="group inline-flex items-center gap-2 px-6 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-sm font-medium transition-all shadow-xs cursor-pointer active:scale-[0.99]"
           >
             <span>Request a Pilot Demo</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
           </button>
-        </div>
+        </ScrollReveal>
       </div>
     </section>
   );

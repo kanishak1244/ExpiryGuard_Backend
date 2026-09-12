@@ -114,9 +114,10 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPilot, onOpenLegal }) => {
                 <button
                   type="button"
                   onClick={onOpenPilot}
-                  className="hover:text-[#202522] text-[#526B5A] font-medium transition-colors cursor-pointer text-left"
+                  className="group hover:text-[#202522] text-[#526B5A] font-medium transition-colors cursor-pointer text-left flex items-center gap-1"
                 >
-                  Request a Free Pilot →
+                  <span>Request a Free Pilot</span>
+                  <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
                 </button>
               </li>
             </ul>

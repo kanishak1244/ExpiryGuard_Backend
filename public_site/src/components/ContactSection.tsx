@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpRight, HelpCircle, ShieldAlert } from 'lucide-react';
 import { APP_CONFIG, getDirectWhatsAppUrl } from '../config/appConfig';
+import { ScrollReveal } from './ui/ScrollReveal';
 
 /**
  * Authentic WhatsApp Brand Icon SVG
@@ -29,8 +30,8 @@ export const ContactSection: React.FC = () => {
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#5E625D] mb-3">
+        <ScrollReveal yOffset={16} className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#5E625D] mb-3 shadow-2xs">
             <span className="w-1.5 h-1.5 rounded-full bg-[#526B5A]" />
             <span>Support &amp; Inquiries</span>
           </div>
@@ -43,101 +44,107 @@ export const ContactSection: React.FC = () => {
           <p className="mt-2 text-sm sm:text-base text-[#5E625D] leading-relaxed">
             Have questions about the pilot, need support with your counter, or want to speak with our team? Choose the channel that suits you best.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* 3 Clear Contact Options Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Option 1: WhatsApp */}
-          <a
-            id="contact-option-whatsapp"
-            href={whatsAppHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#526B5A]/60 hover:shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all cursor-pointer"
-            aria-label="WhatsApp: Chat with our team"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-[#EBF7EE] text-[#25D366] flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
-                <WhatsAppIcon className="w-5 h-5" />
+          <ScrollReveal delay={0.05} yOffset={20}>
+            <a
+              id="contact-option-whatsapp"
+              href={whatsAppHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#25D366]/60 hover:shadow-xs hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all duration-300 cursor-pointer h-full"
+              aria-label="WhatsApp: Chat with our team"
+            >
+              <div>
+                <div className="w-10 h-10 rounded-lg bg-[#EBF7EE] text-[#25D366] flex items-center justify-center mb-4 transition-transform duration-200 group-hover:scale-110">
+                  <WhatsAppIcon className="w-5 h-5" />
+                </div>
+                <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight group-hover:text-[#526B5A] transition-colors">
+                  WhatsApp
+                </h3>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
+                  Chat with our team
+                </p>
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight">
-                WhatsApp
-              </h3>
-              <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
-                Chat with our team
-              </p>
-            </div>
 
-            <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
-              <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
-                {APP_CONFIG.supportPhoneFormatted}
-              </span>
-              <span className="inline-flex items-center gap-1 group-hover:underline">
-                Chat Now
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </span>
-            </div>
-          </a>
+              <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
+                <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
+                  {APP_CONFIG.supportPhoneFormatted}
+                </span>
+                <span className="inline-flex items-center gap-1 group-hover:underline">
+                  Chat Now
+                  <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </span>
+              </div>
+            </a>
+          </ScrollReveal>
 
           {/* Option 2: Support */}
-          <a
-            id="contact-option-support"
-            href={supportHref}
-            className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#526B5A]/60 hover:shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all cursor-pointer"
-            aria-label="Support: Need help with Dawaiflow? Our team is here to help."
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-[#EDECE6] text-[#526B5A] flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
-                <HelpCircle className="w-5 h-5" />
+          <ScrollReveal delay={0.12} yOffset={20}>
+            <a
+              id="contact-option-support"
+              href={supportHref}
+              className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#526B5A]/60 hover:shadow-xs hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all duration-300 cursor-pointer h-full"
+              aria-label="Support: Need help with Dawaiflow? Our team is here to help."
+            >
+              <div>
+                <div className="w-10 h-10 rounded-lg bg-[#EDECE6] text-[#526B5A] flex items-center justify-center mb-4 transition-transform duration-200 group-hover:scale-110">
+                  <HelpCircle className="w-5 h-5" />
+                </div>
+                <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight group-hover:text-[#526B5A] transition-colors">
+                  Support
+                </h3>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
+                  Need help with Dawaiflow? Our team is here to help.
+                </p>
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight">
-                Support
-              </h3>
-              <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
-                Need help with Dawaiflow? Our team is here to help.
-              </p>
-            </div>
 
-            <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
-              <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
-                {APP_CONFIG.supportEmail}
-              </span>
-              <span className="inline-flex items-center gap-1 group-hover:underline">
-                Email Us
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </span>
-            </div>
-          </a>
+              <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
+                <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
+                  {APP_CONFIG.supportEmail}
+                </span>
+                <span className="inline-flex items-center gap-1 group-hover:underline">
+                  Email Us
+                  <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </span>
+              </div>
+            </a>
+          </ScrollReveal>
 
           {/* Option 3: Grievances */}
-          <a
-            id="contact-option-grievances"
-            href={grievancesHref}
-            className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#526B5A]/60 hover:shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all cursor-pointer"
-            aria-label="Grievances: Have a concern or complaint? Let us know."
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-[#FAF0ED] text-[#8C4A3E] flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
-                <ShieldAlert className="w-5 h-5" />
+          <ScrollReveal delay={0.19} yOffset={20}>
+            <a
+              id="contact-option-grievances"
+              href={grievancesHref}
+              className="group flex flex-col justify-between p-6 bg-[#FFFFFF] rounded-xl border border-[#DCDDD5] hover:border-[#8C4A3E]/60 hover:shadow-xs hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#526B5A] focus-visible:ring-offset-2 transition-all duration-300 cursor-pointer h-full"
+              aria-label="Grievances: Have a concern or complaint? Let us know."
+            >
+              <div>
+                <div className="w-10 h-10 rounded-lg bg-[#FAF0ED] text-[#8C4A3E] flex items-center justify-center mb-4 transition-transform duration-200 group-hover:scale-110">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight group-hover:text-[#8C4A3E] transition-colors">
+                  Grievances
+                </h3>
+                <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
+                  Have a concern or complaint? Let us know.
+                </p>
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-[#202522] tracking-tight">
-                Grievances
-              </h3>
-              <p className="mt-1.5 text-xs sm:text-sm text-[#5E625D] leading-relaxed">
-                Have a concern or complaint? Let us know.
-              </p>
-            </div>
 
-            <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
-              <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
-                {APP_CONFIG.grievanceEmail}
-              </span>
-              <span className="inline-flex items-center gap-1 group-hover:underline">
-                Email Us
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </span>
-            </div>
-          </a>
+              <div className="mt-6 pt-4 border-t border-[#DCDDD5]/60 flex items-center justify-between text-xs font-medium text-[#526B5A]">
+                <span className="text-[#5E625D] font-mono text-[11px] sm:text-xs">
+                  {APP_CONFIG.grievanceEmail}
+                </span>
+                <span className="inline-flex items-center gap-1 group-hover:underline">
+                  Email Us
+                  <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </span>
+              </div>
+            </a>
+          </ScrollReveal>
         </div>
       </div>
     </section>

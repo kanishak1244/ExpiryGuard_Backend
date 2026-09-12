@@ -68,9 +68,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPilot }) => {
                 key={link.label}
                 href={link.href}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className="text-sm font-medium text-[#5E625D] hover:text-[#202522] transition-colors py-1 focus:outline-none"
+                className="relative text-sm font-medium text-[#5E625D] hover:text-[#202522] transition-colors py-1 focus:outline-none group"
               >
-                {link.label}
+                <span>{link.label}</span>
+                <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#526B5A] rounded-full group-hover:w-full transition-all duration-200" />
               </a>
             ))}
           </nav>
@@ -81,10 +82,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPilot }) => {
               id="nav-get-started-btn"
               type="button"
               onClick={onOpenPilot}
-              className="px-4 py-2 text-sm font-medium text-white bg-[#526B5A] hover:bg-[#43584a] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
+              className="group px-4 py-2 text-sm font-medium text-white bg-[#526B5A] hover:bg-[#43584a] rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-[0.99]"
             >
               <span>Get Started</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
             </button>
           </div>
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScrollReveal } from './ui/ScrollReveal';
 import {
   ScanBarcode,
   Pill,
@@ -43,29 +44,32 @@ export const SecondaryFeatures: React.FC = () => {
   return (
     <section id="features" className="py-16 sm:py-20 bg-[#F5F4EF] border-b border-[#DCDDD5]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8 sm:mb-11">
+        <ScrollReveal yOffset={16} className="text-center mb-8 sm:mb-11">
           <h3 className="text-xl sm:text-2xl font-semibold text-[#202522]">
             Everything else you need, without the clutter.
           </h3>
           <p className="mt-2 text-xs sm:text-sm text-[#5E625D]">
             Essential counter and backroom capabilities built right into your daily flow.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* Compact Grid: 1 or 2 columns on mobile, 4 on desktop */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
-          {supportingCapabilities.map((item) => {
+          {supportingCapabilities.map((item, idx) => {
             const Icon = item.icon;
             return (
-              <div
-                key={item.name}
-                className="p-2.5 sm:p-3 rounded-lg bg-[#FFFFFF] border border-[#DCDDD5] flex items-center gap-2.5 hover:border-[#C4C5BC] transition-colors min-w-0 shadow-2xs"
-              >
-                <div className="w-7 h-7 rounded-md bg-[#EDECE6] border border-[#DCDDD5] flex items-center justify-center text-[#526B5A] shrink-0">
-                  <Icon className="w-3.5 h-3.5" />
+              <ScrollReveal key={item.name} delay={Math.min(idx * 0.025, 0.35)} yOffset={12}>
+                <div
+                  className="group p-2.5 sm:p-3 rounded-lg bg-[#FFFFFF] border border-[#DCDDD5] flex items-center gap-2.5 hover:border-[#526B5A]/40 hover:-translate-y-0.5 hover:shadow-xs transition-all duration-200 min-w-0 shadow-2xs cursor-default"
+                >
+                  <div className="w-7 h-7 rounded-md bg-[#EDECE6] border border-[#DCDDD5] group-hover:bg-[#EBF7EE] group-hover:border-[#526B5A]/30 flex items-center justify-center text-[#526B5A] shrink-0 transition-colors">
+                    <Icon className="w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110" />
+                  </div>
+                  <span className="text-xs font-medium text-[#202522] group-hover:text-[#202522] truncate transition-colors">
+                    {item.name}
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-[#202522] truncate">{item.name}</span>
-              </div>
+              </ScrollReveal>
             );
           })}
         </div>
