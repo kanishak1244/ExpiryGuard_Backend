@@ -54,29 +54,71 @@ export const ScrollWorkflowSection: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeStep, setActiveStep] = useState(1);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+  const [isInView, setIsInView] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
+  // Detect reduced motion preference
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Track viewport width for responsive behavior (Desktop >= 1024px)
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // DESKTOP: Scroll-driven sticky presentation (throttled via requestAnimationFrame)
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    let ticking = false;
     const handleScroll = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const totalScrollableDistance = containerRef.current.offsetHeight - window.innerHeight;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (!containerRef.current) {
+            ticking = false;
+            return;
+          }
+          const rect = containerRef.current.getBoundingClientRect();
+          const totalScrollableDistance =
+            containerRef.current.offsetHeight - window.innerHeight;
 
-      if (totalScrollableDistance <= 0) return;
+          if (totalScrollableDistance > 0) {
+            const currentScroll = -rect.top;
+            const progress = Math.max(
+              0,
+              Math.min(1, currentScroll / totalScrollableDistance)
+            );
+            setScrollProgress(progress);
 
-      const currentScroll = -rect.top;
-      const progress = Math.max(0, Math.min(1, currentScroll / totalScrollableDistance));
-      setScrollProgress(progress);
-
-      if (progress < 0.2) {
-        setActiveStep(1);
-      } else if (progress < 0.4) {
-        setActiveStep(2);
-      } else if (progress < 0.6) {
-        setActiveStep(3);
-      } else if (progress < 0.8) {
-        setActiveStep(4);
-      } else {
-        setActiveStep(5);
+            if (progress < 0.2) {
+              setActiveStep(1);
+            } else if (progress < 0.4) {
+              setActiveStep(2);
+            } else if (progress < 0.6) {
+              setActiveStep(3);
+            } else if (progress < 0.8) {
+              setActiveStep(4);
+            } else {
+              setActiveStep(5);
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
@@ -86,26 +128,89 @@ export const ScrollWorkflowSection: React.FC = () => {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [isDesktop]);
 
+  // MOBILE: IntersectionObserver to detect when workflow is in view
+  useEffect(() => {
+    if (isDesktop || !containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [isDesktop]);
+
+  // MOBILE: Gentle auto-advance when in view (paused if user taps/interacts or prefers reduced motion)
+  useEffect(() => {
+    if (isDesktop || !isInView || isPaused || prefersReducedMotion) return;
+
+    const interval = setInterval(() => {
+      setActiveStep((prev) => (prev < STEPS.length ? prev + 1 : 1));
+    }, 3200);
+
+    return () => clearInterval(interval);
+  }, [isDesktop, isInView, isPaused, prefersReducedMotion]);
+
+  // Handle pill click
   const handleStepClick = (stepId: number) => {
     setActiveStep(stepId);
-    if (!containerRef.current) return;
-    const containerTop = containerRef.current.offsetTop;
-    const totalScrollableDistance = containerRef.current.offsetHeight - window.innerHeight;
-    const targetProgress = (stepId - 0.5) / STEPS.length;
-    window.scrollTo({
-      top: containerTop + targetProgress * totalScrollableDistance,
-      behavior: 'smooth',
-    });
+    setIsPaused(true);
+
+    // On desktop, scroll the sticky container to that step's position
+    if (isDesktop && containerRef.current) {
+      const containerTop = containerRef.current.offsetTop;
+      const totalScrollableDistance =
+        containerRef.current.offsetHeight - window.innerHeight;
+      const targetProgress = (stepId - 0.5) / STEPS.length;
+      window.scrollTo({
+        top: containerTop + targetProgress * totalScrollableDistance,
+        behavior: 'smooth',
+      });
+    }
   };
 
   const handlePrev = () => {
-    if (activeStep > 1) handleStepClick(activeStep - 1);
+    setIsPaused(true);
+    if (activeStep > 1) {
+      handleStepClick(activeStep - 1);
+    } else if (!isDesktop) {
+      handleStepClick(STEPS.length);
+    }
   };
 
   const handleNext = () => {
-    if (activeStep < STEPS.length) handleStepClick(activeStep + 1);
+    setIsPaused(true);
+    if (activeStep < STEPS.length) {
+      handleStepClick(activeStep + 1);
+    } else if (!isDesktop) {
+      handleStepClick(1);
+    }
+  };
+
+  // Mobile touch swipe gestures on the card
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(diffX) > 40) {
+      setIsPaused(true);
+      if (diffX < 0) {
+        // Swipe left -> Next step
+        handleNext();
+      } else {
+        // Swipe right -> Prev step
+        handlePrev();
+      }
+    }
+    touchStartX.current = null;
   };
 
   const current = STEPS[activeStep - 1] || STEPS[0];
@@ -114,16 +219,18 @@ export const ScrollWorkflowSection: React.FC = () => {
     <section
       id="workflow-demo"
       ref={containerRef}
-      className="relative bg-[#F5F4EF] text-[#202522] border-b border-[#DCDDD5] min-h-[220vh] sm:min-h-[260vh] lg:min-h-[300vh]"
+      className="relative bg-[#F5F4EF] text-[#202522] border-b border-[#DCDDD5] min-h-0 lg:min-h-[300vh]"
     >
-      {/* Sticky presentation viewport */}
-      <div className="sticky top-16 h-[calc(100vh-4rem)] max-h-[840px] flex flex-col justify-between py-6 sm:py-8 overflow-hidden">
+      {/* Viewport container: sticky on desktop (lg:), natural flow on mobile */}
+      <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:max-h-[840px] flex flex-col justify-between py-8 sm:py-10 lg:py-8 overflow-hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 flex flex-col justify-between">
-          {/* Section Header: 32-40px desktop, 26-32px mobile */}
+          {/* Section Header */}
           <div className="text-center max-w-2xl mx-auto mb-4 sm:mb-6 shrink-0">
             <h2 className="text-2xl sm:text-3xl lg:text-[36px] font-semibold text-[#202522] tracking-tight leading-tight">
               Less manual work.{' '}
-              <span className="text-[#526B5A] block sm:inline">More time for your pharmacy.</span>
+              <span className="text-[#526B5A] block sm:inline">
+                More time for your pharmacy.
+              </span>
             </h2>
 
             <p className="mt-2 text-xs sm:text-sm text-[#5E625D]">
@@ -142,7 +249,7 @@ export const ScrollWorkflowSection: React.FC = () => {
                     key={step.id}
                     type="button"
                     onClick={() => handleStepClick(step.id)}
-                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 rounded-md text-xs transition-colors cursor-pointer ${
+                    className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-0.5 sm:px-1 rounded-md text-xs transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-[#526B5A] text-white font-medium shadow-xs'
                         : isPassed
@@ -152,7 +259,7 @@ export const ScrollWorkflowSection: React.FC = () => {
                     aria-label={`Step ${step.id}: ${step.label}`}
                   >
                     <span
-                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-medium ${
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-medium shrink-0 ${
                         isActive
                           ? 'bg-white text-[#526B5A]'
                           : isPassed
@@ -168,18 +275,22 @@ export const ScrollWorkflowSection: React.FC = () => {
               })}
             </div>
 
-            {/* Scroll Progress Line */}
+            {/* Progress Line: Desktop uses scrollProgress, Mobile uses step progress */}
             <div className="max-w-md mx-auto mt-2 h-1 bg-[#DCDDD5] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#526B5A] transition-all duration-150"
-                style={{ width: `${Math.round(scrollProgress * 100)}%` }}
+                className="h-full bg-[#526B5A] transition-all duration-300 ease-out"
+                style={{
+                  width: isDesktop
+                    ? `${Math.round(scrollProgress * 100)}%`
+                    : `${(activeStep / STEPS.length) * 100}%`,
+                }}
               />
             </div>
           </div>
 
           {/* Main Visual Stage: Desktop Side-by-Side / Mobile Stacked */}
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-center">
-            {/* Left Column: Short step description */}
+            {/* Left Column: Step description & controls */}
             <div className="lg:col-span-5 space-y-2 sm:space-y-3 text-center lg:text-left">
               <div className="text-xs font-mono font-medium text-[#526B5A] uppercase tracking-wider">
                 {current.tagline}
@@ -189,30 +300,30 @@ export const ScrollWorkflowSection: React.FC = () => {
                 {current.label}
               </h3>
 
-              <p className="text-[15px] sm:text-base text-[#5E625D] leading-relaxed max-w-md mx-auto lg:mx-0">
+              <p className="text-[14px] sm:text-[15px] lg:text-base text-[#5E625D] leading-relaxed max-w-md mx-auto lg:mx-0 min-h-[40px] flex items-center justify-center lg:justify-start">
                 {current.shortDesc}
               </p>
 
               {/* Navigation Controls */}
-              <div className="flex items-center justify-center lg:justify-start gap-2 pt-2">
+              <div className="flex items-center justify-center lg:justify-start gap-2 pt-1 sm:pt-2">
                 <button
                   type="button"
                   onClick={handlePrev}
-                  disabled={activeStep === 1}
-                  className="px-2.5 py-1 rounded-md bg-[#EDECE6] border border-[#DCDDD5] text-xs text-[#5E625D] hover:text-[#202522] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors"
+                  disabled={isDesktop && activeStep === 1}
+                  className="px-3 py-1.5 sm:py-1 rounded-md bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#5E625D] hover:text-[#202522] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
                   aria-label="Previous step"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Prev</span>
+                  <span>Prev</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={activeStep === STEPS.length}
-                  className="px-2.5 py-1 rounded-md bg-[#EDECE6] border border-[#DCDDD5] text-xs text-[#5E625D] hover:text-[#202522] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors"
+                  disabled={isDesktop && activeStep === STEPS.length}
+                  className="px-3 py-1.5 sm:py-1 rounded-md bg-[#EDECE6] border border-[#DCDDD5] text-xs font-medium text-[#5E625D] hover:text-[#202522] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
                   aria-label="Next step"
                 >
-                  <span className="hidden sm:inline">Next</span>
+                  <span>Next</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
                 <span className="text-[11px] font-mono text-[#5E625D] ml-2">
@@ -221,11 +332,22 @@ export const ScrollWorkflowSection: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: Visual Stage */}
+            {/* Right Column: Pre-rendered Stable Visual Stage Card */}
             <div className="lg:col-span-7 h-full flex items-center justify-center">
-              <div className="w-full max-w-lg bg-[#FFFFFF] border border-[#DCDDD5] rounded-xl p-4 sm:p-5 shadow-xs relative overflow-hidden transition-all duration-300">
+              <div
+                className="w-full max-w-lg bg-[#FFFFFF] border border-[#DCDDD5] rounded-xl p-4 sm:p-5 shadow-xs relative overflow-hidden min-h-[295px] sm:min-h-[305px] flex flex-col justify-center select-none"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+              >
                 {/* STEP 1: SCAN */}
-                {activeStep === 1 && (
+                <div
+                  className={`w-full transition-opacity duration-200 ease-in-out ${
+                    activeStep === 1
+                      ? 'opacity-100 relative z-10'
+                      : 'opacity-0 absolute inset-4 sm:inset-5 pointer-events-none z-0 hidden'
+                  }`}
+                  aria-hidden={activeStep !== 1}
+                >
                   <div className="space-y-3 py-1">
                     <div className="flex items-center justify-between text-xs text-[#5E625D] border-b border-[#DCDDD5] pb-2 font-mono">
                       <span className="flex items-center gap-1.5 text-[#526B5A] font-medium">
@@ -246,11 +368,16 @@ export const ScrollWorkflowSection: React.FC = () => {
                           <span className="absolute -top-2 left-1 bg-[#526B5A] text-[9px] font-mono text-white px-1 rounded">
                             STRIP 1
                           </span>
-                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">Augmentin</div>
+                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">
+                            Augmentin
+                          </div>
                           <div className="text-[9px] text-[#5E625D]">625 DUO</div>
                           <div className="mt-1 flex justify-center gap-0.5">
                             {[...Array(6)].map((_, i) => (
-                              <span key={i} className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs" />
+                              <span
+                                key={i}
+                                className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs"
+                              />
                             ))}
                           </div>
                         </div>
@@ -259,11 +386,16 @@ export const ScrollWorkflowSection: React.FC = () => {
                           <span className="absolute -top-2 left-1 bg-[#526B5A] text-[9px] font-mono text-white px-1 rounded">
                             STRIP 2
                           </span>
-                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">Pan 40</div>
+                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">
+                            Pan 40
+                          </div>
                           <div className="text-[9px] text-[#5E625D]">Pantoprazole</div>
                           <div className="mt-1 flex justify-center gap-0.5">
                             {[...Array(5)].map((_, i) => (
-                              <span key={i} className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs" />
+                              <span
+                                key={i}
+                                className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs"
+                              />
                             ))}
                           </div>
                         </div>
@@ -272,11 +404,16 @@ export const ScrollWorkflowSection: React.FC = () => {
                           <span className="absolute -top-2 left-1 bg-[#526B5A] text-[9px] font-mono text-white px-1 rounded">
                             STRIP 3
                           </span>
-                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">Dolo 650</div>
+                          <div className="text-[11px] font-semibold text-[#202522] mt-1 truncate">
+                            Dolo 650
+                          </div>
                           <div className="text-[9px] text-[#5E625D]">Paracetamol</div>
                           <div className="mt-1 flex justify-center gap-0.5">
                             {[...Array(6)].map((_, i) => (
-                              <span key={i} className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs" />
+                              <span
+                                key={i}
+                                className="w-1.5 h-2 bg-[#DCDDD5] rounded-xs"
+                              />
                             ))}
                           </div>
                         </div>
@@ -287,23 +424,36 @@ export const ScrollWorkflowSection: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* STEP 2: IDENTIFY */}
-                {activeStep === 2 && (
+                <div
+                  className={`w-full transition-opacity duration-200 ease-in-out ${
+                    activeStep === 2
+                      ? 'opacity-100 relative z-10'
+                      : 'opacity-0 absolute inset-4 sm:inset-5 pointer-events-none z-0 hidden'
+                  }`}
+                  aria-hidden={activeStep !== 2}
+                >
                   <div className="space-y-2.5 sm:space-y-3 py-1">
                     <div className="flex items-center justify-between text-xs text-[#5E625D] border-b border-[#DCDDD5] pb-2 font-mono">
                       <span className="flex items-center gap-1.5 text-[#526B5A] font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Matched In Store Inventory
                       </span>
-                      <span className="text-[#526B5A] font-medium text-[11px]">3 Matched</span>
+                      <span className="text-[#526B5A] font-medium text-[11px]">
+                        3 Matched
+                      </span>
                     </div>
 
                     <div className="space-y-1.5 sm:space-y-2 font-mono text-xs">
                       <div className="p-2 sm:p-2.5 bg-[#F5F4EF] border border-[#DCDDD5] rounded-md flex items-center justify-between">
                         <div>
-                          <div className="font-semibold text-[#202522] text-xs">Augmentin 625 Duo</div>
-                          <div className="text-[10px] text-[#5E625D]">Batch AG-942 • Exp 08/26</div>
+                          <div className="font-semibold text-[#202522] text-xs">
+                            Augmentin 625 Duo
+                          </div>
+                          <div className="text-[10px] text-[#5E625D]">
+                            Batch AG-942 • Exp 08/26
+                          </div>
                         </div>
                         <span className="text-[#526B5A] font-medium bg-[#EDECE6] px-2 py-0.5 rounded text-[10px]">
                           Matched
@@ -312,8 +462,12 @@ export const ScrollWorkflowSection: React.FC = () => {
 
                       <div className="p-2 sm:p-2.5 bg-[#F5F4EF] border border-[#DCDDD5] rounded-md flex items-center justify-between">
                         <div>
-                          <div className="font-semibold text-[#202522] text-xs">Pan 40 Tablet</div>
-                          <div className="text-[10px] text-[#5E625D]">Batch PN-108 • Exp 11/26</div>
+                          <div className="font-semibold text-[#202522] text-xs">
+                            Pan 40 Tablet
+                          </div>
+                          <div className="text-[10px] text-[#5E625D]">
+                            Batch PN-108 • Exp 11/26
+                          </div>
                         </div>
                         <span className="text-[#526B5A] font-medium bg-[#EDECE6] px-2 py-0.5 rounded text-[10px]">
                           Matched
@@ -322,8 +476,12 @@ export const ScrollWorkflowSection: React.FC = () => {
 
                       <div className="p-2 sm:p-2.5 bg-[#F5F4EF] border border-[#DCDDD5] rounded-md flex items-center justify-between">
                         <div>
-                          <div className="font-semibold text-[#202522] text-xs">Dolo 650mg</div>
-                          <div className="text-[10px] text-[#5E625D]">Batch DL-331 • Exp 05/27</div>
+                          <div className="font-semibold text-[#202522] text-xs">
+                            Dolo 650mg
+                          </div>
+                          <div className="text-[10px] text-[#5E625D]">
+                            Batch DL-331 • Exp 05/27
+                          </div>
                         </div>
                         <span className="text-[#526B5A] font-medium bg-[#EDECE6] px-2 py-0.5 rounded text-[10px]">
                           Matched
@@ -335,10 +493,17 @@ export const ScrollWorkflowSection: React.FC = () => {
                       FEFO batch automatically selected based on nearest expiry
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* STEP 3: BILL */}
-                {activeStep === 3 && (
+                <div
+                  className={`w-full transition-opacity duration-200 ease-in-out ${
+                    activeStep === 3
+                      ? 'opacity-100 relative z-10'
+                      : 'opacity-0 absolute inset-4 sm:inset-5 pointer-events-none z-0 hidden'
+                  }`}
+                  aria-hidden={activeStep !== 3}
+                >
                   <div className="space-y-2.5 sm:space-y-3 py-1">
                     <div className="flex items-center justify-between text-xs text-[#5E625D] border-b border-[#DCDDD5] pb-2 font-mono">
                       <span className="flex items-center gap-1.5 text-[#526B5A] font-medium">
@@ -356,44 +521,75 @@ export const ScrollWorkflowSection: React.FC = () => {
 
                       <div className="divide-y divide-[#DCDDD5]">
                         <div className="grid grid-cols-12 p-1.5 sm:p-2 text-[#202522] bg-[#FFFFFF]">
-                          <span className="col-span-6 truncate font-medium">Augmentin 625</span>
-                          <span className="col-span-3 text-center text-[#5E625D]">AG-942</span>
-                          <span className="col-span-3 text-right text-[#526B5A] font-medium">₹204.00</span>
+                          <span className="col-span-6 truncate font-medium">
+                            Augmentin 625
+                          </span>
+                          <span className="col-span-3 text-center text-[#5E625D]">
+                            AG-942
+                          </span>
+                          <span className="col-span-3 text-right text-[#526B5A] font-medium">
+                            ₹204.00
+                          </span>
                         </div>
                         <div className="grid grid-cols-12 p-1.5 sm:p-2 text-[#202522] bg-[#FFFFFF]">
-                          <span className="col-span-6 truncate font-medium">Pan 40 Tablet</span>
-                          <span className="col-span-3 text-center text-[#5E625D]">PN-108</span>
-                          <span className="col-span-3 text-right text-[#526B5A] font-medium">₹148.00</span>
+                          <span className="col-span-6 truncate font-medium">
+                            Pan 40 Tablet
+                          </span>
+                          <span className="col-span-3 text-center text-[#5E625D]">
+                            PN-108
+                          </span>
+                          <span className="col-span-3 text-right text-[#526B5A] font-medium">
+                            ₹148.00
+                          </span>
                         </div>
                         <div className="grid grid-cols-12 p-1.5 sm:p-2 text-[#202522] bg-[#FFFFFF]">
-                          <span className="col-span-6 truncate font-medium">Dolo 650mg</span>
-                          <span className="col-span-3 text-center text-[#5E625D]">DL-331</span>
-                          <span className="col-span-3 text-right text-[#526B5A] font-medium">₹34.00</span>
+                          <span className="col-span-6 truncate font-medium">
+                            Dolo 650mg
+                          </span>
+                          <span className="col-span-3 text-center text-[#5E625D]">
+                            DL-331
+                          </span>
+                          <span className="col-span-3 text-right text-[#526B5A] font-medium">
+                            ₹34.00
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center text-xs font-mono px-1">
                       <span className="text-[#5E625D]">3 items populated</span>
-                      <span className="text-[#202522] font-semibold">Subtotal: ₹386.00</span>
+                      <span className="text-[#202522] font-semibold">
+                        Subtotal: ₹386.00
+                      </span>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* STEP 4: CONFIRM */}
-                {activeStep === 4 && (
+                <div
+                  className={`w-full transition-opacity duration-200 ease-in-out ${
+                    activeStep === 4
+                      ? 'opacity-100 relative z-10'
+                      : 'opacity-0 absolute inset-4 sm:inset-5 pointer-events-none z-0 hidden'
+                  }`}
+                  aria-hidden={activeStep !== 4}
+                >
                   <div className="space-y-2.5 sm:space-y-3 py-1">
                     <div className="flex items-center justify-between text-xs text-[#5E625D] border-b border-[#DCDDD5] pb-2 font-mono">
                       <span className="flex items-center gap-1.5 text-[#526B5A] font-medium">
                         <Receipt className="w-3.5 h-3.5" /> Review &amp; Tender
                       </span>
-                      <span className="text-[#526B5A] text-[11px] font-medium">Ready</span>
+                      <span className="text-[#526B5A] text-[11px] font-medium">
+                        Ready
+                      </span>
                     </div>
 
                     <div className="p-2.5 sm:p-3 bg-[#F5F4EF] border border-[#DCDDD5] rounded-md space-y-1.5 font-mono text-xs">
                       <div className="flex justify-between items-center text-[#202522]">
                         <span>Items:</span>
-                        <span className="font-semibold text-[#202522]">3 Strips (40 Tablets)</span>
+                        <span className="font-semibold text-[#202522]">
+                          3 Strips (40 Tablets)
+                        </span>
                       </div>
                       <div className="flex justify-between items-center text-[#202522]">
                         <span>Taxes:</span>
@@ -401,7 +597,9 @@ export const ScrollWorkflowSection: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center pt-1.5 border-t border-[#DCDDD5] text-sm">
                         <span className="font-semibold text-[#202522]">Total:</span>
-                        <span className="font-semibold text-[#526B5A] text-base">₹386.00</span>
+                        <span className="font-semibold text-[#526B5A] text-base">
+                          ₹386.00
+                        </span>
                       </div>
                     </div>
 
@@ -412,21 +610,33 @@ export const ScrollWorkflowSection: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* STEP 5: DONE */}
-                {activeStep === 5 && (
+                <div
+                  className={`w-full transition-opacity duration-200 ease-in-out ${
+                    activeStep === 5
+                      ? 'opacity-100 relative z-10'
+                      : 'opacity-0 absolute inset-4 sm:inset-5 pointer-events-none z-0 hidden'
+                  }`}
+                  aria-hidden={activeStep !== 5}
+                >
                   <div className="space-y-2.5 sm:space-y-3 py-1">
                     <div className="flex items-center justify-between text-xs text-[#5E625D] border-b border-[#DCDDD5] pb-2 font-mono">
                       <span className="flex items-center gap-1.5 text-[#526B5A] font-medium">
-                        <Layers className="w-3.5 h-3.5" /> Stock Updated &amp; Receipt Printed
+                        <Layers className="w-3.5 h-3.5" /> Stock Updated &amp; Receipt
+                        Printed
                       </span>
-                      <span className="text-[#526B5A] font-medium text-[11px]">Completed</span>
+                      <span className="text-[#526B5A] font-medium text-[11px]">
+                        Completed
+                      </span>
                     </div>
 
                     <div className="space-y-1.5 font-mono text-xs">
                       <div className="p-2 bg-[#F5F4EF] rounded-md border border-[#DCDDD5] flex justify-between items-center">
-                        <span className="text-[#202522] truncate">Augmentin 625 (AG-942)</span>
+                        <span className="text-[#202522] truncate">
+                          Augmentin 625 (AG-942)
+                        </span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[#5E625D]">48 → 47</span>
                           <span className="text-[#526B5A] font-medium text-[10px] bg-[#EDECE6] px-1.5 py-0.5 rounded">
@@ -436,7 +646,9 @@ export const ScrollWorkflowSection: React.FC = () => {
                       </div>
 
                       <div className="p-2 bg-[#F5F4EF] rounded-md border border-[#DCDDD5] flex justify-between items-center">
-                        <span className="text-[#202522] truncate">Pan 40 Tablet (PN-108)</span>
+                        <span className="text-[#202522] truncate">
+                          Pan 40 Tablet (PN-108)
+                        </span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[#5E625D]">120 → 119</span>
                           <span className="text-[#526B5A] font-medium text-[10px] bg-[#EDECE6] px-1.5 py-0.5 rounded">
@@ -446,7 +658,9 @@ export const ScrollWorkflowSection: React.FC = () => {
                       </div>
 
                       <div className="p-2 bg-[#F5F4EF] rounded-md border border-[#DCDDD5] flex justify-between items-center">
-                        <span className="text-[#202522] truncate">Dolo 650mg (DL-331)</span>
+                        <span className="text-[#202522] truncate">
+                          Dolo 650mg (DL-331)
+                        </span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[#5E625D]">250 → 249</span>
                           <span className="text-[#526B5A] font-medium text-[10px] bg-[#EDECE6] px-1.5 py-0.5 rounded">
@@ -457,11 +671,13 @@ export const ScrollWorkflowSection: React.FC = () => {
                     </div>
 
                     <div className="p-2.5 bg-[#EDECE6] border border-[#DCDDD5] rounded-md flex items-center justify-between text-xs font-mono">
-                      <span className="text-[#526B5A] font-medium">Receipt Printed &amp; Ledger Synced</span>
+                      <span className="text-[#526B5A] font-medium">
+                        Receipt Printed &amp; Ledger Synced
+                      </span>
                       <span className="text-[#202522] font-semibold">~90s Saved</span>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
