@@ -18,12 +18,30 @@ if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in .env")
 
-# Centralized Client Configuration
-client = genai.Client(api_key=API_KEY)
-GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.1-flash-lite")
+class _LazyGeminiClientProxy:
+    """
+    Lazy proxy for google.genai.Client to ensure the backend starts up successfully
+    even if GEMINI_API_KEY is not immediately configured in production environment variables.
+    """
+    _instance = None
+
+    def _get_client(self):
+        if self._instance is not None:
+            return self._instance
+        key = os.getenv("GEMINI_API_KEY")
+        if not key or key.strip().lower().startswith("your_") or "placeholder" in key.lower():
+            raise ValueError(
+                "GEMINI_API_KEY is missing or invalid. Please configure a valid Google Gemini API Key in your environment variables."
+            )
+        self._instance = genai.Client(api_key=key.strip())
+        return self._instance
+
+    def __getattr__(self, name):
+        return getattr(self._get_client(), name)
+
+client = _LazyGeminiClientProxy()
+GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-2.5-flash")
 
 # Centralized Barcode/QR Code Map (Cost-Saving Interceptor)
 BARCODE_MAP = {
