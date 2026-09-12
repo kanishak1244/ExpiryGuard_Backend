@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, CheckCircle2, Send } from 'lucide-react';
+import { X, CheckCircle2, Send, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { PilotApplication } from '../types';
+import { getWhatsAppInquiryUrl } from '../config/appConfig';
 
 interface PilotModalProps {
   isOpen: boolean;
@@ -15,35 +16,79 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
     phone: '',
     email: '',
     city: '',
-    pharmacyType: 'independent',
-    estimatedDailyBills: '50-150',
+    currentBillingMethod: 'Marg ERP',
+    estimatedDailyBills: '50–100',
+    numPharmacies: '1 Outlet',
     notes: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    setErrorMessage(null);
+
+    // Client-side validation
+    const cleanPhone = formData.phone.replace(/[^\d+]/g, '');
+    if (cleanPhone.length < 10) {
+      setErrorMessage('Please enter a valid phone number (at least 10 digits).');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      try {
-        const existing = JSON.parse(localStorage.getItem('dawaiflow_pilot_submissions') || '[]');
-        existing.push({
-          ...formData,
-          submittedAt: new Date().toISOString(),
-        });
-        localStorage.setItem('dawaiflow_pilot_submissions', JSON.stringify(existing));
-      } catch (err) {
-        // Safe fallback
+    // Format combined problem / notes containing outlets and email
+    let combinedDetails = '';
+    if (formData.numPharmacies) {
+      combinedDetails += `[Pharmacies: ${formData.numPharmacies}]`;
+    }
+    if (formData.email?.trim()) {
+      combinedDetails += ` [Email: ${formData.email.trim()}]`;
+    }
+    if (formData.notes?.trim()) {
+      combinedDetails += `\nWorkflow Notes: ${formData.notes.trim()}`;
+    }
+
+    const payload = {
+      full_name: formData.contactPerson.trim(),
+      pharmacy_name: formData.pharmacyName.trim(),
+      city: formData.city.trim(),
+      phone: cleanPhone,
+      current_billing_method: formData.currentBillingMethod || 'Marg ERP',
+      bills_per_day: formData.estimatedDailyBills || '50–100',
+      biggest_problem: combinedDetails.trim() || undefined,
+    };
+
+    try {
+      const response = await fetch('/api/pilot-leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server returned ${response.status}`);
       }
 
-      setIsSubmitting(false);
       setIsSubmitted(true);
-    }, 500);
+    } catch (err: any) {
+      console.error('Pilot request submission error:', err);
+      setErrorMessage(
+        err.message || 'Could not submit your pilot request. Please check your connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -67,25 +112,39 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
         {isSubmitted ? (
           <div className="text-center py-6 space-y-4">
             <div className="w-12 h-12 rounded-xl bg-[#EDECE6] border border-[#DCDDD5] text-[#526B5A] flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-6 h-6" />
+              <CheckCircle2 className="w-6 h-6 text-[#526B5A]" />
             </div>
 
             <h3 className="text-xl font-semibold text-[#202522]">Pilot Request Received</h3>
 
             <p className="text-sm text-[#5E625D] max-w-md mx-auto leading-relaxed">
-              Thank you for your interest in DawaiFlow for <strong className="text-[#202522]">{formData.pharmacyName}</strong>. Our team will contact you at <span className="font-mono text-[#202522]">{formData.phone}</span> to coordinate your walkthrough.
+              Thank you for your interest in DawaiFlow for{' '}
+              <strong className="text-[#202522]">{formData.pharmacyName}</strong>. Our team will contact you at{' '}
+              <span className="font-mono text-[#202522]">{formData.phone}</span> to coordinate your walkthrough.
             </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsSubmitted(false);
-                onClose();
-              }}
-              className="px-6 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white font-medium rounded-lg text-sm transition-colors cursor-pointer"
-            >
-              Done
-            </button>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a
+                href={getWhatsAppInquiryUrl(formData.contactPerson)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-transparent hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                <span>Chat on WhatsApp</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSubmitted(false);
+                  onClose();
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white font-medium rounded-lg text-sm transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,25 +153,33 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                 Request a DawaiFlow Pilot
               </h3>
               <p className="text-xs sm:text-sm text-[#5E625D] mt-1">
-                Tell us about your pharmacy to try DawaiFlow.
+                Tell us about your pharmacy. We&apos;ll get in touch to walk you through the pilot.
               </p>
             </div>
 
+            {errorMessage && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <span>{errorMessage}</span>
+                  <div className="mt-1">
+                    <a
+                      href={getWhatsAppInquiryUrl(formData.contactPerson)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-medium hover:text-red-900 inline-flex items-center gap-1"
+                    >
+                      <MessageCircle className="w-3 h-3 text-[#25D366]" />
+                      <span>Or connect directly on WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">Pharmacy / Store Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Apollo Medical Store"
-                  value={formData.pharmacyName}
-                  onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">Contact Person Name *</label>
+                <label className="text-xs font-medium text-[#5E625D]">Full Name *</label>
                 <input
                   type="text"
                   required
@@ -124,35 +191,23 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">Phone / WhatsApp *</label>
+                <label className="text-xs font-medium text-[#5E625D]">Pharmacy Name *</label>
                 <input
-                  type="tel"
+                  type="text"
                   required
-                  placeholder="e.g. +91 98765 43210"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] font-mono placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">Email Address *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. ramesh@gmail.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="e.g. Sanjeevani Medicos"
+                  value={formData.pharmacyName}
+                  onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
                   className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">City / State *</label>
+                <label className="text-xs font-medium text-[#5E625D]">City / Town *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Jaipur, Rajasthan"
+                  placeholder="e.g. Sonipat, Ahmedabad, Jaipur"
                   value={formData.city}
                   onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
@@ -160,61 +215,96 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[#5E625D]">Pharmacy Type *</label>
+                <label className="text-xs font-medium text-[#5E625D]">Phone (WhatsApp) *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9817066533"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] font-mono placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#5E625D]">Current Billing Software *</label>
                 <select
-                  value={formData.pharmacyType}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      pharmacyType: e.target.value as 'independent' | 'growing_team' | 'modern_chemist',
-                    })
-                  }
+                  value={formData.currentBillingMethod}
+                  onChange={(e) => setFormData({ ...formData, currentBillingMethod: e.target.value })}
                   className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] focus:outline-none focus:border-[#526B5A]"
                 >
-                  <option value="independent">Independent Pharmacy</option>
-                  <option value="growing_team">Growing Pharmacy Team</option>
-                  <option value="modern_chemist">Modern Chemist Store</option>
+                  <option value="Marg ERP">Marg ERP</option>
+                  <option value="MargBooks">MargBooks</option>
+                  <option value="Paper / Manual">Paper / Manual Billing</option>
+                  <option value="Other">Other Software</option>
                 </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#5E625D]">Approximate Bills Per Day *</label>
+                <select
+                  value={formData.estimatedDailyBills}
+                  onChange={(e) => setFormData({ ...formData, estimatedDailyBills: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] focus:outline-none focus:border-[#526B5A]"
+                >
+                  <option value="Under 50">Under 50 bills / day</option>
+                  <option value="50–100">50–100 bills / day</option>
+                  <option value="100–200">100–200 bills / day</option>
+                  <option value="200+">200+ bills / day</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#5E625D]">Number of Pharmacies</label>
+                <select
+                  value={formData.numPharmacies}
+                  onChange={(e) => setFormData({ ...formData, numPharmacies: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] focus:outline-none focus:border-[#526B5A]"
+                >
+                  <option value="1 Outlet">1 Outlet</option>
+                  <option value="2-5 Outlets">2-5 Outlets</option>
+                  <option value="5+ Outlets">5+ Outlets</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#5E625D]">Email Address (Optional)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. pharmacy@gmail.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
+                />
               </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#5E625D]">
-                Estimated Daily Counter Bills
-              </label>
-              <select
-                value={formData.estimatedDailyBills}
-                onChange={(e) => setFormData({ ...formData, estimatedDailyBills: e.target.value })}
-                className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] focus:outline-none focus:border-[#526B5A]"
-              >
-                <option value="<50">Under 50 bills / day</option>
-                <option value="50-150">50 – 150 bills / day</option>
-                <option value="150-400">150 – 400 bills / day</option>
-                <option value="400+">400+ bills / day</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[#5E625D]">
-                Any specific areas you want to improve? (Optional)
+                What is the biggest problem with your current workflow? (Optional)
               </label>
               <textarea
                 rows={2}
-                placeholder="e.g. Faster counter billing, expiry tracking, or reducing typing on purchase bills."
+                placeholder="e.g. Entering bills after rush hours takes 2 hours every evening..."
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 className="w-full px-3 py-2 bg-[#FFFFFF] border border-[#DCDDD5] rounded-lg text-sm text-[#202522] placeholder-[#5E625D]/60 focus:outline-none focus:border-[#526B5A]"
               />
             </div>
 
-            <div className="pt-2 space-y-2">
+            <div className="pt-2 space-y-2.5">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 bg-[#526B5A] hover:bg-[#43584a] disabled:opacity-50 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-[#526B5A] hover:bg-[#43584a] disabled:opacity-50 text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs active:scale-[0.99]"
               >
                 {isSubmitting ? (
-                  <span>Sending Request...</span>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Submitting Request...</span>
+                  </>
                 ) : (
                   <>
                     <span>Submit Pilot Request</span>
@@ -223,13 +313,26 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                 )}
               </button>
 
+              <div className="flex items-center justify-between pt-1 border-t border-[#DCDDD5] text-xs text-[#5E625D]">
+                <span>Prefer to chat directly?</span>
+                <a
+                  href={getWhatsAppInquiryUrl(formData.contactPerson)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[#526B5A] hover:underline font-medium"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                  <span>Chat on WhatsApp</span>
+                </a>
+              </div>
+
               <p className="text-[11px] text-[#5E625D] text-center leading-normal">
                 By submitting, you agree to our{' '}
                 {onOpenLegal ? (
                   <button
                     type="button"
                     onClick={() => onOpenLegal('terms')}
-                    className="underline text-[#202522] hover:text-[#526B5A]"
+                    className="underline text-[#202522] hover:text-[#526B5A] cursor-pointer"
                   >
                     Terms
                   </button>
@@ -241,7 +344,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                   <button
                     type="button"
                     onClick={() => onOpenLegal('privacy')}
-                    className="underline text-[#202522] hover:text-[#526B5A]"
+                    className="underline text-[#202522] hover:text-[#526B5A] cursor-pointer"
                   >
                     Privacy Policy
                   </button>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, MessageCircle } from 'lucide-react';
+import { getWhatsAppInquiryUrl } from '../config/appConfig';
 
 interface PilotSectionProps {
   onOpenPilot: () => void;
@@ -17,16 +18,27 @@ export const PilotSection: React.FC<PilotSectionProps> = ({ onOpenPilot }) => {
           We&apos;re working with pharmacies to make everyday operations faster and simpler.
         </p>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
           <button
             id="pilot-request-btn"
             type="button"
             onClick={onOpenPilot}
-            className="px-7 py-3 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-base font-medium transition-colors flex items-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+            className="w-full sm:w-auto px-7 py-3 bg-[#526B5A] hover:bg-[#43584a] text-white rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
           >
             <span>Request a Pilot</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          <a
+            id="pilot-whatsapp-btn"
+            href={getWhatsAppInquiryUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-6 py-3 bg-transparent hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] rounded-lg text-base font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4 text-[#25D366]" />
+            <span>Chat on WhatsApp</span>
+          </a>
         </div>
       </div>
     </section>

@@ -2,10 +2,11 @@ export interface PilotApplication {
   pharmacyName: string;
   contactPerson: string;
   phone: string;
-  email: string;
+  email?: string;
   city: string;
-  pharmacyType: 'independent' | 'growing_team' | 'modern_chemist';
+  currentBillingMethod: string;
   estimatedDailyBills: string;
+  numPharmacies?: string;
   notes?: string;
 }
 

@@ -17,7 +17,8 @@ export const APP_CONFIG = {
   grievanceEmail: 'vashistkanishak9@gmail.com',
   supportPhone: '+91 98170 66533',
   supportPhoneFormatted: '+91 98170 66533',
-  whatsAppUrl: 'https://wa.me/919817066533?text=Hi%20DawaiFlow%20team%2C%20I%20have%20questions%20about%20the%20pilot',
+  whatsAppNumber: '919817066533',
+  whatsAppUrl: 'https://wa.me/919817066533?text=Hi%2C%20my%20name%20is%20____.%20I%20want%20to%20make%20an%20inquiry%20about%20DawaiFlow%20and%20would%20like%20to%20know%20more%20about%20the%20pilot.',
 
   // Location & Corporate Details (with explicit placeholders where statutory formal incorporation is pending)
   location: 'Sonipat, Haryana, India',
@@ -40,4 +41,18 @@ export const APP_CONFIG = {
     aiVision: 'DawaiFlow in-memory image OCR (images discarded immediately after text extraction)',
     analyticsCookies: 'None (No third-party tracking or advertising cookies)',
   },
+};
+
+/**
+ * Generates official WhatsApp click-to-chat URL with pre-filled inquiry message.
+ * Formats:
+ * With name: "Hi, my name is [Name]. I want to make an inquiry about DawaiFlow and would like to know more about the pilot."
+ * Without name: "Hi, my name is ____. I want to make an inquiry about DawaiFlow and would like to know more about the pilot."
+ */
+export const getWhatsAppInquiryUrl = (name?: string): string => {
+  const cleanName = name?.trim();
+  const message = cleanName
+    ? `Hi, my name is ${cleanName}. I want to make an inquiry about DawaiFlow and would like to know more about the pilot.`
+    : `Hi, my name is ____. I want to make an inquiry about DawaiFlow and would like to know more about the pilot.`;
+  return `https://wa.me/919817066533?text=${encodeURIComponent(message)}`;
 };
