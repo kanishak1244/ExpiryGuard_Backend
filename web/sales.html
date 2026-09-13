@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Sales Feed — ExpiryGuard Web App</title>
+  <title>Live Sales Feed — DawaiFlow Web App</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -46,7 +46,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -114,14 +114,17 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Live Transactions & Sales History</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Real-time feed of completed counter POS bills, customer names, and GST tax invoice PDFs.</p>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <a href="billing.html" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; padding: 8px 16px; font-weight: 700; font-size: 13.5px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <a href="returns.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: #DC2626; color: #DC2626; font-weight: 700; font-size: 13.5px;" title="View Today's Returns & Process Item Returns">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+            <span>Returned Items</span>
+          </a>
+          <a href="billing.html" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; padding: 8px 18px; font-weight: 700; font-size: 13.5px;">
             <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>+ New Bill</span>
           </a>
-          <button class="btn btn-secondary" onclick="openCreateBillModal()" style="display: flex; align-items: center; gap: 6px;" title="Quick open billing modal">
+          <button class="btn btn-secondary" onclick="openCreateBillModal()" style="display: flex; align-items: center; gap: 6px; font-weight: 600;" title="Quick open billing modal">
             <span>⚡ Quick POS</span>
           </button>
           <div class="live-indicator">
@@ -138,8 +141,12 @@
           <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
             
             <!-- Search Box -->
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; max-width: 380px;">
-              <input type="text" id="sales-search-input" class="form-input" placeholder="🔍 Search bill no, customer, medicine..." style="font-size: 13px;" oninput="onSalesSearchInput(this.value)">
+            <div style="display: flex; align-items: center; position: relative; flex: 1; min-width: 260px; max-width: 380px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none;">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="sales-search-input" class="form-input" placeholder="Search bill no, customer, medicine..." style="font-size: 13px; padding-left: 36px; width: 100%; font-weight: 500;" oninput="onSalesSearchInput(this.value)">
             </div>
 
             <!-- Sales Type Filter: All / Live Only / Historical Only -->
