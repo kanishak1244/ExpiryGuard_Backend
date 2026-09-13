@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documents & Invoice Archival — ExpiryGuard ERP</title>
+  <title>Documents & Invoice Archival — DawaiFlow ERP</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -36,19 +36,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    .upload-dropzone {
-      border: 2px dashed var(--primary-green);
-      background-color: var(--very-light-green);
-      border-radius: var(--radius-md);
-      padding: 30px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-bottom: 20px;
-    }
-    .upload-dropzone:hover {
-      background-color: #DCFCE7;
-    }
     .split-modal-overlay {
       display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;
@@ -92,7 +79,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -160,29 +147,18 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Pharmacy Documents & Invoice OCR Archive</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Upload purchase invoices, run AI vision extraction, review items, and update stock with supplier traceability.</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary" onclick="triggerUploadClick()">+ Upload New Document</button>
         </div>
       </header>
 
       <main class="content-body">
-        
-        <!-- Upload Dropzone Card -->
-        <div class="upload-dropzone" onclick="triggerUploadClick()">
-          <input type="file" id="doc-file-input" style="display: none;" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileSelect(this)">
-          <div style="font-size: 42px; margin-bottom: 8px;">📑</div>
-          <h3 style="margin-bottom: 4px;">Drag & Drop Supplier Invoices or Click to Upload</h3>
-          <p style="font-size: 13px; color: var(--muted-text);">Supports PDF, PNG, JPG files up to 10MB. Dawaiflow AI automatically parses medicines, batch numbers & prices.</p>
-        </div>
+        <input type="file" id="doc-file-input" style="display: none;" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileSelect(this)">
 
         <!-- Filter & Search Toolbar -->
         <div class="card" style="margin-bottom: 20px;">
-          <div class="card-body" style="padding: 16px;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
-              <input type="text" id="doc-search-input" class="form-input" placeholder="Search Title, Invoice #..." oninput="loadDocuments()">
-              <select id="doc-type-filter" class="form-input" onchange="loadDocuments()">
+          <div class="card-body" style="padding: 14px 16px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+              <input type="text" id="doc-search-input" class="form-input" placeholder="Search Title, Invoice #..." oninput="loadDocuments()" style="flex: 2; min-width: 220px;">
+              <select id="doc-type-filter" class="form-input" onchange="loadDocuments()" style="flex: 1; min-width: 150px;">
                 <option value="all">All Document Types</option>
                 <option value="purchase_invoice">Purchase Invoice</option>
                 <option value="supplier_bill">Supplier Bill</option>
@@ -190,14 +166,14 @@
                 <option value="medicine_doc">Medicine Document</option>
                 <option value="scanned_bill">Scanned Bill / Receipt</option>
               </select>
-              <select id="doc-status-filter" class="form-input" onchange="loadDocuments()">
+              <select id="doc-status-filter" class="form-input" onchange="loadDocuments()" style="flex: 1; min-width: 150px;">
                 <option value="all">All Statuses</option>
                 <option value="Processing">Processing</option>
                 <option value="Needs Review">Needs Review</option>
                 <option value="Verified">Verified</option>
                 <option value="Failed">Failed</option>
               </select>
-              <select id="doc-supplier-filter" class="form-input" onchange="loadDocuments()">
+              <select id="doc-supplier-filter" class="form-input" onchange="loadDocuments()" style="flex: 1; min-width: 150px;">
                 <option value="">All Suppliers</option>
               </select>
             </div>
@@ -232,9 +208,8 @@
 
             <div id="documents-empty-state" style="display: none; text-align: center; padding: 40px 20px;">
               <div style="font-size: 48px; margin-bottom: 12px;">📂</div>
-              <h4>No documents uploaded yet</h4>
-              <p style="font-size: 14px; color: var(--muted-text); margin-bottom: 16px;">Upload a distributor invoice to build your document history and restock inventory.</p>
-              <button class="btn btn-primary" onclick="triggerUploadClick()">Upload Invoice PDF</button>
+              <h4>No documents archived yet</h4>
+              <p style="font-size: 14px; color: var(--muted-text); margin-bottom: 16px;">Add stock via "+ Add Inventory" or process supplier invoices to build your document archive.</p>
             </div>
           </div>
         </div>
