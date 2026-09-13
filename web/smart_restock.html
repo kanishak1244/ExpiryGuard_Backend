@@ -120,7 +120,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -265,7 +265,7 @@
         if (cachedSuppliers) {
           populateSuppliersFilter(cachedSuppliers);
         }
-        const cachedIntel = (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/inventory/intelligence?limit=150')) ||
+        const cachedIntel = (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/inventory/intelligence?limit=1000')) ||
           (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/inventory/intelligence')) ||
           (localStorage.getItem('expiryguard_cached_intel') ? JSON.parse(localStorage.getItem('expiryguard_cached_intel')) : null);
         if (cachedIntel) {
@@ -300,7 +300,7 @@
 
     async function loadSmartRestockData() {
       try {
-        const res = await api.getInventoryIntelligence({ limit: 150 });
+        const res = await api.getInventoryIntelligence({ limit: 1000 });
         if (res) {
           allRecommendations = res.recommendations || [];
           renderSummaryKPIs(res.summary || {});
@@ -372,25 +372,101 @@
       }
 
       document.getElementById('rec-count-display').textContent = filtered.length;
-      renderRecommendations(filtered);
+      renderRecommendations(filtered, priorityFilter, q);
     }
 
-    function renderRecommendations(recs) {
+    function renderRecommendations(recs, priorityFilter = 'ALL', searchQuery = '') {
       const container = document.getElementById('recommendations-container');
       if (!recs || recs.length === 0) {
-        container.innerHTML = `
-          <div style="text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="font-size: 40px; margin-bottom: 10px;">🟢</div>
-            <h3 style="margin-bottom: 6px;">All Clear! No Restock Actions Needed</h3>
-            <p style="font-size: 13px; color: var(--muted-text); max-width: 420px; margin: 0 auto;">
-              All inventory levels are healthy with zero critical stockouts or unmanaged expiry risks detected.
-            </p>
-          </div>
-        `;
+        if (searchQuery) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+              <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
+              <h3 style="margin-bottom: 6px;">No Matching Inventory Items Found</h3>
+              <p style="font-size: 13px; color: var(--muted-text); max-width: 420px; margin: 0 auto;">
+                No items match your search query for "<strong>${window.escapeHtml(searchQuery)}</strong>". Try clearing your search term.
+              </p>
+            </div>
+          `;
+        } else if (priorityFilter !== 'ALL') {
+          const emptyMap = {
+            'SLOW_MOVING': { icon: '🔵', title: 'No Slow-Moving Items', desc: 'No medicines currently meet the slow-moving threshold (90+ days stock coverage).' },
+            'DEAD_STOCK': { icon: '⚪', title: 'No Dead Stock Items', desc: 'No active medicines with zero sales in 90+ days detected.' },
+            'EXPIRY_RISK': { icon: '🟠', title: 'No Expiry Risk Batches', desc: 'No active batches expiring within 60 days with financial exposure.' },
+            'CRITICAL_RESTOCK': { icon: '🔴', title: 'No Critical Stockouts', desc: 'No medicines currently below critical reorder points.' },
+            'RESTOCK_SOON': { icon: '🟡', title: 'No Restock Soon Items', desc: 'No medicines currently approaching reorder thresholds.' },
+            'OVERSTOCK': { icon: '🟢', title: 'No Overstocked Items', desc: 'No medicines currently exceeding 60-day target coverage limit.' }
+          };
+          const info = emptyMap[priorityFilter] || { icon: 'ℹ️', title: 'No Items Found', desc: 'No items match the selected priority filter.' };
+          container.innerHTML = `
+            <div style="text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+              <div style="font-size: 36px; margin-bottom: 10px;">${info.icon}</div>
+              <h3 style="margin-bottom: 6px;">${info.title}</h3>
+              <p style="font-size: 13px; color: var(--muted-text); max-width: 420px; margin: 0 auto;">
+                ${info.desc}
+              </p>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 48px 20px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+              <div style="font-size: 40px; margin-bottom: 10px;">🟢</div>
+              <h3 style="margin-bottom: 6px;">All Clear! No Restock Actions Needed</h3>
+              <p style="font-size: 13px; color: var(--muted-text); max-width: 420px; margin: 0 auto;">
+                All inventory levels are healthy with zero critical stockouts or unmanaged expiry risks detected.
+              </p>
+            </div>
+          `;
+        }
         return;
       }
 
-      container.innerHTML = recs.map(item => {
+      let headerBannerHtml = '';
+      if (priorityFilter !== 'ALL') {
+        const headerMap = {
+          'SLOW_MOVING': {
+            bg: 'rgba(55, 48, 163, 0.08)', border: '#C7D2FE', color: '#3730A3',
+            title: `🔵 ${recs.length} Slow-Moving Item${recs.length === 1 ? '' : 's'}`,
+            desc: 'Review these medicines before purchasing more. Slow sales velocity detected; halt reordering to prevent tying up capital.'
+          },
+          'DEAD_STOCK': {
+            bg: 'rgba(71, 85, 105, 0.08)', border: '#CBD5E1', color: '#334155',
+            title: `⚪ ${recs.length} Dead Stock Item${recs.length === 1 ? '' : 's'}`,
+            desc: 'Zero sales recorded in 90+ days. Consider clearance discounts or distributor returns to unlock tied-up capital.'
+          },
+          'EXPIRY_RISK': {
+            bg: 'rgba(194, 65, 12, 0.08)', border: '#FFEDD5', color: '#C2410C',
+            title: `🟠 ${recs.length} Expiry Risk Batches`,
+            desc: 'Financial capital at risk of expiring before sale. Prioritize FEFO dispensing or initiate distributor return.'
+          },
+          'CRITICAL_RESTOCK': {
+            bg: 'rgba(220, 38, 38, 0.08)', border: '#FECACA', color: '#991B1B',
+            title: `🔴 ${recs.length} Critical Stockout Item${recs.length === 1 ? '' : 's'}`,
+            desc: 'Imminent stockout risk detected. Add to purchase draft immediately to maintain stock coverage.'
+          },
+          'RESTOCK_SOON': {
+            bg: 'rgba(217, 119, 6, 0.08)', border: '#FDE68A', color: '#92400E',
+            title: `🟡 ${recs.length} Restock Soon Item${recs.length === 1 ? '' : 's'}`,
+            desc: 'Approaching reorder point threshold. Plan purchase order replenishment soon.'
+          },
+          'OVERSTOCK': {
+            bg: 'rgba(5, 150, 105, 0.08)', border: '#A7F3D0', color: '#065F46',
+            title: `🟢 ${recs.length} Overstocked Item${recs.length === 1 ? '' : 's'}`,
+            desc: 'Inventory coverage exceeds 60-day target limit. Reduce future order quantities to optimize cash flow.'
+          }
+        };
+        const h = headerMap[priorityFilter];
+        if (h) {
+          headerBannerHtml = `
+            <div style="background: ${h.bg}; border: 1px solid ${h.border}; padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 14px; color: ${h.color};">
+              <div style="font-weight: 700; font-size: 14px;">${h.title}</div>
+              <div style="font-size: 12.5px; margin-top: 2px; opacity: 0.95;">${h.desc}</div>
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = headerBannerHtml + recs.map(item => {
         let badgeClass = 'badge-healthy';
         let badgeIcon = '🟢';
         let levelLabel = 'HEALTHY';

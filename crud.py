@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple, Any, Optional
 from datetime import date, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, case, or_, and_, text
+from sqlalchemy import select, func, case, or_, and_, text
 from sqlalchemy.exc import IntegrityError
 import logging
 import models
@@ -279,9 +279,9 @@ def get_products(
 
     if filter_key:
         fk = filter_key.lower().strip()
-        today_str = date.today().strftime("%Y-%m-%d")
-        thirty_days_later_str = (date.today() + timedelta(days=30)).strftime("%Y-%m-%d")
-        ninety_days_later_str = (date.today() + timedelta(days=90)).strftime("%Y-%m-%d")
+        today_dt = date.today()
+        thirty_days_later_dt = today_dt + timedelta(days=30)
+        sixty_days_later_dt = today_dt + timedelta(days=60)
 
         if fk in ["instock", "in_stock"]:
             base_query = base_query.filter(models.Product.quantity > 0)
@@ -290,16 +290,22 @@ def get_products(
         elif fk in ["outofstock", "out_of_stock"]:
             base_query = base_query.filter(models.Product.quantity == 0)
         elif fk in ["expiring", "expiring_30d", "expiring_soon"]:
-            base_query = base_query.filter(models.Product.expiry_date.between(today_str, thirty_days_later_str))
+            base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date.between(today_dt, thirty_days_later_dt))
+        elif fk in ["expiring_60d", "expiry_risk", "expiry_risk_batches", "at_risk"]:
+            base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date.between(today_dt, sixty_days_later_dt))
         elif fk == "expired":
-            base_query = base_query.filter(models.Product.expiry_date < today_str)
-        elif fk in ["deadstock", "dead_stock"]:
+            base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date < today_dt)
+        elif fk in ["deadstock", "dead_stock", "dead_stock_items"]:
+            dt_90d = datetime.utcnow() - timedelta(days=90)
+            sold_product_ids_subquery = (
+                select(models.SaleItem.product_id)
+                .join(models.Sale, models.SaleItem.sale_id == models.Sale.id)
+                .filter(models.Sale.user_id == user_id, models.Sale.created_at >= dt_90d)
+                .scalar_subquery()
+            )
             base_query = base_query.filter(
                 models.Product.quantity > 0,
-                or_(
-                    models.Product.expiry_date > ninety_days_later_str,
-                    models.Product.status == "Dead Stock",
-                ),
+                ~models.Product.id.in_(sold_product_ids_subquery)
             )
 
     if search and search.strip():
@@ -903,6 +909,22 @@ def create_sale_transaction(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Product ID {item.product_id} was not found for this shop.",
                 )
+
+            # If user explicitly selected a batch_number that differs from product.batch_number, resolve exact batch
+            req_batch = (item.batch_number or "").strip()
+            if req_batch and product.batch_number and product.batch_number.strip() != req_batch:
+                selected_batch_product = (
+                    db.query(models.Product)
+                    .filter(
+                        models.Product.user_id == user_id,
+                        models.Product.is_deleted == False,
+                        func.lower(models.Product.product_name) == func.lower(product.product_name),
+                        models.Product.batch_number == req_batch
+                    )
+                    .first()
+                )
+                if selected_batch_product:
+                    product = selected_batch_product
 
             is_strip = str(item.unit_type or "strip").lower() in ["strip", "pack"]
 
@@ -3352,19 +3374,8 @@ def delete_document(db: Session, document_id: int, user_id: int):
 # ==========================================
 
 def soft_delete_inventory_items(db: Session, stock_ids: List[int], user_id: int) -> Dict[str, Any]:
-    """Soft-deletes selective inventory rows with 60-day recovery window."""
-    now = datetime.utcnow()
-    items = (
-        db.query(models.Product)
-        .filter(
-            models.Product.user_id == user_id,
-            models.Product.id.in_(stock_ids),
-            models.Product.is_deleted == False,
-        )
-        .all()
-    )
-
-    if not items:
+    """Soft-deletes specific inventory rows for the authenticated shop."""
+    if not stock_ids:
         return {
             "success": True,
             "message": "0 items moved to Recently Deleted.",
@@ -3372,47 +3383,52 @@ def soft_delete_inventory_items(db: Session, stock_ids: List[int], user_id: int)
             "stock_ids": []
         }
 
-    affected_ids = []
-    for item in items:
-        item.is_deleted = True
-        item.deleted_at = now
-        item.deleted_by = user_id
-        affected_ids.append(item.id)
+    now = datetime.utcnow()
+    count = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.id.in_(stock_ids),
+            models.Product.is_deleted == False,
+        )
+        .update(
+            {
+                models.Product.is_deleted: True,
+                models.Product.deleted_at: now,
+                models.Product.deleted_by: user_id,
+            },
+            synchronize_session=False
+        )
+    )
 
     db.commit()
     invalidate_products_cache(user_id)
     return {
         "success": True,
-        "message": f"{len(affected_ids)} items moved to Recently Deleted, recoverable for 60 days.",
-        "deleted_count": len(affected_ids),
-        "stock_ids": affected_ids
+        "message": f"{count} items moved to Recently Deleted, recoverable for 60 days.",
+        "deleted_count": count,
+        "stock_ids": stock_ids
     }
 
 
 def soft_delete_all_inventory_items(db: Session, user_id: int) -> Dict[str, Any]:
-    """Soft-deletes all active (non-deleted) inventory rows for the authenticated shop."""
+    """Soft-deletes all active (non-deleted) inventory rows for the authenticated shop in high-performance bulk."""
     now = datetime.utcnow()
-    items = (
+    count = (
         db.query(models.Product)
         .filter(
             models.Product.user_id == user_id,
             models.Product.is_deleted == False,
         )
-        .all()
+        .update(
+            {
+                models.Product.is_deleted: True,
+                models.Product.deleted_at: now,
+                models.Product.deleted_by: user_id,
+            },
+            synchronize_session=False
+        )
     )
-
-    if not items:
-        return {
-            "success": True,
-            "message": "No active stock items to delete.",
-            "deleted_count": 0
-        }
-
-    count = len(items)
-    for item in items:
-        item.is_deleted = True
-        item.deleted_at = now
-        item.deleted_by = user_id
 
     db.commit()
     invalidate_products_cache(user_id)
@@ -3616,24 +3632,42 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
     if not rows_to_process:
         raise HTTPException(status_code=400, detail="No data rows found in the uploaded file.")
 
+    # Pre-fetch existing active products for ultra-fast O(1) duplicate lookup (1 DB query for 1000+ rows)
+    existing_prods = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False
+        )
+        .all()
+    )
+    existing_map = {
+        (p.product_name.strip().lower(), (p.batch_number or "").strip(), p.expiry_date): p
+        for p in existing_prods
+    }
+
     imported_items = []
     errors = []
+    items_to_add = []
     rows_imported = 0
     rows_updated = 0
     rows_skipped = 0
+    mode_clean = (on_duplicate or "merge").lower()
 
-    def get_val(row, *aliases):
-        for a in aliases:
-            for k in row:
-                k_clean = k.replace(" ", "_").replace("-", "_").lower()
-                if k_clean == a or a in k_clean:
-                    v = row[k]
-                    if v is not None:
-                        return v
-        return None
+    for line_num, raw_row in enumerate(rows_to_process, start=2):
+        # Normalize keys once for ultra-fast alias matching
+        row = {k.replace(" ", "_").replace("-", "_").lower(): v for k, v in raw_row.items() if k}
 
-    for line_num, row in enumerate(rows_to_process, start=2):
-        med_name = get_val(row, "medicine_name", "product_name", "medicine", "name", "item_name")
+        def get_val(*aliases):
+            for a in aliases:
+                if a in row and row[a] is not None:
+                    return row[a]
+                for k in row:
+                    if a in k and row[k] is not None:
+                        return row[k]
+            return None
+
+        med_name = get_val("medicine_name", "product_name", "medicine", "name", "item_name")
         if not med_name or str(med_name).strip() == "":
             errors.append({
                 "row": line_num,
@@ -3646,7 +3680,7 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         if med_name_str.lower() in ["medicine_name", "product_name", "column name"]:
             continue
 
-        raw_mrp = get_val(row, "mrp", "unit_price", "selling_price", "price")
+        raw_mrp = get_val("mrp", "unit_price", "selling_price", "price")
         mrp_val = 0.0
         if raw_mrp is not None and str(raw_mrp).strip() != "":
             try:
@@ -3662,12 +3696,12 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
             })
             continue
 
-        batch_no = get_val(row, "batch_no", "batch_number", "batch", "lot_no", "lot")
+        batch_no = get_val("batch_no", "batch_number", "batch", "lot_no", "lot")
         if not batch_no or str(batch_no).strip() == "":
             batch_no = f"IMP-{int(datetime.utcnow().timestamp())}"
         batch_no_str = str(batch_no).strip()
 
-        raw_exp = get_val(row, "expiry_date", "exp_date", "expiry", "exp")
+        raw_exp = get_val("expiry_date", "exp_date", "expiry", "exp")
         exp_date = parse_date(raw_exp)
         if not exp_date:
             errors.append({
@@ -3677,10 +3711,10 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
             })
             continue
 
-        raw_mfd = get_val(row, "mfd_date", "mfg_date", "manufacturing_date", "mfd")
+        raw_mfd = get_val("mfd_date", "mfg_date", "manufacturing_date", "mfd")
         mfd_date = parse_date(raw_mfd) if raw_mfd else None
 
-        raw_qty = get_val(row, "quantity", "qty", "stock_qty", "packs")
+        raw_qty = get_val("quantity", "qty", "stock_qty", "packs")
         try:
             qty = int(float(str(raw_qty).replace(",", "").strip())) if raw_qty is not None else 1
             if qty <= 0:
@@ -3688,82 +3722,98 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         except Exception:
             qty = 1
 
-        raw_purchase = get_val(row, "purchase_price", "purchase_rate", "cost_price", "cost", "rate")
+        raw_purchase = get_val("purchase_price", "purchase_rate", "cost_price", "cost", "rate")
         try:
             purchase_val = float(str(raw_purchase).replace("₹", "").replace(",", "").strip()) if raw_purchase is not None else round(mrp_val * 0.7, 2)
         except Exception:
             purchase_val = round(mrp_val * 0.7, 2)
 
-        raw_pack = get_val(row, "pack_size_label", "pack_size", "packaging", "pack", "units_per_pack")
+        raw_pack = get_val("pack_size_label", "pack_size", "packaging", "pack", "units_per_pack")
         pack_label = str(raw_pack).strip() if raw_pack else "1x10 Tablets"
         units_per_pack = parse_pack_units(pack_label)
 
-        raw_gst = get_val(row, "gst_percent", "gst_rate", "gst", "tax_percent")
+        raw_gst = get_val("gst_percent", "gst_rate", "gst", "tax_percent")
         try:
             gst_val = float(str(raw_gst).replace("%", "").strip()) if raw_gst is not None else 12.0
         except Exception:
             gst_val = 12.0
 
-        brand_val = str(get_val(row, "manufacturer", "brand", "company") or "").strip() or None
-        hsn_val = str(get_val(row, "hsn_code", "hsn") or "3004").strip()
-        rack_val = str(get_val(row, "rack_location", "location", "rack", "shelf") or "").strip() or None
+        brand_val = str(get_val("manufacturer", "brand", "company") or "").strip() or None
+        hsn_val = str(get_val("hsn_code", "hsn") or "3004").strip()
+        rack_val = str(get_val("rack_location", "location", "rack", "shelf") or "").strip() or None
 
-        # Check existing item for duplicate mode handling
-        existing_prod = db.query(models.Product).filter(
-            models.Product.user_id == user_id,
-            models.Product.is_deleted == False,
-            func.lower(models.Product.product_name) == med_name_str.lower(),
-            models.Product.batch_number == batch_no_str,
-            models.Product.expiry_date == exp_date
-        ).first()
+        lookup_key = (med_name_str.lower(), batch_no_str, exp_date)
+        existing_p = existing_map.get(lookup_key)
 
-        mode_clean = (on_duplicate or "merge").lower()
-        if existing_prod and mode_clean == "skip":
+        if existing_p and mode_clean == "skip":
             rows_skipped += 1
             continue
 
-        try:
-            add_req = schemas.InventoryAddRequest(
+        if existing_p and mode_clean != "separate":
+            existing_p.quantity += qty
+            existing_p.unit_price = mrp_val
+            existing_p.purchase_price = purchase_val
+            existing_p.units_per_pack = units_per_pack
+            calc_per_unit = round(mrp_val / units_per_pack, 2) if (units_per_pack and units_per_pack > 0) else mrp_val
+            existing_p.price_per_unit = calc_per_unit
+            existing_p.loose_tablet_price = calc_per_unit
+            existing_p.tablets_per_strip = units_per_pack
+            existing_p.total_price = existing_p.unit_price * existing_p.quantity
+            rows_updated += 1
+            imported_items.append({
+                "id": existing_p.id,
+                "product_name": existing_p.product_name,
+                "batch_number": existing_p.batch_number,
+                "quantity": existing_p.quantity,
+                "mrp": existing_p.unit_price,
+                "expiry_date": str(existing_p.expiry_date)
+            })
+        else:
+            days_rem = (exp_date - date.today()).days
+            p_status = "Expired" if days_rem < 0 else ("Expiring Soon" if days_rem <= 30 else "Safe")
+            calc_per_unit = round(mrp_val / units_per_pack, 2) if (units_per_pack and units_per_pack > 0) else mrp_val
+
+            new_p = models.Product(
+                user_id=user_id,
                 product_name=med_name_str,
                 brand=brand_val,
                 category="allopathy",
-                hsn_code=hsn_val,
-                gst_rate=gst_val,
                 batch_number=batch_no_str,
                 quantity=qty,
                 purchase_price=purchase_val,
                 unit_price=mrp_val,
                 units_per_pack=units_per_pack,
-                expiry_date=exp_date.strftime("%Y-%m-%d"),
-                manufacturing_date=mfd_date.strftime("%Y-%m-%d") if mfd_date else None,
+                price_per_unit=calc_per_unit,
+                loose_tablet_price=calc_per_unit,
+                tablets_per_strip=units_per_pack,
+                expiry_date=exp_date,
+                manufacturing_date=mfd_date,
+                hsn_code=hsn_val,
+                gst_rate=gst_val,
+                gst_percentage=gst_val,
                 pack_size_label=pack_label,
-                location=rack_val,
-                duplicate_mode="separate" if mode_clean == "separate" else "merge"
+                days_remaining=days_rem,
+                status=p_status,
+                is_deleted=False
             )
-            prod = add_real_inventory_item(db=db, data=add_req, user_id=user_id, do_commit=False)
-            
-            if existing_prod and mode_clean != "separate":
-                rows_updated += 1
-            else:
-                rows_imported += 1
-
+            items_to_add.append(new_p)
+            existing_map[lookup_key] = new_p
+            rows_imported += 1
             imported_items.append({
-                "id": prod.id,
-                "product_name": prod.product_name,
-                "batch_number": prod.batch_number,
-                "quantity": prod.quantity,
-                "mrp": prod.unit_price,
-                "expiry_date": str(prod.expiry_date)
-            })
-        except Exception as add_err:
-            errors.append({
-                "row": line_num,
+                "id": None,
                 "product_name": med_name_str,
-                "reason": str(add_err)
+                "batch_number": batch_no_str,
+                "quantity": qty,
+                "mrp": mrp_val,
+                "expiry_date": str(exp_date)
             })
 
-    if imported_items:
+    if items_to_add:
+        db.add_all(items_to_add)
+
+    if items_to_add or rows_updated > 0:
         db.commit()
+        invalidate_products_cache(user_id)
 
     total_processed = len(rows_to_process)
     total_successful = rows_imported + rows_updated
@@ -4247,43 +4297,65 @@ def get_dashboard_stats(db: Session, user_id: int):
 # SMART INVENTORY INTELLIGENCE & RESTOCK ENGINE
 # ===========================
 
-def get_inventory_summary(db: Session, user_id: int) -> dict:
+def get_inventory_summary(db: Session, user_id: int):
     """
     Blazing-fast SQL-aggregated inventory health dashboard summary.
-    Executes a single PostgreSQL query using conditional aggregates in < 5ms.
+    Executes unified database queries for 100% exact parity with get_products filters.
     """
-    from sqlalchemy import text
-    sql = text("""
-        SELECT 
-            COUNT(*)::int AS total_products,
-            COALESCE(SUM(quantity * unit_price), 0.0)::float AS total_stock_value,
-            COUNT(*) FILTER (WHERE expiry_date > CURRENT_DATE AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND quantity > 0)::int AS expiring_30d_count,
-            COUNT(*) FILTER (WHERE expiry_date <= CURRENT_DATE AND quantity > 0)::int AS expired_count,
-            COUNT(*) FILTER (WHERE quantity > 0 AND quantity <= 10)::int AS low_stock_count,
-            COUNT(*) FILTER (WHERE quantity <= 0)::int AS out_of_stock_count,
-            COUNT(*) FILTER (WHERE quantity > 10 AND days_remaining > 90)::int AS dead_stock_count
-        FROM products
-        WHERE user_id = :user_id AND is_deleted = false;
-    """)
-    row = db.execute(sql, {"user_id": user_id}).fetchone()
-    if not row:
-        return {
-            "total_products": 0,
-            "total_stock_value": 0.0,
-            "expiring_30_days": 0,
-            "expired": 0,
-            "low_stock": 0,
-            "out_of_stock": 0,
-            "dead_stock": 0,
-        }
+    today_dt = date.today()
+    thirty_days_later_dt = today_dt + timedelta(days=30)
+    dt_90d = datetime.utcnow() - timedelta(days=90)
+
+    base_q = db.query(models.Product).filter(
+        models.Product.user_id == user_id,
+        models.Product.is_deleted == False
+    )
+
+    total_products = base_q.count()
+
+    stock_val_row = base_q.filter(models.Product.quantity > 0).with_entities(
+        func.coalesce(func.sum(models.Product.quantity * models.Product.unit_price), 0.0)
+    ).first()
+    total_stock_value = float(stock_val_row[0]) if stock_val_row else 0.0
+
+    expiring_30_days = base_q.filter(
+        models.Product.quantity > 0,
+        models.Product.expiry_date.between(today_dt, thirty_days_later_dt)
+    ).count()
+
+    expired = base_q.filter(
+        models.Product.quantity > 0,
+        models.Product.expiry_date < today_dt
+    ).count()
+
+    low_stock = base_q.filter(
+        models.Product.quantity > 0,
+        models.Product.quantity <= 10
+    ).count()
+
+    out_of_stock = base_q.filter(
+        models.Product.quantity <= 0
+    ).count()
+
+    sold_product_ids_subquery = (
+        select(models.SaleItem.product_id)
+        .join(models.Sale, models.SaleItem.sale_id == models.Sale.id)
+        .filter(models.Sale.user_id == user_id, models.Sale.created_at >= dt_90d)
+        .scalar_subquery()
+    )
+    dead_stock = base_q.filter(
+        models.Product.quantity > 0,
+        ~models.Product.id.in_(sold_product_ids_subquery)
+    ).count()
+
     return {
-        "total_products": row[0] or 0,
-        "total_stock_value": float(row[1] or 0.0),
-        "expiring_30_days": row[2] or 0,
-        "expired": row[3] or 0,
-        "low_stock": row[4] or 0,
-        "out_of_stock": row[5] or 0,
-        "dead_stock": row[6] or 0,
+        "total_products": total_products,
+        "total_stock_value": round(total_stock_value, 2),
+        "expiring_30_days": expiring_30_days,
+        "expired": expired,
+        "low_stock": low_stock,
+        "out_of_stock": out_of_stock,
+        "dead_stock": dead_stock,
     }
 
 
@@ -4587,11 +4659,7 @@ def get_inventory_intelligence(
             reason = f"Batch expired on {exp_date}. Remove from active shelves immediately."
             action = "PURGE / WRITE OFF EXPIRED STOCK"
 
-        # Filter by priority_level query parameter if requested
-        if priority_level and priority_level != 'ALL' and level != priority_level:
-            continue
-
-        # Accumulate Summary Counts
+        # Accumulate Summary Counts across all products
         if level == "CRITICAL_RESTOCK": summary_counts["critical_restock"] += 1
         elif level == "RESTOCK_SOON": summary_counts["restock_soon"] += 1
         elif level == "EXPIRY_RISK": summary_counts["expiry_risk"] += 1; summary_counts["total_at_risk_value"] += at_risk_val
@@ -4599,6 +4667,10 @@ def get_inventory_intelligence(
         elif level == "DEAD_STOCK": summary_counts["dead_stock"] += 1
         elif level == "OVERSTOCK": summary_counts["overstock"] += 1
         elif level == "HEALTHY": summary_counts["healthy"] += 1
+
+        # Filter by priority_level query parameter if requested
+        if priority_level and priority_level != 'ALL' and level != priority_level:
+            continue
 
         rec_item = {
             "rank": 0,
@@ -5547,7 +5619,7 @@ def get_app_bootstrap(db: Session, user_id: int, current_user: Any) -> Dict[str,
             "name": current_user.name,
             "role": current_user.role,
             "is_owner": current_user.is_owner,
-            "shop_name": current_user.shop_name or "ExpiryGuard Pharmacy",
+            "shop_name": current_user.shop_name or "DawaiFlow Pharmacy",
             "owner_name": current_user.owner_name or "Pharmacy Owner",
             "email": current_user.email,
             "phone": current_user.phone,
@@ -5571,7 +5643,7 @@ def get_app_bootstrap(db: Session, user_id: int, current_user: Any) -> Dict[str,
             },
             "pending_payments_list": pending_payments_list,
             "pending_payments_total": round(pending_payments_total, 2),
-            "shop_name": current_user.shop_name or "ExpiryGuard Pharmacy",
+            "shop_name": current_user.shop_name or "DawaiFlow Pharmacy",
             "role": current_user.role,
         },
         "inventory_summary": {
@@ -5589,6 +5661,350 @@ def get_app_bootstrap(db: Session, user_id: int, current_user: Any) -> Dict[str,
         },
         "bootstrap_at": now_utc.isoformat(),
     }
+
+
+# ==========================================
+# SALES RETURN CRUD IMPLEMENTATION
+# ==========================================
+
+def search_sales_by_medicine(db: Session, user_id: int, query: str, limit: int = 50):
+    """
+    Searches original bills where a specific medicine was sold.
+    Matches product_name, brand, or bill_number.
+    Returns bill metadata, originally sold quantity, already returned quantity, and available return quantity.
+    No AI involved — direct SQL query against sales database.
+    """
+    clean_query = query.strip()
+    if not clean_query:
+        return []
+
+    q = db.query(models.SaleItem, models.Sale).join(
+        models.Sale, models.SaleItem.sale_id == models.Sale.id
+    ).filter(
+        models.Sale.user_id == user_id,
+        or_(
+            models.SaleItem.product_name.ilike(f"%{clean_query}%"),
+            models.Sale.bill_number.ilike(f"%{clean_query}%"),
+            models.SaleItem.batch_number.ilike(f"%{clean_query}%"),
+            models.Sale.customer_name.ilike(f"%{clean_query}%"),
+            models.Sale.customer_phone.ilike(f"%{clean_query}%"),
+        )
+    ).order_by(models.Sale.created_at.desc()).limit(limit).all()
+
+    results = []
+    for sale_item, sale in q:
+        orig_qty = sale_item.quantity or 1
+        ret_qty = sale_item.returned_quantity or 0
+        avail_qty = max(0, orig_qty - ret_qty)
+
+        item_info = {
+            "sale_item_id": sale_item.id,
+            "product_id": sale_item.product_id,
+            "product_name": sale_item.product_name,
+            "batch_number": sale_item.batch_number,
+            "unit_price": float(sale_item.unit_price or 0.0),
+            "unit_type": sale_item.unit_type or "strip",
+            "originally_sold_quantity": orig_qty,
+            "already_returned_quantity": ret_qty,
+            "available_return_quantity": avail_qty,
+            "gst_percentage": float(sale_item.gst_percentage or 0.0),
+        }
+
+        results.append({
+            "sale_id": sale.id,
+            "bill_number": sale.bill_number,
+            "sale_date": sale.created_at,
+            "customer_id": sale.customer_id,
+            "customer_name": sale.customer_name,
+            "customer_phone": sale.customer_phone,
+            "doctor_name": sale.doctor_name,
+            "payment_method": sale.payment_method or "CASH",
+            "payment_status": sale.payment_status or "PAID",
+            "matching_item": item_info,
+        })
+
+    return results
+
+
+def process_sale_return(
+    db: Session,
+    user_id: int,
+    sale_id: int,
+    return_items: List[Dict[str, Any]],
+    reason: Optional[str] = None,
+    staff_id: Optional[int] = None,
+):
+    """
+    Processes a sales return in an atomic database transaction.
+    1. Validates sale and sale items belong to user.
+    2. Validates return quantity <= available returnable quantity.
+    3. Creates SaleReturn and SaleReturnItem records.
+    4. Updates sale_item.returned_quantity.
+    5. Restores stock in Product inventory (batch preserved).
+    6. Updates Sale total_returned_amount and return_status.
+    7. Keeps original bill intact for audit integrity.
+    """
+    sale = db.query(models.Sale).filter(
+        models.Sale.id == sale_id,
+        models.Sale.user_id == user_id
+    ).with_for_update().first()
+
+    if not sale:
+        raise ValueError("Sale bill not found or access denied.")
+
+    if not return_items:
+        raise ValueError("No items provided for return.")
+
+    sale_return = models.SaleReturn(
+        sale_id=sale.id,
+        user_id=user_id,
+        reason=reason,
+        return_amount=0.0
+    )
+    db.add(sale_return)
+    db.flush()
+
+    total_refund_amount = 0.0
+    processed_items_summary = []
+
+    for item_req in return_items:
+        sale_item_id = item_req.get("sale_item_id")
+        return_qty = item_req.get("return_quantity")
+
+        if not sale_item_id or not return_qty or return_qty <= 0:
+            continue
+
+        sale_item = db.query(models.SaleItem).filter(
+            models.SaleItem.id == sale_item_id,
+            models.SaleItem.sale_id == sale.id
+        ).with_for_update().first()
+
+        if not sale_item:
+            raise ValueError(f"Sale item #{sale_item_id} not found in bill {sale.bill_number}.")
+
+        orig_qty = sale_item.quantity or 1
+        already_ret = sale_item.returned_quantity or 0
+        avail_qty = orig_qty - already_ret
+
+        if avail_qty <= 0:
+            raise ValueError(f"Item '{sale_item.product_name}' in bill {sale.bill_number} has already been fully returned.")
+
+        if return_qty > avail_qty:
+            raise ValueError(
+                f"Cannot return {return_qty} units of '{sale_item.product_name}'. "
+                f"Max available return quantity is {avail_qty} (Sold: {orig_qty}, Already Returned: {already_ret})."
+            )
+
+        unit_price = float(sale_item.unit_price or 0.0)
+        item_refund = round(return_qty * unit_price, 2)
+        total_refund_amount += item_refund
+
+        sale_item.returned_quantity = already_ret + return_qty
+
+        ret_item = models.SaleReturnItem(
+            sale_return_id=sale_return.id,
+            sale_item_id=sale_item.id,
+            product_id=sale_item.product_id or 0,
+            quantity=return_qty,
+            unit_price=unit_price,
+            return_total=item_refund
+        )
+        db.add(ret_item)
+        db.flush()
+
+        product = None
+        if sale_item.product_id:
+            product = db.query(models.Product).filter(
+                models.Product.id == sale_item.product_id,
+                models.Product.user_id == user_id
+            ).first()
+
+        if not product and sale_item.product_name:
+            prod_query = db.query(models.Product).filter(
+                models.Product.user_id == user_id,
+                models.Product.product_name == sale_item.product_name,
+                models.Product.is_deleted == False
+            )
+            if sale_item.batch_number:
+                prod_query = prod_query.filter(models.Product.batch_number == sale_item.batch_number)
+            product = prod_query.first()
+
+        if product:
+            product.quantity += return_qty
+
+            txn = models.InventoryTransaction(
+                transaction_id=f"RET-{sale_return.id}-{ret_item.id}",
+                shop_id=user_id,
+                product_id=product.id,
+                transaction_type="return",
+                quantity=return_qty,
+                unit_price=unit_price,
+                purchase_price=product.purchase_price or 0.0,
+                total_price=item_refund,
+                final_price=item_refund,
+            )
+            db.add(txn)
+
+        processed_items_summary.append({
+            "return_item_id": ret_item.id,
+            "sale_item_id": sale_item.id,
+            "product_id": sale_item.product_id,
+            "product_name": sale_item.product_name,
+            "batch_number": sale_item.batch_number,
+            "returned_quantity": return_qty,
+            "unit_price": unit_price,
+            "return_total": item_refund,
+        })
+
+    sale_return.return_amount = round(total_refund_amount, 2)
+    sale.total_returned_amount = round((sale.total_returned_amount or 0.0) + total_refund_amount, 2)
+
+    all_fully_returned = all(
+        (item.returned_quantity or 0) >= (item.quantity or 1)
+        for item in sale.items
+    )
+    sale.return_status = "returned" if all_fully_returned else "partially_returned"
+
+    db.commit()
+    db.refresh(sale_return)
+
+    return {
+        "success": True,
+        "message": f"Successfully processed return of {len(processed_items_summary)} item(s) for Bill #{sale.bill_number}.",
+        "return_id": sale_return.id,
+        "sale_id": sale.id,
+        "bill_number": sale.bill_number,
+        "total_refund_amount": round(total_refund_amount, 2),
+        "returned_items": processed_items_summary,
+        "processed_at": sale_return.created_at or datetime.utcnow(),
+    }
+
+
+def get_today_returns_summary(db: Session, user_id: int):
+    """
+    Returns today's processed returns and itemized list for DawaiFlow returns dashboard.
+    """
+    now_utc = datetime.utcnow()
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = now_utc + ist_offset
+    today_start_ist = datetime(now_ist.year, now_ist.month, now_ist.day, 0, 0, 0)
+    today_end_ist = datetime(now_ist.year, now_ist.month, now_ist.day, 23, 59, 59)
+
+    today_start_utc = today_start_ist - ist_offset
+    today_end_utc = today_end_ist - ist_offset
+
+    returns_query = db.query(models.SaleReturnItem, models.SaleReturn, models.Sale).join(
+        models.SaleReturn, models.SaleReturnItem.sale_return_id == models.SaleReturn.id
+    ).join(
+        models.Sale, models.SaleReturn.sale_id == models.Sale.id
+    ).filter(
+        models.SaleReturn.user_id == user_id,
+        models.SaleReturn.created_at >= today_start_utc,
+        models.SaleReturn.created_at <= today_end_utc
+    ).order_by(models.SaleReturn.created_at.desc()).all()
+
+    total_returns_count = len(set(r.SaleReturn.id for r in returns_query))
+    total_items_returned = sum(r.SaleReturnItem.quantity for r in returns_query)
+    total_refund_val = sum(r.SaleReturnItem.return_total for r in returns_query)
+
+    records = []
+    for ret_item, ret, sale in returns_query:
+        user_name = None
+        if ret.user:
+            user_name = ret.user.owner_name or ret.user.shop_name
+
+        records.append({
+            "return_id": ret.id,
+            "return_item_id": ret_item.id,
+            "sale_id": sale.id,
+            "bill_number": sale.bill_number,
+            "product_name": ret_item.sale_item.product_name if ret_item.sale_item else "Medicine",
+            "batch_number": ret_item.sale_item.batch_number if ret_item.sale_item else None,
+            "returned_quantity": ret_item.quantity,
+            "unit_price": float(ret_item.unit_price or 0.0),
+            "refund_amount": float(ret_item.return_total or 0.0),
+            "customer_name": sale.customer_name or "Walk-in Customer",
+            "customer_phone": sale.customer_phone or "N/A",
+            "reason": ret.reason or "Customer Return",
+            "processed_by": user_name or "Pharmacist",
+            "returned_at": ret.created_at,
+        })
+
+    return {
+        "total_returns_count": total_returns_count,
+        "total_items_returned_count": total_items_returned,
+        "total_return_value": round(float(total_refund_val), 2),
+        "returns": records
+    }
+
+
+def get_returns_history(
+    db: Session,
+    user_id: int,
+    search: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100
+):
+    """
+    Searchable and filterable returns history list for DawaiFlow.
+    """
+    query = db.query(models.SaleReturnItem, models.SaleReturn, models.Sale).join(
+        models.SaleReturn, models.SaleReturnItem.sale_return_id == models.SaleReturn.id
+    ).join(
+        models.Sale, models.SaleReturn.sale_id == models.Sale.id
+    ).filter(
+        models.SaleReturn.user_id == user_id
+    )
+
+    if search and search.strip():
+        s = search.strip()
+        query = query.filter(
+            or_(
+                models.Sale.bill_number.ilike(f"%{s}%"),
+                models.Sale.customer_name.ilike(f"%{s}%"),
+                models.SaleItem.product_name.ilike(f"%{s}%"),
+                models.SaleItem.batch_number.ilike(f"%{s}%"),
+            )
+        )
+
+    if start_date:
+        try:
+            sd = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(models.SaleReturn.created_at >= sd)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            ed = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(models.SaleReturn.created_at < ed)
+        except ValueError:
+            pass
+
+    rows = query.order_by(models.SaleReturn.created_at.desc()).limit(limit).all()
+
+    records = []
+    for ret_item, ret, sale in rows:
+        records.append({
+            "return_id": ret.id,
+            "return_item_id": ret_item.id,
+            "sale_id": sale.id,
+            "bill_number": sale.bill_number,
+            "product_name": ret_item.sale_item.product_name if ret_item.sale_item else "Medicine",
+            "batch_number": ret_item.sale_item.batch_number if ret_item.sale_item else None,
+            "returned_quantity": ret_item.quantity,
+            "unit_price": float(ret_item.unit_price or 0.0),
+            "refund_amount": float(ret_item.return_total or 0.0),
+            "customer_name": sale.customer_name or "Walk-in Customer",
+            "customer_phone": sale.customer_phone or "N/A",
+            "reason": ret.reason or "Customer Return",
+            "processed_by": ret.user.owner_name if ret.user else "Pharmacist",
+            "returned_at": ret.created_at,
+        })
+
+    return records
+
 
 
 
