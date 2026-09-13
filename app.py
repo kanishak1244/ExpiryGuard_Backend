@@ -3529,6 +3529,8 @@ def batch_add_inventory_stock(
 # INVENTORY SOFT-DELETE & 60-DAY RECOVERY
 # ==========================================
 
+@app.post("/api/inventory/delete")
+@app.post("/api/inventory/delete-stock")
 @app.post("/inventory/delete")
 @app.post("/inventory/delete-stock")
 @limiter.limit("60/minute")
@@ -3554,6 +3556,7 @@ def delete_inventory_stock(
     return res
 
 
+@app.post("/api/inventory/delete-all")
 @app.post("/inventory/delete-all")
 @limiter.limit("60/minute")
 def delete_all_inventory_stock(
@@ -3580,6 +3583,7 @@ def delete_all_inventory_stock(
     return res
 
 
+@app.get("/api/inventory/deleted", response_model=List[schemas.DeletedProductResponse])
 @app.get("/inventory/deleted", response_model=List[schemas.DeletedProductResponse])
 def get_recently_deleted_stock(
     current_user: models.User = Depends(get_current_user),
@@ -3595,6 +3599,8 @@ def get_recently_deleted_stock(
     )
 
 
+@app.post("/api/inventory/restore")
+@app.post("/api/inventory/restore-stock")
 @app.post("/inventory/restore")
 @app.post("/inventory/restore-stock")
 @limiter.limit("60/minute")

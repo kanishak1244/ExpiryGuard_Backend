@@ -765,17 +765,25 @@ class ApiClient {
 
   // Inventory Soft-Delete & 60-Day Recovery API
   async deleteInventoryStock(stockIds) {
-    return await this.request('/inventory/delete', {
+    const res = await this.request('/inventory/delete', {
       method: 'POST',
       body: JSON.stringify({ stock_ids: stockIds })
     });
+    this.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+    return res;
   }
 
   async deleteAllInventoryStock() {
-    return await this.request('/inventory/delete-all', {
+    const res = await this.request('/inventory/delete-all', {
       method: 'POST',
       body: JSON.stringify({ confirm: true })
     });
+    this.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+    return res;
   }
 
   async getRecentlyDeletedStock() {
@@ -783,10 +791,14 @@ class ApiClient {
   }
 
   async restoreInventoryStock(stockIds) {
-    return await this.request('/inventory/restore', {
+    const res = await this.request('/inventory/restore', {
       method: 'POST',
       body: JSON.stringify({ stock_ids: stockIds })
     });
+    this.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+    return res;
   }
 
   // Bulk Inventory Import Template

@@ -646,7 +646,10 @@ function renderInventoryRows(items) {
         <td><span class="num-date">${p.expiry_date || '-'}</span></td>
         <td>${statusBadge}</td>
         <td>
-          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="viewProductDetails(${p.id})">Stock Card</button>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="viewProductDetails(${p.id})">Stock Card</button>
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: #DC2626; border-color: #FCA5A5;" onclick="deleteSingleInventoryStock(${p.id}, '${window.escapeHtml(p.product_name)}')">🗑️ Delete</button>
+          </div>
         </td>
       </tr>
     `;
@@ -654,6 +657,25 @@ function renderInventoryRows(items) {
 
   updateSelectionUI();
 }
+
+window.deleteSingleInventoryStock = async function(stockId, medName) {
+  if (!confirm(`Are you sure you want to delete '${medName}' from active inventory? It will be moved to Recently Deleted (60-day recovery guarantee).`)) {
+    return;
+  }
+  try {
+    const res = await api.deleteInventoryStock([stockId]);
+    showToastNotification(res.message || `'${medName}' moved to Recently Deleted.`, true);
+    if (window.api && typeof window.api.invalidateCache === 'function') {
+      window.api.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
+    }
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+    if (typeof fetchInventoryPage === 'function') fetchInventoryPage();
+    if (typeof initInventory === 'function') initInventory();
+  } catch (err) {
+    showToastNotification(`Failed to delete '${medName}': ${err.message}`, false);
+  }
+};
 
 function initInventory() {
   const renderIntel = (intel) => {
@@ -885,17 +907,23 @@ async function executeDeleteSelected() {
     selectedStockIds.clear();
     showToastNotification(res.message || `${ids.length} items moved to Recently Deleted, recoverable for 60 days.`, true);
     
-    // Refresh inventory immediately
-    if (window.api && typeof window.api.getProducts === 'function') {
-      allProducts = await window.api.getProducts();
-    } else {
-      const token = localStorage.getItem('expiryguard_token');
-      const r = await fetch('/products', {
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-      });
-      allProducts = await r.json();
+    // Invalidate client-side caches and refresh inventory page & KPIs immediately
+    if (window.api && typeof window.api.invalidateCache === 'function') {
+      window.api.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
     }
-    applyInventoryFilters();
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+
+    if (typeof fetchInventoryPage === 'function') {
+      fetchInventoryPage();
+    } else if (typeof loadInventoryProducts === 'function') {
+      loadInventoryProducts();
+    } else if (typeof applyInventoryFilters === 'function') {
+      applyInventoryFilters();
+    }
+    if (typeof initInventory === 'function') {
+      initInventory();
+    }
   } catch (err) {
     console.error('Delete selected error:', err);
     showToastNotification(`Failed to delete items: ${err.message}`, false);
@@ -908,14 +936,12 @@ async function executeDeleteSelected() {
 }
 
 function openDeleteAllModal() {
-  const totalCount = allProducts.length;
-  if (totalCount === 0) return;
-
+  const totalCount = (typeof inventoryTotalCount === 'number' && inventoryTotalCount > 0) ? inventoryTotalCount : (Array.isArray(allProducts) ? allProducts.length : 0);
   if (window.ConfirmModal) {
     ConfirmModal({
       isOpen: true,
       title: 'Delete All Stock',
-      message: `This will remove all ${totalCount} items from your active live inventory. All items will be moved to Recently Deleted (60-day recovery guarantee).`,
+      message: `This will remove all stock items from your active live inventory. All items will be moved to Recently Deleted (60-day recovery guarantee).`,
       confirmText: 'Yes, Delete All Stock',
       cancelText: 'Cancel',
       icon: '⚠️',
@@ -969,16 +995,23 @@ async function executeDeleteAll() {
     selectedStockIds.clear();
     showToastNotification(res.message || 'All items moved to Recently Deleted, recoverable for 60 days.', true);
     
-    if (window.api && typeof window.api.getProducts === 'function') {
-      allProducts = await window.api.getProducts();
-    } else {
-      const token = localStorage.getItem('expiryguard_token');
-      const r = await fetch('/products', {
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-      });
-      allProducts = await r.json();
+    // Invalidate client-side caches and refresh inventory page & KPIs immediately
+    if (window.api && typeof window.api.invalidateCache === 'function') {
+      window.api.invalidateCache(['products', 'inventory', 'dashboard', 'reports', 'analytics']);
     }
-    applyInventoryFilters();
+    localStorage.removeItem('expiryguard_cached_inventory');
+    localStorage.removeItem('expiryguard_cached_billing_products');
+
+    if (typeof fetchInventoryPage === 'function') {
+      fetchInventoryPage();
+    } else if (typeof loadInventoryProducts === 'function') {
+      loadInventoryProducts();
+    } else if (typeof applyInventoryFilters === 'function') {
+      applyInventoryFilters();
+    }
+    if (typeof initInventory === 'function') {
+      initInventory();
+    }
   } catch (err) {
     console.error('Delete all stock error:', err);
     showToastNotification(`Failed to delete all stock: ${err.message}`, false);
