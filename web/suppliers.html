@@ -60,7 +60,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -128,7 +128,6 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Suppliers & Vendor Management</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Manage pharmaceutical distributors, contact details, GSTIN, payment terms, and trace stock batches.</p>
         </div>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-primary" onclick="openAddSupplierModal()">+ Add New Supplier</button>
@@ -139,10 +138,10 @@
         
         <!-- Filter & Search Toolbar -->
         <div class="card" style="margin-bottom: 20px;">
-          <div class="card-body" style="padding: 16px;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-              <input type="text" id="supplier-search-input" class="form-input" placeholder="Search Supplier Name, GSTIN, Phone..." oninput="loadSuppliers()">
-              <select id="supplier-status-filter" class="form-input" onchange="loadSuppliers()">
+          <div class="card-body" style="padding: 14px 16px;">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+              <input type="text" id="supplier-search-input" class="form-input" placeholder="Search Supplier Name, GSTIN, Phone..." oninput="loadSuppliers()" style="flex: 3; min-width: 240px;">
+              <select id="supplier-status-filter" class="form-input" onchange="loadSuppliers()" style="flex: 1; max-width: 200px; min-width: 140px;">
                 <option value="ALL">All Statuses</option>
                 <option value="Active">Active Only</option>
                 <option value="Inactive">Inactive Only</option>
@@ -161,14 +160,14 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Supplier Name</th>
-                    <th>GSTIN</th>
-                    <th>Contact Person</th>
-                    <th>Phone / Email</th>
-                    <th>State</th>
-                    <th>Total Purchases</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th style="width: 22%;">Supplier Name</th>
+                    <th style="width: 13%;">GSTIN</th>
+                    <th style="width: 13%;">Contact Person</th>
+                    <th style="width: 18%;">Phone / Email</th>
+                    <th style="width: 8%;">State</th>
+                    <th style="width: 12%;">Total Purchases</th>
+                    <th style="width: 8%;">Status</th>
+                    <th style="width: 12%; text-align: right;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="suppliers-table-body">
@@ -413,7 +412,7 @@
             <td><strong>${totalAmt}</strong></td>
             <td><span class="badge ${statusBadge}">${supStatus}</span></td>
             <td>
-              <div style="display: flex; gap: 6px;">
+              <div style="display: flex; gap: 6px; justify-content: flex-end;">
                 <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openSupplierProfile(${Number(s.id)})">👁️ Profile</button>
                 <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openEditSupplierModal(${Number(s.id)})">✏️ Edit</button>
               </div>
