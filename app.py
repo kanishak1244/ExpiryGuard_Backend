@@ -7289,24 +7289,25 @@ def acknowledge_job_status(
     current_user: models.User = Depends(get_current_user),
 ):
     """HTTP endpoint for agent to report successful transmission or errors."""
-    job = db.query(models.PrintJob).filter(
+    update_data = {"status": payload.status}
+    if payload.status == "PRINTING":
+        update_data["claimed_at"] = datetime.utcnow()
+    elif payload.status == "PRINTED":
+        update_data["printed_at"] = datetime.utcnow()
+    elif payload.status == "FAILED":
+        update_data["failed_at"] = datetime.utcnow()
+        update_data["error_message"] = payload.error_message
+
+    rows_updated = db.query(models.PrintJob).filter(
         models.PrintJob.id == payload.job_id,
         models.PrintJob.user_id == current_user.id,
-    ).first()
-    if not job:
+    ).update(update_data)
+
+    if not rows_updated:
         raise HTTPException(status_code=404, detail="Print job not found.")
 
-    job.status = payload.status
-    if payload.status == "PRINTING":
-        job.claimed_at = datetime.utcnow()
-    elif payload.status == "PRINTED":
-        job.printed_at = datetime.utcnow()
-    elif payload.status == "FAILED":
-        job.failed_at = datetime.utcnow()
-        job.error_message = payload.error_message
-
     db.commit()
-    return {"success": True, "job_id": job.id, "status": job.status}
+    return {"success": True, "job_id": payload.job_id, "status": payload.status}
 
 
 # ==========================================

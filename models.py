@@ -107,8 +107,8 @@ class Product(Base):
     __table_args__ = (
         Index("idx_products_user_name", "user_id", "product_name"),
         Index("idx_products_user_deleted", "user_id", "is_deleted"),
-        Index("idx_products_user_name_prefix", "user_id", text("lower(product_name) varchar_pattern_ops")),
-        Index("idx_products_user_brand_prefix", "user_id", text("lower(brand) varchar_pattern_ops")),
+        Index("idx_products_user_name_prefix", "user_id", "product_name"),
+        Index("idx_products_user_brand_prefix", "user_id", "brand"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
