@@ -2118,6 +2118,10 @@ def bulk_import_inventory(
                     upd_dict["expiry_date"] = data["expiry_date"]
                     upd_dict["days_remaining"] = data["days_remaining"]
                     upd_dict["status"] = data["status"]
+                if data.get("brand"):
+                    upd_dict["brand"] = data["brand"]
+                if data.get("barcode"):
+                    upd_dict["barcode"] = data["barcode"]
                 
                 to_update_dicts.append(upd_dict)
                 existing_map_by_batch[(norm_name, norm_batch)] = (pid, new_qty)
@@ -2134,6 +2138,8 @@ def bulk_import_inventory(
             new_dict = {
                 "user_id": user_id,
                 "product_name": data["product_name"],
+                "brand": data.get("brand"),
+                "barcode": data.get("barcode"),
                 "unit_price": data["unit_price"],
                 "purchase_price": data["purchase_price"],
                 "hsn_code": data["hsn_code"],
@@ -3533,10 +3539,11 @@ def parse_pack_units(pack_size_label: Optional[str]) -> int:
     return 10
 
 
-def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, filename: str) -> dict:
+def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, filename: str, on_duplicate: str = "merge") -> dict:
     """
     Directly parses an uploaded .xlsx, .xls, or .csv file (no AI required)
     and onboards medicine stock batches into the shop's active live inventory.
+    Supports row-level validation (missing fields, zero prices, invalid dates) and duplicate stock handling.
     """
     import io
     import csv
@@ -3598,8 +3605,8 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
 
             reader = csv.DictReader(io.StringIO(text_content))
             for row in reader:
-                if any(v.strip() for v in row.values() if v):
-                    clean_row = {k.strip().lower(): v for k, v in row.items() if k}
+                if any(v is not None and str(v).strip() for v in row.values()):
+                    clean_row = {k.strip().lower(): (v if v is not None else "") for k, v in row.items() if k}
                     rows_to_process.append(clean_row)
         except Exception as e:
             raise HTTPException(status_code=400, detail="Failed to parse CSV file. Please ensure the file encoding is valid.")
@@ -3611,7 +3618,9 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
 
     imported_items = []
     errors = []
-    skipped_count = 0
+    rows_imported = 0
+    rows_updated = 0
+    rows_skipped = 0
 
     def get_val(row, *aliases):
         for a in aliases:
@@ -3626,12 +3635,31 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
     for line_num, row in enumerate(rows_to_process, start=2):
         med_name = get_val(row, "medicine_name", "product_name", "medicine", "name", "item_name")
         if not med_name or str(med_name).strip() == "":
-            skipped_count += 1
+            errors.append({
+                "row": line_num,
+                "product_name": "N/A",
+                "reason": "Missing required field 'product_name'"
+            })
             continue
 
         med_name_str = str(med_name).strip()
         if med_name_str.lower() in ["medicine_name", "product_name", "column name"]:
-            skipped_count += 1
+            continue
+
+        raw_mrp = get_val(row, "mrp", "unit_price", "selling_price", "price")
+        mrp_val = 0.0
+        if raw_mrp is not None and str(raw_mrp).strip() != "":
+            try:
+                mrp_val = float(str(raw_mrp).replace("₹", "").replace(",", "").strip())
+            except Exception:
+                mrp_val = 0.0
+
+        if mrp_val <= 0:
+            errors.append({
+                "row": line_num,
+                "product_name": med_name_str,
+                "reason": f"Invalid or missing price '{raw_mrp}'. Price (MRP) must be greater than 0."
+            })
             continue
 
         batch_no = get_val(row, "batch_no", "batch_number", "batch", "lot_no", "lot")
@@ -3642,7 +3670,11 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         raw_exp = get_val(row, "expiry_date", "exp_date", "expiry", "exp")
         exp_date = parse_date(raw_exp)
         if not exp_date:
-            errors.append(f"Row {line_num} ('{med_name_str}'): Invalid expiry date '{raw_exp}'. Use DD-MM-YYYY.")
+            errors.append({
+                "row": line_num,
+                "product_name": med_name_str,
+                "reason": f"Invalid expiry date '{raw_exp}'. Expected format: YYYY-MM-DD or DD-MM-YYYY."
+            })
             continue
 
         raw_mfd = get_val(row, "mfd_date", "mfg_date", "manufacturing_date", "mfd")
@@ -3656,14 +3688,7 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         except Exception:
             qty = 1
 
-        raw_mrp = get_val(row, "mrp", "unit_price", "selling_price", "price")
         raw_purchase = get_val(row, "purchase_price", "purchase_rate", "cost_price", "cost", "rate")
-
-        try:
-            mrp_val = float(str(raw_mrp).replace("₹", "").replace(",", "").strip()) if raw_mrp is not None else 0.0
-        except Exception:
-            mrp_val = 0.0
-
         try:
             purchase_val = float(str(raw_purchase).replace("₹", "").replace(",", "").strip()) if raw_purchase is not None else round(mrp_val * 0.7, 2)
         except Exception:
@@ -3683,6 +3708,20 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         hsn_val = str(get_val(row, "hsn_code", "hsn") or "3004").strip()
         rack_val = str(get_val(row, "rack_location", "location", "rack", "shelf") or "").strip() or None
 
+        # Check existing item for duplicate mode handling
+        existing_prod = db.query(models.Product).filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            func.lower(models.Product.product_name) == med_name_str.lower(),
+            models.Product.batch_number == batch_no_str,
+            models.Product.expiry_date == exp_date
+        ).first()
+
+        mode_clean = (on_duplicate or "merge").lower()
+        if existing_prod and mode_clean == "skip":
+            rows_skipped += 1
+            continue
+
         try:
             add_req = schemas.InventoryAddRequest(
                 product_name=med_name_str,
@@ -3699,9 +3738,15 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
                 manufacturing_date=mfd_date.strftime("%Y-%m-%d") if mfd_date else None,
                 pack_size_label=pack_label,
                 location=rack_val,
-                duplicate_mode="merge"
+                duplicate_mode="separate" if mode_clean == "separate" else "merge"
             )
             prod = add_real_inventory_item(db=db, data=add_req, user_id=user_id, do_commit=False)
+            
+            if existing_prod and mode_clean != "separate":
+                rows_updated += 1
+            else:
+                rows_imported += 1
+
             imported_items.append({
                 "id": prod.id,
                 "product_name": prod.product_name,
@@ -3711,20 +3756,32 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
                 "expiry_date": str(prod.expiry_date)
             })
         except Exception as add_err:
-            errors.append(f"Row {line_num} ('{med_name_str}'): {str(add_err)}")
+            errors.append({
+                "row": line_num,
+                "product_name": med_name_str,
+                "reason": str(add_err)
+            })
 
     if imported_items:
         db.commit()
 
+    total_processed = len(rows_to_process)
+    total_successful = rows_imported + rows_updated
+
     return {
-        "success": len(imported_items) > 0 or len(errors) == 0,
-        "total_rows": len(rows_to_process),
-        "imported_count": len(imported_items),
-        "skipped_count": skipped_count,
+        "success": total_successful > 0 or len(errors) == 0,
+        "total_rows_processed": total_processed,
+        "total_rows": total_processed,
+        "rows_imported": rows_imported,
+        "rows_updated": rows_updated,
+        "rows_skipped": rows_skipped,
+        "imported_count": total_successful,
+        "skipped_count": rows_skipped,
+        "errors_count": len(errors),
         "errors": errors,
         "imported_items": imported_items[:20],
-        "message": f"Successfully imported {len(imported_items)} medicine batches into active inventory."
-        if imported_items else "No items imported."
+        "message": f"Successfully processed {total_processed} rows ({rows_imported} added, {rows_updated} updated, {len(errors)} failed)."
+        if total_successful else "No items imported."
     }
 
 

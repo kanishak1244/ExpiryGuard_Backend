@@ -12,7 +12,13 @@ HEADER_ALIASES: Dict[str, List[str]] = {
     "product_name": [
         "product_name", "product name", "product", "item_name", "item name", "item",
         "medicine_name", "medicine name", "medicine", "particulars", "description",
-        "drug_name", "drug name", "brand", "brand name", "name", "items"
+        "drug_name", "drug name", "name", "items"
+    ],
+    "brand": [
+        "brand", "brand_name", "brand name", "company", "manufacturer", "mfg", "make"
+    ],
+    "barcode": [
+        "barcode", "sku", "code", "item_code", "product_code", "upc", "ean"
     ],
     "price": [
         "price", "mrp", "sale_price", "sale price", "selling_price", "selling price",
@@ -301,16 +307,26 @@ def validate_and_normalize_row(
         except Exception:
             pass
 
-    # 10. Category (OPTIONAL, default "General")
-    cat_col = mapping.get("category")
-    category = "General"
-    if cat_col and cat_col in row and not pd.isna(row[cat_col]):
-        c_str = str(row[cat_col]).strip()
-        if c_str and c_str.lower() != 'nan':
-            category = c_str
+    # 11. Brand / Manufacturer (OPTIONAL)
+    brand_col = mapping.get("brand")
+    brand = None
+    if brand_col and brand_col in row and not pd.isna(row[brand_col]):
+        b_str = str(row[brand_col]).strip()
+        if b_str and b_str.lower() != 'nan':
+            brand = b_str
+
+    # 12. Barcode / SKU (OPTIONAL)
+    barcode_col = mapping.get("barcode")
+    barcode = None
+    if barcode_col and barcode_col in row and not pd.isna(row[barcode_col]):
+        bc_str = str(row[barcode_col]).strip()
+        if bc_str and bc_str.lower() != 'nan':
+            barcode = bc_str
 
     cleaned_data = {
         "product_name": product_name,
+        "brand": brand,
+        "barcode": barcode,
         "unit_price": price_val,
         "price": price_val,
         "purchase_price": purchase_price,

@@ -691,6 +691,158 @@ function calcExpiryBadge(expDateStr) {
   }
 }
 
+// ----------------------------------------------------
+// DIRECT EXCEL / CSV BULK IMPORT HANDLERS (NO AI)
+// ----------------------------------------------------
+
+function handleBulkDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('bulk-import-dropzone');
+  if (dz) dz.style.borderColor = 'var(--primary-green)';
+}
+
+function handleBulkDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('bulk-import-dropzone');
+  if (dz) dz.style.borderColor = 'var(--border-color)';
+}
+
+function handleBulkDropFile(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('bulk-import-dropzone');
+  if (dz) dz.style.borderColor = 'var(--border-color)';
+
+  const dt = e.dataTransfer;
+  if (dt && dt.files && dt.files.length > 0) {
+    const file = dt.files[0];
+    processBulkFileUpload(file);
+  }
+}
+
+function handleBulkFileSelected(e) {
+  const input = e.target;
+  if (input && input.files && input.files.length > 0) {
+    const file = input.files[0];
+    processBulkFileUpload(file);
+  }
+}
+
+function resetBulkImportView() {
+  const fileInput = document.getElementById('bulk-import-file-input');
+  if (fileInput) fileInput.value = '';
+  
+  const filenameDiv = document.getElementById('bulk-import-selected-filename');
+  if (filenameDiv) filenameDiv.textContent = '';
+  
+  const resultsCard = document.getElementById('bulk-import-results-card');
+  if (resultsCard) resultsCard.style.display = 'none';
+  
+  const statusText = document.getElementById('bulk-import-status-text');
+  if (statusText) statusText.innerHTML = '';
+  
+  const errorList = document.getElementById('bulk-import-error-list');
+  if (errorList) errorList.innerHTML = '';
+}
+
+async function processBulkFileUpload(file) {
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['csv', 'xlsx', 'xls'].includes(ext)) {
+    alert('Please upload a valid .csv, .xlsx, or .xls spreadsheet file.');
+    return;
+  }
+
+  const statusText = document.getElementById('bulk-import-status-text');
+  const resultsCard = document.getElementById('bulk-import-results-card');
+  const errorList = document.getElementById('bulk-import-error-list');
+  const filenameDiv = document.getElementById('bulk-import-selected-filename');
+
+  if (filenameDiv) filenameDiv.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  if (resultsCard) resultsCard.style.display = 'block';
+  if (statusText) statusText.innerHTML = `<span style="color: #0D9488; display: inline-flex; align-items: center; gap: 8px;"><span>⏳</span><span>Parsing & validating CSV/Excel rows... Inserting valid medicines into database.</span></span>`;
+  if (errorList) errorList.innerHTML = '';
+
+  try {
+    const res = await api.uploadInventorySpreadsheet(file);
+
+    const total = res.total_rows_processed || 0;
+    const imported = res.rows_imported || 0;
+    const updated = res.rows_updated || 0;
+    const skipped = res.rows_skipped || 0;
+    const errors = res.errors || [];
+    const warnings = res.warnings || [];
+
+    let summaryHtml = `
+      <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+        <h4 style="margin: 0 0 8px 0; color: #166534; font-size: 15px; display: flex; align-items: center; gap: 6px;">
+          <span>🎉 Import Complete</span>
+        </h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; font-size: 13px; text-align: center;">
+          <div style="background: #FFFFFF; padding: 8px; border-radius: 6px; border: 1px solid #DCFCE7;">
+            <div style="color: #64748B; font-size: 11px;">Total Rows</div>
+            <strong style="font-size: 16px; color: #0F172A;">${total}</strong>
+          </div>
+          <div style="background: #FFFFFF; padding: 8px; border-radius: 6px; border: 1px solid #DCFCE7;">
+            <div style="color: #166534; font-size: 11px;">Successfully Added</div>
+            <strong style="font-size: 16px; color: #16A34A;">${imported}</strong>
+          </div>
+          <div style="background: #FFFFFF; padding: 8px; border-radius: 6px; border: 1px solid #DCFCE7;">
+            <div style="color: #0369A1; font-size: 11px;">Updated</div>
+            <strong style="font-size: 16px; color: #0284C7;">${updated}</strong>
+          </div>
+          <div style="background: #FFFFFF; padding: 8px; border-radius: 6px; border: 1px solid #DCFCE7;">
+            <div style="color: #D97706; font-size: 11px;">Skipped / Dupes</div>
+            <strong style="font-size: 16px; color: #D97706;">${skipped}</strong>
+          </div>
+          <div style="background: #FFFFFF; padding: 8px; border-radius: 6px; border: 1px solid #DCFCE7;">
+            <div style="color: #DC2626; font-size: 11px;">Failed Rows</div>
+            <strong style="font-size: 16px; color: #DC2626;">${errors.length}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (statusText) statusText.innerHTML = summaryHtml;
+
+    if (errors.length > 0) {
+      let errItems = errors.map(err => {
+        const rowNum = err.row || 'N/A';
+        const reason = err.reason || 'Validation error';
+        return `<div style="padding: 4px 8px; border-bottom: 1px solid #FEE2E2;">⚠️ <strong>Row ${rowNum}</strong> — ${reason}</div>`;
+      }).join('');
+      if (errorList) errorList.innerHTML = `<div style="font-weight: 700; margin-bottom: 6px; color: #991B1B;">Row-Level Errors (${errors.length}):</div>` + errItems;
+    } else if (warnings.length > 0) {
+      let warnItems = warnings.map(w => {
+        const rowNum = w.row || 'N/A';
+        const msg = w.message || '';
+        return `<div style="padding: 4px 8px; border-bottom: 1px solid #FEF3C7; color: #92400E;">ℹ️ <strong>Row ${rowNum}</strong> — ${msg}</div>`;
+      }).join('');
+      if (errorList) errorList.innerHTML = `<div style="font-weight: 700; margin-bottom: 6px; color: #92400E;">Import Warnings (${warnings.length}):</div>` + warnItems;
+    } else {
+      if (errorList) errorList.innerHTML = `<div style="color: #166534; font-size: 13px; font-weight: 600;">✨ All rows were processed cleanly without errors!</div>`;
+    }
+
+    // Invalidate client-side inventory caches so live tables refresh immediately
+    api.invalidateCache(['products', 'inventory', 'reports']);
+    localStorage.removeItem('expiryguard_cached_billing_products');
+    if (typeof loadInventoryProducts === 'function') {
+      loadInventoryProducts();
+    }
+    if (typeof loadDashboardData === 'function') {
+      loadDashboardData();
+    }
+
+  } catch (err) {
+    console.error('Bulk import upload failed:', err);
+    if (statusText) statusText.innerHTML = `<div style="color: #DC2626; padding: 10px; background: #FEF2F2; border-radius: 6px;">❌ Upload Error: ${err.message || 'Could not process file.'}</div>`;
+    if (errorList) errorList.innerHTML = '';
+  }
+}
+
 let pendingBatchPayload = null;
 
 async function handleBatchFormQueue(e) {

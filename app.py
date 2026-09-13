@@ -2856,6 +2856,7 @@ def download_inventory_import_template(
 @app.post("/inventory/import")
 async def import_inventory_file(
     file: UploadFile = File(...),
+    on_duplicate: str = "merge",
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -2876,6 +2877,7 @@ async def import_inventory_file(
         user_id=current_user.id,
         file_bytes=file_bytes,
         filename=file.filename,
+        on_duplicate=on_duplicate,
     )
 
 
@@ -5218,6 +5220,33 @@ async def single_step_inventory_import(
         "warnings": import_result["warnings"],
         "errors": errors
     }
+
+
+@app.get("/api/inventory/import-template")
+@app.get("/inventory/import-template")
+def download_inventory_import_template():
+    """
+    Returns standardized inventory import template file (.xlsx or .csv).
+    Allows users to download standard structure before bulk uploading medicines.
+    """
+    template_path = os.path.join(os.path.dirname(__file__), "ExpiryGuard_Inventory_Import_Template.xlsx")
+    if os.path.exists(template_path):
+        return FileResponse(
+            path=template_path,
+            filename="ExpiryGuard_Inventory_Import_Template.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    csv_content = (
+        "product_name,brand,category,batch_number,expiry_date,quantity,mrp,purchase_price,hsn_code,gst_rate,tablets_per_strip,barcode\n"
+        "Dolo 650mg Tablet,Micro Labs,allopathy,B2026-01,2027-12-31,50,30.00,24.00,3004,12.0,15,8901234567890\n"
+        "Azithral 500mg Tablet,Alembic,allopathy,AZ-102,2026-10-31,20,120.00,96.00,3004,12.0,5,8902222222222\n"
+        "Pan 40mg Tablet,Alkem,allopathy,PN-889,2027-06-30,30,90.00,72.00,3004,12.0,10,8904444444444\n"
+    )
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ExpiryGuard_Inventory_Import_Template.csv"}
+    )
 
 
 # ==========================================
