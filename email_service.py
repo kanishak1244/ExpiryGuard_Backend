@@ -40,7 +40,9 @@ def get_smtp_config() -> Dict[str, Any]:
         os.getenv("SMTP_USER")
         or os.getenv("SMTP_USERNAME")
         or os.getenv("MAIL_USERNAME")
-        or ""
+        or os.getenv("MY_EMAIL")
+        or os.getenv("ADMIN_EMAIL")
+        or "vashistkanishak9@gmail.com"
     ).strip().strip("'\"")
 
     password = (

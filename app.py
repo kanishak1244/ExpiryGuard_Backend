@@ -5770,7 +5770,7 @@ def create_pilot_lead(
         db.commit()
         db.refresh(new_lead)
 
-        # Dispatch immediate email alert to founder in background (non-blocking)
+        # Dispatch immediate email alert to founder synchronously with background fallback
         lead_dict = {
             "id": new_lead.id,
             "full_name": new_lead.full_name,
@@ -5782,7 +5782,14 @@ def create_pilot_lead(
             "biggest_problem": new_lead.biggest_problem,
             "created_at": new_lead.created_at.strftime("%d %b %Y, %I:%M %p UTC") if new_lead.created_at else datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC"),
         }
-        background_tasks.add_task(send_pilot_lead_notification, lead_data=lead_dict, lead_id=new_lead.id)
+        sent = False
+        try:
+            sent = send_pilot_lead_notification(lead_data=lead_dict, lead_id=new_lead.id)
+        except Exception as notify_err:
+            logger.warning(f"Synchronous pilot lead email dispatch failed: {notify_err}")
+
+        if not sent:
+            background_tasks.add_task(send_pilot_lead_notification, lead_data=lead_dict, lead_id=new_lead.id)
 
         return new_lead
     except Exception as e:
