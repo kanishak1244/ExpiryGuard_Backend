@@ -1,5 +1,5 @@
 /**
- * ExpiryGuard ERP — Refined Add Inventory Flow & Multi-Medicine Session Manager
+ * DawaiFlow ERP — Refined Add Inventory Flow & Multi-Medicine Session Manager
  */
 
 let inventoryCart = [];
@@ -29,49 +29,55 @@ function createAddInventoryModalDOM() {
 
   const modalHtml = `
   <div id="add-inventory-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 960px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-card" style="max-width: 920px; max-height: 88vh; overflow-y: auto; padding: 20px;">
       
       <!-- Modal Header -->
-      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 14px;">
         <div>
-          <h2 style="margin: 0; font-size: 20px; color: var(--dark-text);">+ Add Inventory Stock</h2>
-          <p style="font-size: 13px; color: var(--muted-text); margin: 4px 0 0 0;">Receive new stock from suppliers, parse bills, or search medicines manually.</p>
+          <h2 style="margin: 0; font-size: 19px; font-weight: 700; color: var(--dark-text);">+ Add Inventory Stock</h2>
+          <p style="font-size: 12.5px; color: var(--muted-text); margin: 3px 0 0 0;">Receive new stock from suppliers, parse bills, or search medicines manually.</p>
         </div>
         <button class="close-btn" onclick="closeAddInventoryModal()">&times;</button>
       </div>
 
       <!-- Step 1: Choice Hub (Scan Bill vs Search Medicine vs Bulk Excel) -->
-      <div id="inv-step-choice" style="display: block; padding: 24px 0;">
-        <h3 style="text-align: center; margin-bottom: 20px; color: var(--dark-text);">How would you like to add stock?</h3>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+      <div id="inv-step-choice" style="display: block; padding: 6px 0 14px 0;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px;">
           <!-- Option 1: Scan / Upload Bill -->
-          <div class="card" style="padding: 20px; text-align: center; cursor: pointer; border: 2px solid var(--border-color); transition: all 0.2s ease;"
+          <div class="card" style="padding: 16px 14px; text-align: center; cursor: pointer; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.15s ease; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 180px;"
                onclick="triggerScanBillOption()" onmouseover="this.style.borderColor='var(--primary-green)'" onmouseout="this.style.borderColor='var(--border-color)'">
-            <div style="font-size: 40px; margin-bottom: 8px;">📄</div>
-            <h3 style="margin-bottom: 6px; font-size: 16px;">Scan / Upload Bill</h3>
-            <p style="font-size: 12.5px; color: var(--muted-text); margin: 0;">Upload supplier invoice image or PDF. Dawaiflow AI extracts medicines, batches & prices.</p>
+            <div style="font-size: 34px; margin-bottom: 6px; line-height: 1;">📄</div>
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: var(--dark-text);">Scan / Upload Bill</h3>
+              <p style="font-size: 12px; color: var(--muted-text); margin: 0; line-height: 1.4;">Upload supplier invoice image or PDF. Dawaiflow AI extracts medicines, batches & prices.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top: 10px; font-size: 12px; font-weight: 600;" onclick="event.stopPropagation(); triggerScanBillOption();">📄 Select Invoice File</button>
           </div>
 
           <!-- Option 2: Search Medicine -->
-          <div class="card" style="padding: 20px; text-align: center; cursor: pointer; border: 2px solid var(--border-color); transition: all 0.2s ease;"
+          <div class="card" style="padding: 16px 14px; text-align: center; cursor: pointer; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.15s ease; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 180px;"
                onclick="showSearchMedicineStep()" onmouseover="this.style.borderColor='var(--primary-green)'" onmouseout="this.style.borderColor='var(--border-color)'">
-            <div style="font-size: 40px; margin-bottom: 8px;">🔎</div>
-            <h3 style="margin-bottom: 6px; font-size: 16px;">Search Medicine</h3>
-            <p style="font-size: 12.5px; color: var(--muted-text); margin: 0;">Search against 240,000+ Indian medicines database by name, brand, or generic composition.</p>
+            <div style="font-size: 34px; margin-bottom: 6px; line-height: 1;">🔎</div>
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: var(--dark-text);">Search Medicine</h3>
+              <p style="font-size: 12px; color: var(--muted-text); margin: 0; line-height: 1.4;">Search against 240,000+ Indian medicines database by name, brand, or generic composition.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top: 10px; font-size: 12px; font-weight: 600;" onclick="event.stopPropagation(); showSearchMedicineStep();">🔎 Search Database</button>
           </div>
 
           <!-- Option 3: Bulk Excel Import -->
-          <div class="card" style="padding: 20px; text-align: center; cursor: pointer; border: 2px solid var(--border-color); transition: all 0.2s ease;"
+          <div class="card" style="padding: 16px 14px; text-align: center; cursor: pointer; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.15s ease; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 180px;"
                onclick="showBulkImportStep()" onmouseover="this.style.borderColor='var(--primary-green)'" onmouseout="this.style.borderColor='var(--border-color)'">
-            <div style="font-size: 40px; margin-bottom: 8px;">📊</div>
-            <h3 style="margin-bottom: 6px; font-size: 16px;">Direct Excel / CSV Import</h3>
-            <p style="font-size: 12.5px; color: var(--muted-text); margin: 0 0 12px 0;">Onboard hundreds of stock batches directly from spreadsheet without AI processing.</p>
-            <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-              <button class="btn btn-primary" style="font-size: 12px; padding: 6px 12px;" onclick="event.stopPropagation(); showBulkImportStep();">
+            <div style="font-size: 34px; margin-bottom: 6px; line-height: 1;">📊</div>
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: var(--dark-text);">Direct Excel / CSV Import</h3>
+              <p style="font-size: 12px; color: var(--muted-text); margin: 0 0 8px 0; line-height: 1.4;">Onboard hundreds of stock batches directly from spreadsheet without AI processing.</p>
+            </div>
+            <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-primary btn-sm" style="font-size: 12px; font-weight: 600; padding: 5px 10px;" onclick="event.stopPropagation(); showBulkImportStep();">
                 📂 Upload File
               </button>
-              <a href="/api/inventory/import-template" download="ExpiryGuard_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation();">
+              <a href="/api/inventory/import-template" download="DawaiFlow_Inventory_Import_Template.xlsx" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; padding: 5px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation();">
                 <span>📥 Template</span>
               </a>
             </div>
@@ -83,7 +89,7 @@ function createAddInventoryModalDOM() {
       <div id="inv-step-bulk-import" style="display: none; padding: 16px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="showChoiceStep()">← Back to Options</button>
-          <a href="/api/inventory/import-template" download="ExpiryGuard_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+          <a href="/api/inventory/import-template" download="DawaiFlow_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
             <span>📥 Download Template (.xlsx)</span>
           </a>
         </div>
@@ -289,10 +295,10 @@ function createAddInventoryModalDOM() {
       </div>
 
       <!-- Step 4: Multi-Medicine Session Queue Summary -->
-      <div id="inv-step-queue-summary" style="margin-top: 20px; border-top: 2px solid var(--border-color); padding-top: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h4 style="margin: 0;"><span id="cart-item-count">0</span> Medicines Queued in Current Session</h4>
-          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="showSearchMedicineStep()">+ Add Another Medicine</button>
+      <div id="inv-step-queue-summary" style="margin-top: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; background: var(--bg-card, #fff);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--dark-text);"><span id="cart-item-count">0</span> Medicines Queued in Current Session</h4>
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 12px; font-weight: 600;" onclick="showSearchMedicineStep()">+ Add Another Medicine</button>
         </div>
 
         <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">
@@ -314,12 +320,12 @@ function createAddInventoryModalDOM() {
           </table>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--very-light-green); padding: 14px 20px; border-radius: var(--radius-md); margin-top: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--very-light-green, #F0FDF4); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid #BBF7D0; margin-top: 14px;">
           <div>
-            <span style="font-size: 13px; color: var(--muted-text);">Total Stock Value:</span>
-            <h3 id="cart-total-value" style="margin: 0; color: var(--primary-green);">₹0.00</h3>
+            <span style="font-size: 12px; color: var(--muted-text); font-weight: 600; text-transform: uppercase;">Total Stock Value:</span>
+            <h3 id="cart-total-value" style="margin: 2px 0 0 0; color: var(--primary-green); font-size: 18px; font-weight: 800;">₹0.00</h3>
           </div>
-          <button class="btn btn-primary" id="commit-inventory-btn" style="padding: 10px 24px; font-size: 15px;" onclick="commitInventorySession()" disabled>
+          <button class="btn btn-primary" id="commit-inventory-btn" style="padding: 9px 22px; font-size: 14px; font-weight: 700;" onclick="commitInventorySession()" disabled>
             Add All Medicines to Active Inventory
           </button>
         </div>
