@@ -144,9 +144,8 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">🧠 Smart Restock & Inventory Intelligence</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Know what to restock, what to clear, and what to return before stockouts or capital loss occur.</p>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <a href="inventory.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
             <span>📦 Live Inventory</span>
           </a>
@@ -160,41 +159,78 @@
 
       <main class="content-body">
         
+        <style>
+          .restock-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+          }
+          @media (max-width: 1024px) {
+            .restock-metrics-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+          @media (max-width: 640px) {
+            .restock-metrics-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
+          .restock-stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          }
+          .restock-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+          }
+        </style>
+
         <!-- Summary KPI Cards -->
-        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #DC2626;" onclick="filterPriority('CRITICAL_RESTOCK')">
-            <span class="stat-label" style="font-size: 11px;">Critical Restock</span>
-            <div class="stat-value" id="kpi-critical" style="font-size: 20px; color: #DC2626;">0</div>
+        <div class="restock-metrics-grid">
+          <div class="restock-stat-card" style="border-left: 4px solid #DC2626;" onclick="filterPriority('CRITICAL_RESTOCK')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Critical Restock</span>
+            <div class="stat-value" id="kpi-critical" style="font-size: 22px; font-weight: 800; color: #DC2626; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #D97706;" onclick="filterPriority('RESTOCK_SOON')">
-            <span class="stat-label" style="font-size: 11px;">Restock Soon</span>
-            <div class="stat-value" id="kpi-soon" style="font-size: 20px; color: #D97706;">0</div>
+          <div class="restock-stat-card" style="border-left: 4px solid #D97706;" onclick="filterPriority('RESTOCK_SOON')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Restock Soon</span>
+            <div class="stat-value" id="kpi-soon" style="font-size: 22px; font-weight: 800; color: #D97706; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #C2410C;" onclick="filterPriority('EXPIRY_RISK')">
-            <span class="stat-label" style="font-size: 11px;">Expiry Risk</span>
-            <div class="stat-value" id="kpi-expiry-risk" style="font-size: 20px; color: #C2410C;">0</div>
+          <div class="restock-stat-card" style="border-left: 4px solid #C2410C;" onclick="filterPriority('EXPIRY_RISK')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Expiry Risk</span>
+            <div class="stat-value" id="kpi-expiry-risk" style="font-size: 22px; font-weight: 800; color: #C2410C; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #3730A3;" onclick="filterPriority('SLOW_MOVING')">
-            <span class="stat-label" style="font-size: 11px;">Slow Moving</span>
-            <div class="stat-value" id="kpi-slow" style="font-size: 20px; color: #3730A3;">0</div>
+          <div class="restock-stat-card" style="border-left: 4px solid #3730A3;" onclick="filterPriority('SLOW_MOVING')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Slow Moving</span>
+            <div class="stat-value" id="kpi-slow" style="font-size: 22px; font-weight: 800; color: #3730A3; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #475569;" onclick="filterPriority('DEAD_STOCK')">
-            <span class="stat-label" style="font-size: 11px;">Dead Stock</span>
-            <div class="stat-value" id="kpi-dead" style="font-size: 20px; color: #475569;">0</div>
+          <div class="restock-stat-card" style="border-left: 4px solid #475569;" onclick="filterPriority('DEAD_STOCK')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Dead Stock</span>
+            <div class="stat-value" id="kpi-dead" style="font-size: 22px; font-weight: 800; color: #475569; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer; border-left: 4px solid #059669;" onclick="filterPriority('OVERSTOCK')">
-            <span class="stat-label" style="font-size: 11px;">Overstock</span>
-            <div class="stat-value" id="kpi-overstock" style="font-size: 20px; color: #059669;">0</div>
+          <div class="restock-stat-card" style="border-left: 4px solid #059669;" onclick="filterPriority('OVERSTOCK')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Overstock</span>
+            <div class="stat-value" id="kpi-overstock" style="font-size: 22px; font-weight: 800; color: #059669; margin-top: 4px;">0</div>
           </div>
         </div>
 
         <!-- Filter & Search Controls -->
         <div class="panel" style="margin-bottom: 16px; padding: 14px 18px;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <input type="text" id="restock-search" class="form-input" style="max-width: 260px;" placeholder="🔍 Search medicine or brand...">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1;">
+              <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted-text); pointer-events: none;">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="restock-search" class="form-input" style="padding-left: 32px; width: 100%; font-size: 13px; font-weight: 500;" placeholder="Search medicine or brand...">
+              </div>
               
-              <select id="filter-priority" class="form-input" style="width: auto;" onchange="applyFilters()">
+              <select id="filter-priority" class="form-input" style="width: auto; font-size: 13px; font-weight: 500;" onchange="applyFilters()">
                 <option value="ALL">All Priority Levels</option>
                 <option value="CRITICAL_RESTOCK">🔴 Critical Restock</option>
                 <option value="RESTOCK_SOON">🟡 Restock Soon</option>
@@ -204,11 +240,11 @@
                 <option value="OVERSTOCK">🟢 Overstock</option>
               </select>
 
-              <select id="filter-supplier" class="form-input" style="width: auto;" onchange="applyFilters()">
+              <select id="filter-supplier" class="form-input" style="width: auto; font-size: 13px; font-weight: 500;" onchange="applyFilters()">
                 <option value="">All Suppliers</option>
               </select>
 
-              <select id="filter-sort" class="form-input" style="width: auto;" onchange="applyFilters()">
+              <select id="filter-sort" class="form-input" style="width: auto; font-size: 13px; font-weight: 500;" onchange="applyFilters()">
                 <option value="priority">Ranked Priority (Recommended)</option>
                 <option value="urgency">Highest Urgency Score</option>
                 <option value="at_risk_value">Highest Value at Risk (₹)</option>
@@ -217,8 +253,8 @@
               </select>
             </div>
 
-            <div style="font-size: 13px; color: var(--muted-text);">
-              Showing <strong id="rec-count-display">0</strong> decisions
+            <div style="font-size: 13px; color: var(--muted-text); font-weight: 500;">
+              Showing <strong id="rec-count-display" style="color: var(--color-text-primary);">0</strong> decisions
             </div>
           </div>
         </div>
