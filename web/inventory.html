@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Inventory — ExpiryGuard Web App</title>
+  <title>Live Inventory — DawaiFlow Web App</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -46,7 +46,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -114,13 +114,12 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Live Inventory & Stock Management</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Manage active medicine stock, batch numbers, FEFO expiry tracking, and loose tablet pricing.</p>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <a href="smart_restock.html" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; border-color: #0D9488; color: #0D9488; font-weight: 600;" title="Open Smart Restock / Inventory Decision Engine">
             <span>🧠 Smart Restock</span>
           </a>
-          <a href="/api/inventory/import-template" download="ExpiryGuard_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Standardized Excel Import Template">
+          <a href="/api/inventory/import-template" download="DawaiFlow_Inventory_Import_Template.xlsx" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;" title="Download Standardized Excel Import Template">
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Template (.xlsx)</span>
           </a>
@@ -138,31 +137,62 @@
 
       <main class="content-body">
         
+        <style>
+          .inventory-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+          }
+          @media (max-width: 1024px) {
+            .inventory-metrics-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+          @media (max-width: 640px) {
+            .inventory-metrics-grid {
+              grid-template-columns: repeat(2, 1fr);
+            }
+          }
+          .inv-stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          }
+          .inv-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+          }
+        </style>
+
         <!-- Smart KPI Summary Cards -->
-        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('all')">
-            <span class="stat-label" style="font-size: 11px;">Total Products</span>
-            <div class="stat-value" id="kpi-total-products" style="font-size: 20px;">0</div>
+        <div class="inventory-metrics-grid">
+          <div class="inv-stat-card" onclick="setInventoryFilter('all')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Total Products</span>
+            <div class="stat-value" id="kpi-total-products" style="font-size: 22px; font-weight: 800; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('all')">
-            <span class="stat-label" style="font-size: 11px;">Stock Capital</span>
-            <div class="stat-value" id="kpi-stock-value" style="font-size: 20px; color: #0D9488;">₹0</div>
+          <div class="inv-stat-card" onclick="setInventoryFilter('all')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Stock Capital</span>
+            <div class="stat-value" id="kpi-stock-value" style="font-size: 22px; font-weight: 800; color: #0D9488; margin-top: 4px;">₹0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('expiring')">
-            <span class="stat-label" style="font-size: 11px;">Expiring 30d</span>
-            <div class="stat-value" id="kpi-expiring-soon" style="font-size: 20px; color: #D97706;">0</div>
+          <div class="inv-stat-card" onclick="setInventoryFilter('expiring')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Expiring 30d</span>
+            <div class="stat-value" id="kpi-expiring-soon" style="font-size: 22px; font-weight: 800; color: #D97706; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('expired')">
-            <span class="stat-label" style="font-size: 11px;">Expired</span>
-            <div class="stat-value" id="kpi-expired" style="font-size: 20px; color: #DC2626;">0</div>
+          <div class="inv-stat-card" onclick="setInventoryFilter('expired')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Expired</span>
+            <div class="stat-value" id="kpi-expired" style="font-size: 22px; font-weight: 800; color: #DC2626; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('lowstock')">
-            <span class="stat-label" style="font-size: 11px;">Low Stock</span>
-            <div class="stat-value" id="kpi-low-stock" style="font-size: 20px; color: #B45309;">0</div>
+          <div class="inv-stat-card" onclick="setInventoryFilter('lowstock')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Low Stock</span>
+            <div class="stat-value" id="kpi-low-stock" style="font-size: 22px; font-weight: 800; color: #B45309; margin-top: 4px;">0</div>
           </div>
-          <div class="stat-card" style="padding: 12px 14px; cursor: pointer;" onclick="setInventoryFilter('deadstock')">
-            <span class="stat-label" style="font-size: 11px;">Dead Stock</span>
-            <div class="stat-value" id="kpi-dead-stock" style="font-size: 20px; color: #4F46E5;">0</div>
+          <div class="inv-stat-card" onclick="setInventoryFilter('deadstock')">
+            <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Dead Stock</span>
+            <div class="stat-value" id="kpi-dead-stock" style="font-size: 22px; font-weight: 800; color: #4F46E5; margin-top: 4px;">0</div>
           </div>
         </div>
 
@@ -178,25 +208,33 @@
           
           <!-- Search & Filter Controls -->
           <div class="filter-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <input type="text" id="inventory-search" class="form-input" style="max-width: 280px;" placeholder="🔍 Search medicine or batch...">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1;">
+              <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted-text); pointer-events: none;">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="inventory-search" class="form-input" style="padding-left: 32px; width: 100%; font-size: 13px; font-weight: 500;" placeholder="Search medicine or batch...">
+              </div>
               
               <button class="filter-btn active" data-filter="all">All</button>
               <button class="filter-btn" data-filter="instock">In Stock</button>
               <button class="filter-btn" data-filter="lowstock">Low Stock (≤10)</button>
-              <button class="filter-btn" data-filter="expiring">Expiring Soon (≤60d)</button>
+              <button class="filter-btn" data-filter="expiring">Expiring 30d</button>
+              <button class="filter-btn" data-filter="expiry_risk">Expiry Risk (≤60d)</button>
               <button class="filter-btn" data-filter="expired">Expired</button>
+              <button class="filter-btn" data-filter="deadstock">Dead Stock (90d+)</button>
             </div>
 
             <!-- Inventory Action Buttons -->
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <button id="btn-delete-selected" class="btn btn-secondary" style="display: none; color: #DC2626; border-color: #FCA5A5; font-weight: 600;" onclick="openDeleteSelectedModal()">
                 🗑️ Delete Selected (<span id="selected-count">0</span>)
               </button>
               <button id="btn-delete-all" class="btn btn-secondary" style="color: #DC2626; border-color: #E2E8F0;" onclick="openDeleteAllModal()">
                 ⚠️ Delete All Stock
               </button>
-              <a href="settings.html#deleted-stock" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px;">
+              <a href="settings.html#deleted-stock" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; text-decoration: none;">
                 <span>♻️ Recently Deleted</span>
               </a>
             </div>
@@ -207,16 +245,16 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 44px; text-align: center;">
+                  <th style="width: 40px; text-align: center;">
                     <input type="checkbox" id="select-all-stock" style="cursor: pointer; width: 16px; height: 16px;" onchange="toggleSelectAllStock(this)" title="Select All Medicines">
                   </th>
-                  <th>Medicine Name</th>
-                  <th>Batch No.</th>
-                  <th>Quantity / Stock</th>
-                  <th>MRP / Unit Price</th>
-                  <th>Expiry Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th style="min-width: 220px;">Medicine Name</th>
+                  <th style="width: 120px;">Batch No.</th>
+                  <th style="width: 130px;">Quantity / Stock</th>
+                  <th style="width: 120px; text-align: right;">MRP / Unit Price</th>
+                  <th style="width: 110px; text-align: center;">Expiry Date</th>
+                  <th style="width: 120px; text-align: center;">Status</th>
+                  <th style="width: 100px; text-align: center;">Actions</th>
                 </tr>
               </thead>
               <tbody id="inventory-table-body">
