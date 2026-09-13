@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create New Bill — ExpiryGuard</title>
+  <title>Create New Bill — DawaiFlow</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -46,7 +46,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -148,31 +148,31 @@
         <div class="billing-grid-header">
           <!-- Customer Selection -->
           <div>
-            <label class="form-label" style="font-weight: 600;">Customer / Patient Party</label>
-            <select id="bill-customer-select" class="form-input" onchange="handleCustomerSelectChange(this.value)"></select>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Customer / Patient Party</label>
+            <select id="bill-customer-select" class="form-input" style="font-size: 13.5px; font-weight: 500;" onchange="handleCustomerSelectChange(this.value)"></select>
           </div>
 
           <!-- Invoice Number -->
           <div>
-            <label class="form-label" style="font-weight: 600;">Invoice No</label>
-            <input type="text" id="bill-invoice-number-input" class="form-input" value="" oninput="activeBillState.invoiceNumber = this.value">
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Invoice No</label>
+            <input type="text" id="bill-invoice-number-input" class="form-input" style="font-size: 13.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;" value="" oninput="activeBillState.invoiceNumber = this.value">
           </div>
 
           <!-- Invoice Date -->
           <div>
-            <label class="form-label" style="font-weight: 600;">Date</label>
-            <input type="date" id="bill-invoice-date-input" class="form-input" value="" onchange="activeBillState.invoiceDate = this.value">
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Date</label>
+            <input type="date" id="bill-invoice-date-input" class="form-input" style="font-size: 13.5px; font-weight: 500;" value="" onchange="activeBillState.invoiceDate = this.value">
           </div>
 
           <!-- Payment Mode Toggle -->
           <div>
-            <label class="form-label" style="font-weight: 600;">Payment Mode</label>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Payment Mode</label>
             <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')" style="flex: 1; padding: 7px 0; font-size: 12px;">💵 Cash</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')" style="flex: 1; padding: 7px 0; font-size: 12px;">📱 UPI</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CARD" onclick="handlePaymentModeChange('CARD')" style="flex: 1; padding: 7px 0; font-size: 12px;">💳 Card</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')" style="flex: 1; padding: 7px 0; font-size: 12px;">📒 Credit</button>
-              <button type="button" class="btn btn-secondary pay-mode-btn" id="pay-mode-split-btn" data-mode="SPLIT" onclick="openSplitPaymentModal()" style="flex: 1.2; padding: 7px 0; font-size: 12px;">✂️ Split</button>
+              <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">💵 Cash</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">📱 UPI</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CARD" onclick="handlePaymentModeChange('CARD')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">💳 Card</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">📒 Credit</button>
+              <button type="button" class="btn btn-secondary pay-mode-btn" id="pay-mode-split-btn" data-mode="SPLIT" onclick="openSplitPaymentModal()" style="flex: 1.2; padding: 7px 0; font-size: 12px; font-weight: 600;">✂️ Split</button>
             </div>
             <!-- Split Payment Summary Badge -->
             <div id="split-payment-summary-strip" style="display: none; margin-top: 8px; padding: 6px 12px; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: var(--radius-md); font-size: 12px; color: #3730A3; justify-content: space-between; align-items: center;">
@@ -201,8 +201,12 @@
 
           <div style="display: flex; gap: 8px; align-items: center;">
             <div style="position: relative; flex: 1;">
-              <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 64px 12px 16px; border-radius: var(--radius-md); width: 100%; box-sizing: border-box;"
-                     placeholder="Type medicine name…"
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; z-index: 3;">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 64px 12px 42px; border-radius: var(--radius-md); width: 100%; box-sizing: border-box; font-weight: 500;"
+                     placeholder="Search medicine by name, composition or barcode…"
                      oninput="handleMedicineSearchInput(this.value)" autocomplete="off" autofocus>
               <button type="button" id="bill-search-clear-btn" class="search-clear-btn" onclick="clearMedicineSearch()" title="Clear search" style="display: none;">&times;</button>
               <div id="bill-search-loading-spinner" class="search-spinner-inline" style="display: none;"></div>
@@ -265,9 +269,9 @@
 
         <!-- Section 3: Full Desktop Width Running Items Table -->
         <div class="panel" style="margin-bottom: 20px;">
-          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="panel-title" style="font-size: 15px;">Billed Line Items</h2>
-            <span id="bill-item-count-badge" class="badge badge-info" style="font-size: 12px;">0 lines • 0 units</span>
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px;">
+            <h2 class="panel-title" style="font-size: 15px; font-weight: 700;">Billed Line Items</h2>
+            <span id="bill-item-count-badge" class="badge badge-info" style="font-size: 12px; font-weight: 600;">0 lines • 0 units</span>
           </div>
 
           <div class="table-responsive">
@@ -288,7 +292,14 @@
                 </tr>
               </thead>
               <tbody id="bill-items-table-body">
-                <tr><td colspan="11" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">Loading bill items...</td></tr>
+                <tr>
+                  <td colspan="11" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">
+                    <div style="font-size: 28px; margin-bottom: 8px; opacity: 0.8;">💊</div>
+                    <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary);">No medicines added yet</div>
+                    <div style="font-size: 13px; margin-top: 4px; color: var(--color-text-muted);">Search for a medicine above to start the bill.</div>
+                    <div style="font-size: 11.5px; margin-top: 6px; color: var(--color-text-muted); opacity: 0.85;">⚡ Medicines are automatically selected in FEFO order.</div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -315,39 +326,44 @@
             <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
               <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
                 <span style="color: var(--color-text-muted);">Subtotal (Taxable):</span>
-                <span id="bill-subtotal-val" style="font-weight: 600;">₹0.00</span>
+                <span id="bill-subtotal-val" style="font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;">₹0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
                 <span style="color: var(--color-text-muted);">Bill Discount:</span>
-                <span id="bill-discount-amount-val" style="font-weight: 600; color: #059669;">- ₹0.00</span>
+                <span id="bill-discount-amount-val" style="font-weight: 600; color: #059669; font-family: 'JetBrains Mono', monospace, sans-serif;">- ₹0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
                 <span style="color: var(--color-text-muted);">CGST Tax:</span>
-                <span id="bill-cgst-val" style="font-weight: 600;">₹0.00</span>
+                <span id="bill-cgst-val" style="font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;">₹0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
                 <span style="color: var(--color-text-muted);">SGST Tax:</span>
-                <span id="bill-sgst-val" style="font-weight: 600;">₹0.00</span>
+                <span id="bill-sgst-val" style="font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;">₹0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13.5px;">
                 <span style="color: var(--color-text-muted);">Round-Off:</span>
-                <span id="bill-roundoff-val" style="font-weight: 600; color: var(--color-text-muted);">+₹0.00</span>
+                <span id="bill-roundoff-val" style="font-weight: 600; color: var(--color-text-muted); font-family: 'JetBrains Mono', monospace, sans-serif;">+₹0.00</span>
               </div>
-              <div style="border-top: 2px solid var(--color-border); padding-top: 10px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 17px; font-weight: 800; color: var(--color-text-primary);">Grand Total:</span>
-                <span id="bill-grand-total-val" style="font-size: 24px; font-weight: 800; color: var(--status-safe);">₹0.00</span>
+              
+              <!-- Highlighted Grand Total Card -->
+              <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 12px 16px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <span style="font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-primary); display: block;">Grand Total</span>
+                  <span style="font-size: 11px; color: var(--color-text-muted);">Inclusive of all taxes & discounts</span>
+                </div>
+                <span id="bill-grand-total-val" style="font-size: 26px; font-weight: 800; color: #059669; font-family: 'JetBrains Mono', monospace, sans-serif;">₹0.00</span>
               </div>
             </div>
 
             <!-- Action Buttons -->
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-              <button type="button" class="btn btn-warning" style="background: #ea580c; color: white; border: none; padding: 11px 20px; font-weight: 700; font-size: 13.5px;" onclick="holdCurrentBill()">
+            <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="button" class="btn btn-warning" style="background: #ea580c; color: white; border: none; padding: 11px 20px; font-weight: 700; font-size: 13.5px; border-radius: var(--radius-md);" onclick="holdCurrentBill()">
                 ⏸️ Hold Bill
               </button>
-              <button type="button" class="btn btn-secondary" style="padding: 11px 22px; font-weight: 600; font-size: 13.5px;" onclick="commitBillTransaction(false, true)">
+              <button type="button" class="btn btn-secondary" style="padding: 11px 22px; font-weight: 600; font-size: 13.5px; border-radius: var(--radius-md);" onclick="commitBillTransaction(false, true)">
                 Save & New Bill
               </button>
-              <button type="button" class="btn btn-primary" id="bill-save-print-btn" style="padding: 11px 28px; font-size: 14.5px; font-weight: 700;" onclick="commitBillTransaction(true, false)">
+              <button type="button" class="btn btn-primary" id="bill-save-print-btn" style="padding: 11px 28px; font-size: 14.5px; font-weight: 700; border-radius: var(--radius-md);" onclick="commitBillTransaction(true, false)">
                 🖨️ Save & Print GST Invoice
               </button>
             </div>

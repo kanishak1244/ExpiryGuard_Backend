@@ -270,8 +270,8 @@ function setBillingSearchMode(mode) {
   if (searchInput) {
     searchInput.value = '';
     searchInput.placeholder = (currentBillingSearchMode === 'code')
-      ? 'Type medicine code / barcode…'
-      : 'Type medicine name…';
+      ? 'Search medicine by code or barcode…'
+      : 'Search medicine by name, composition or barcode…';
     searchInput.focus();
   }
 
@@ -699,9 +699,10 @@ function renderBillItemsTable() {
     tbody.innerHTML = `
       <tr>
         <td colspan="11" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">
-          <div style="font-size: 32px; margin-bottom: 8px;">🛒</div>
-          <div style="font-weight: 600; font-size: 14px;">No medicines in active bill</div>
-          <div style="font-size: 12px; margin-top: 4px;">Type medicine name or salt in the search box above to add items via FEFO order.</div>
+          <div style="font-size: 28px; margin-bottom: 8px; opacity: 0.8;">💊</div>
+          <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary);">No medicines added yet</div>
+          <div style="font-size: 13px; margin-top: 4px; color: var(--color-text-muted);">Search for a medicine above to start the bill.</div>
+          <div style="font-size: 11.5px; margin-top: 6px; color: var(--color-text-muted); opacity: 0.85;">⚡ Medicines are automatically selected in FEFO order.</div>
         </td>
       </tr>
     `;
@@ -820,6 +821,9 @@ function handleItemBatchChange(index, batchNumber) {
   if (!item) return;
   const bData = item.batches.find(b => b.batchNumber === batchNumber);
   if (bData) {
+    if (bData.productId) {
+      item.productId = bData.productId;
+    }
     item.selectedBatch = batchNumber;
     item.expiryDate = bData.expiryDate;
     item.availableStock = bData.stock;
