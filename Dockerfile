@@ -68,5 +68,5 @@ USER dawaiflow
 
 EXPOSE 8000
 
-# Production entrypoint using Uvicorn ASGI server
-CMD uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'
+# Production entrypoint using Uvicorn ASGI server with absolute venv path and dynamic $PORT expansion
+CMD ["sh", "-c", "exec /opt/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'"]
