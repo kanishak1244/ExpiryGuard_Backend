@@ -10,16 +10,14 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required. Please set it in Railway variables.")
-
-# Sanitize common input mistakes (accidental quotes, whitespace, or KEY= prefix)
-DATABASE_URL = DATABASE_URL.strip().strip("'\"")
-if DATABASE_URL.startswith("DATABASE_URL="):
-    DATABASE_URL = DATABASE_URL[len("DATABASE_URL="):].strip().strip("'\"")
-
-if DATABASE_URL.startswith("<") or "your_supabase" in DATABASE_URL.lower():
-    raise RuntimeError("DATABASE_URL contains an example placeholder (<your_supabase_postgresql_connection_string>). Please paste your real Supabase connection string.")
+if not DATABASE_URL or DATABASE_URL.startswith("<") or "your_supabase" in DATABASE_URL.lower():
+    print("[Startup Warning] DATABASE_URL missing or placeholder; defaulting to local SQLite database.")
+    DATABASE_URL = f"sqlite:///{(BASE_DIR / 'dawaiflow.db').resolve()}"
+else:
+    # Sanitize common input mistakes (accidental quotes, whitespace, or KEY= prefix)
+    DATABASE_URL = DATABASE_URL.strip().strip("'\"")
+    if DATABASE_URL.startswith("DATABASE_URL="):
+        DATABASE_URL = DATABASE_URL[len("DATABASE_URL="):].strip().strip("'\"")
 
 # Auto-normalize standard postgresql scheme
 if DATABASE_URL.startswith("postgres://"):
@@ -65,3 +63,19 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
+def ensure_return_columns():
+    """
+    Idempotent schema migration ensuring sales and sale_items relations have return tracking columns.
+    """
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS total_returned_amount DOUBLE PRECISION DEFAULT 0.0;"))
+            conn.execute(text("ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS returned_quantity INTEGER DEFAULT 0;"))
+    except Exception as e:
+        print(f"[!] Schema migration note: {e}")
+
+# Column migration helper - call on demand if needed
+# ensure_return_columns()
+
