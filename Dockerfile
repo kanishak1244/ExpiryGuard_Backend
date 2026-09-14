@@ -48,8 +48,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     VIRTUAL_ENV="/opt/venv" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH="/app" \
-    PORT=8000
+    PYTHONPATH="/app"
 
 # Create unprivileged system user for secure application execution
 RUN groupadd -g 10001 dawaiflow && \
