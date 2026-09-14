@@ -2,7 +2,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 
 // Determine production web URL from environment or official default
-const PRODUCTION_WEB_URL = process.env.DAWAIFLOW_WEB_URL || 'https://app.dawaiflow.com';
+const PRODUCTION_WEB_URL = process.env.DAWAIFLOW_WEB_URL || 'https://api.dawaiflow.com/web/';
 const ALLOWED_DOMAINS = ['app.dawaiflow.com', 'api.dawaiflow.com', 'dawaiflow.com', 'localhost', '127.0.0.1'];
 
 let mainWindow = null;
