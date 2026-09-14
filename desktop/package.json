@@ -1,0 +1,46 @@
+{
+  "name": "dawaiflow-desktop",
+  "version": "1.0.0",
+  "description": "DawaiFlow Windows Desktop Client & Installer",
+  "main": "main.js",
+  "author": "DawaiFlow Team",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0"
+  },
+  "build": {
+    "appId": "com.dawaiflow.desktop",
+    "productName": "DawaiFlow",
+    "copyright": "Copyright © 2026 DawaiFlow",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DawaiFlow",
+      "artifactName": "DawaiFlow-Setup.exe",
+      "uninstallDisplayName": "DawaiFlow"
+    }
+  }
+}

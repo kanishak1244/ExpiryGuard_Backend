@@ -64,6 +64,10 @@ _backup/
 !public_site/**/*.svg
 !web/assets/**
 
+# Un-ignore desktop wrapper configuration & assets
+!desktop/package.json
+!desktop/assets/**
+
 # OS Artifacts
 .DS_Store
 Thumbs.db
