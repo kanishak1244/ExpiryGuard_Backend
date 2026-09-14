@@ -269,88 +269,21 @@ def warmup_database():
     try:
         from database import SessionLocal, Base, engine
         from sqlalchemy import text
-        import crud
-        import models
         from scheduler import start_scheduler
         
-        # Ensure schema tables exist on application startup
+        # 1. Quick table schema creation
         try:
             Base.metadata.create_all(bind=engine)
         except Exception as schema_err:
             logger.warning(f"[Startup] Schema creation notice: {schema_err}")
 
-        # Start background schedulers (expiry notifications, automated backups)
+        # 2. Quick scheduler launch
         try:
             start_scheduler()
         except Exception as sched_err:
             logger.warning(f"[Startup] Scheduler start notice: {sched_err}")
 
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        print("[Startup] Database connection pool pre-warmed.")
-
-        # Automated Database Migration: Ensure GIN Trigram Search Indexes & Composite Performance Indexes exist on startup
-        try:
-            db.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_name ON products USING gin (product_name gin_trgm_ops);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_brand ON products USING gin (brand gin_trgm_ops);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_comp ON products USING gin (composition gin_trgm_ops);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_name_prefix ON products (user_id, lower(product_name) varchar_pattern_ops) WHERE is_deleted = false;"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_brand_prefix ON products (user_id, lower(brand) varchar_pattern_ops) WHERE is_deleted = false;"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_name ON medicine_catalog USING gin (product_name gin_trgm_ops);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_brand ON medicine_catalog USING gin (brand gin_trgm_ops);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_comp ON medicine_catalog USING gin (composition gin_trgm_ops);"))
-
-            # Composite Performance Indexes for instant dashboard & reporting queries
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_user_created ON sales (user_id, created_at DESC);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_user_status ON sales (user_id, payment_status);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_deleted_exp ON products (user_id, is_deleted, quantity, expiry_date);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_sale_items_sale_prod ON sale_items (sale_id, product_id);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_customers_user_pending ON customers (user_id, pending_amount);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_purchases_user_created ON purchase_invoices (user_id, created_at DESC);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_sale_returns_user_created ON sale_returns (user_id, created_at DESC);"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_supplier_payments_user ON supplier_payments (user_id);"))
-
-            # Split payments migration
-            db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_split_payment BOOLEAN DEFAULT FALSE;"))
-            db.execute(text("ALTER TABLE held_bills ADD COLUMN IF NOT EXISTS split_payments_json TEXT;"))
-            db.execute(text("""
-                CREATE TABLE IF NOT EXISTS sale_payments (
-                    id SERIAL PRIMARY KEY,
-                    sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-                    user_id INTEGER NOT NULL REFERENCES users(id),
-                    payment_method VARCHAR NOT NULL,
-                    amount DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
-                );
-                CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(sale_id);
-                CREATE INDEX IF NOT EXISTS idx_sale_payments_user_id ON sale_payments(user_id);
-            """))
-
-            # Multi-User RBAC & Staff Login migration
-            db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS username VARCHAR;"))
-            db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS password VARCHAR;"))
-            db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS permissions_json TEXT;"))
-            db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITHOUT TIME ZONE;"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_staff_members_username ON staff_members(username);"))
-            db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES staff_members(id);"))
-            db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_name VARCHAR;"))
-            db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_staff_id ON sales(staff_id);"))
-            # Pilot leads notification tracking schema
-            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'PENDING';"))
-            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_error TEXT;"))
-            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notified_at TIMESTAMP WITHOUT TIME ZONE;"))
-            db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_provider VARCHAR(50);"))
-            db.commit()
-            print("[Startup] Permanent GIN Trigram search indexes, composite performance indexes & RBAC schema verified/created.")
-        except Exception as idx_err:
-            db.rollback()
-            logger.warning(f"[Startup] Search index / performance migration notice: {idx_err}")
-        
-        db.close()
-        print("[Startup] Database pre-warmed and ready.")
-
-        # Check and log Email Service readiness
+        # 3. Quick SMTP health check
         try:
             smtp_status = check_smtp_health(probe_network=False)
             if smtp_status.get("is_configured"):
@@ -363,7 +296,7 @@ def warmup_database():
         except Exception as smtp_err:
             logger.warning(f"[Startup] SMTP health check notice: {smtp_err}")
 
-        # Pre-warm caches and OCR in background thread
+        # 4. Offload heavy DDL migrations & index creation to background thread so Uvicorn binds port 8000 instantly (< 10ms)
         def _background_warmup():
             try:
                 from database import SessionLocal
@@ -371,6 +304,64 @@ def warmup_database():
                 import models
                 bg_db = SessionLocal()
                 try:
+                    # Index & Schema migrations
+                    try:
+                        bg_db.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_name ON products USING gin (product_name gin_trgm_ops);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_brand ON products USING gin (brand gin_trgm_ops);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_trgm_comp ON products USING gin (composition gin_trgm_ops);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_name_prefix ON products (user_id, lower(product_name) varchar_pattern_ops) WHERE is_deleted = false;"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_brand_prefix ON products (user_id, lower(brand) varchar_pattern_ops) WHERE is_deleted = false;"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_name ON medicine_catalog USING gin (product_name gin_trgm_ops);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_brand ON medicine_catalog USING gin (brand gin_trgm_ops);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_comp ON medicine_catalog USING gin (composition gin_trgm_ops);"))
+
+                        # Composite Performance Indexes for instant dashboard & reporting queries
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_user_created ON sales (user_id, created_at DESC);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_user_status ON sales (user_id, payment_status);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_products_user_deleted_exp ON products (user_id, is_deleted, quantity, expiry_date);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sale_items_sale_prod ON sale_items (sale_id, product_id);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_customers_user_pending ON customers (user_id, pending_amount);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_purchases_user_created ON purchase_invoices (user_id, created_at DESC);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sale_returns_user_created ON sale_returns (user_id, created_at DESC);"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_supplier_payments_user ON supplier_payments (user_id);"))
+
+                        # Split payments migration
+                        bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_split_payment BOOLEAN DEFAULT FALSE;"))
+                        bg_db.execute(text("ALTER TABLE held_bills ADD COLUMN IF NOT EXISTS split_payments_json TEXT;"))
+                        bg_db.execute(text("""
+                            CREATE TABLE IF NOT EXISTS sale_payments (
+                                id SERIAL PRIMARY KEY,
+                                sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+                                user_id INTEGER NOT NULL REFERENCES users(id),
+                                payment_method VARCHAR NOT NULL,
+                                amount DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                                created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_sale_payments_sale_id ON sale_payments(sale_id);
+                            CREATE INDEX IF NOT EXISTS idx_sale_payments_user_id ON sale_payments(user_id);
+                        """))
+
+                        # Multi-User RBAC & Staff Login migration
+                        bg_db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS username VARCHAR;"))
+                        bg_db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS password VARCHAR;"))
+                        bg_db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS permissions_json TEXT;"))
+                        bg_db.execute(text("ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITHOUT TIME ZONE;"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_staff_members_username ON staff_members(username);"))
+                        bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES staff_members(id);"))
+                        bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_name VARCHAR;"))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_staff_id ON sales(staff_id);"))
+                        # Pilot leads notification tracking schema
+                        bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'PENDING';"))
+                        bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_error TEXT;"))
+                        bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notified_at TIMESTAMP WITHOUT TIME ZONE;"))
+                        bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_provider VARCHAR(50);"))
+                        bg_db.commit()
+                        print("[Startup] Background GIN Trigram search indexes & RBAC schema verified.")
+                    except Exception as idx_err:
+                        bg_db.rollback()
+                        logger.warning(f"[Startup] Background migration notice: {idx_err}")
+
                     active_user_ids = [r[0] for r in bg_db.query(models.User.id).limit(10).all()]
                     for uid in active_user_ids:
                         try:
@@ -386,6 +377,7 @@ def warmup_database():
 
         import threading
         threading.Thread(target=_background_warmup, daemon=True).start()
+        print("[Startup] Non-blocking database warmup complete. Uvicorn port 8000 ready.")
     except Exception as e:
         print(f"[Startup] DB warmup warning: {e}")
 
