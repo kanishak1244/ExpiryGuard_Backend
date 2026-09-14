@@ -439,6 +439,24 @@ app.add_middleware(SlowAPIMiddleware)
 security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def safe_verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Safely verifies passwords, handling passlib exceptions or legacy plain-text password fallback without crashing with HTTP 500."""
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        if pwd_context.verify(plain_password, hashed_password):
+            return True
+    except Exception as exc:
+        logger.warning(f"[Auth Notice] Passlib verify exception: {exc}")
+
+    try:
+        if plain_password.strip() == hashed_password.strip():
+            return True
+    except Exception:
+        pass
+
+    return False
+
 # Cryptographic Security Configuration & Startup Validation
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
@@ -893,7 +911,7 @@ def login(
 
     # 1. First attempt Pharmacy Owner login by email
     db_user = db.query(models.User).filter(models.User.email.ilike(login_identifier)).first()
-    if db_user and pwd_context.verify(user.password, db_user.password):
+    if db_user and safe_verify_password(user.password, db_user.password):
         expire_time = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
         token = jwt.encode(
             {
@@ -936,7 +954,7 @@ def login(
         (models.StaffMember.phone == login_identifier)
     ).first()
 
-    if staff and staff.password and pwd_context.verify(user.password, staff.password):
+    if staff and staff.password and safe_verify_password(user.password, staff.password):
         if (staff.status or "ACTIVE").upper() != "ACTIVE":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1050,7 +1068,7 @@ def login_token_alias(
 
     # 1. Owner check
     db_user = db.query(models.User).filter(models.User.email.ilike(login_id)).first()
-    if db_user and pwd_context.verify(form_data.password, db_user.password):
+    if db_user and safe_verify_password(form_data.password, db_user.password):
         expire_time = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
         token = jwt.encode(
             {
@@ -1073,7 +1091,7 @@ def login_token_alias(
         (models.StaffMember.phone == login_id)
     ).first()
 
-    if staff and staff.password and pwd_context.verify(form_data.password, staff.password):
+    if staff and staff.password and safe_verify_password(form_data.password, staff.password):
         if (staff.status or "ACTIVE").upper() != "ACTIVE":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
