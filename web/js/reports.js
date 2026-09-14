@@ -128,11 +128,12 @@ window.ReportsApp = {
     const elStockCost = document.getElementById('rep-stock-cost');
     const elStockMrp = document.getElementById('rep-stock-mrp-sub');
     if (elStockCost) elStockCost.textContent = this.formatCurrency(inv.cost_value);
-    if (elStockMrp) elStockMrp.textContent = `MRP: ${this.formatCurrency(inv.mrp_value)}`;
+    if (elStockMrp) elStockMrp.textContent = `MRP Value: ${this.formatCurrency(inv.mrp_value)}`;
 
     const elExpiring = document.getElementById('rep-expiring-count');
     const elExpiryRisk = document.getElementById('rep-expiry-risk-sub');
-    if (elExpiring) elExpiring.textContent = inv.expiring_soon_count || 0;
+    const expCount = inv.expiring_soon_count || 0;
+    if (elExpiring) elExpiring.textContent = `${expCount} ${expCount === 1 ? 'Batch' : 'Batches'}`;
     if (elExpiryRisk) elExpiryRisk.textContent = `${this.formatCurrency(inv.expiry_risk_value)} at Risk`;
 
     const elReceivables = document.getElementById('rep-receivables');
@@ -140,10 +141,22 @@ window.ReportsApp = {
     if (elReceivables) elReceivables.textContent = this.formatCurrency(rp.total_receivables);
     if (elPayables) elPayables.textContent = `Payables: ${this.formatCurrency(rp.total_payables)}`;
 
-    // 2. Actionable Insights Banner
+    // 2. Actionable Expiry Loss Risk Warning Banner
     const banner = document.getElementById('insights-banner');
     if (banner) {
-      if (insights && insights.length > 0) {
+      const riskVal = Number(inv.expiry_risk_value || 0);
+      const riskCount = Number(inv.expiring_soon_count || 0);
+
+      if (riskVal > 0 || riskCount > 0) {
+        document.getElementById('insight-title').textContent = 'Expiry Loss Risk Warning';
+        document.getElementById('insight-message').textContent = `${this.formatCurrency(riskVal)} at risk across ${riskCount} batch(es) expiring within 30 days.`;
+        const link = document.getElementById('insight-action-link');
+        if (link) {
+          link.textContent = 'Review Expiry Risk';
+          link.href = 'inventory.html?filter=expiring';
+        }
+        banner.style.display = 'flex';
+      } else if (insights && insights.length > 0) {
         const topInsight = insights[0];
         document.getElementById('insight-title').textContent = topInsight.title || 'Attention Needed';
         document.getElementById('insight-message').textContent = topInsight.message || '';
@@ -179,7 +192,7 @@ window.ReportsApp = {
     if (!container) return;
 
     if (!salesTrend || salesTrend.length === 0) {
-      container.innerHTML = `<div style="margin: auto; color: var(--color-text-muted); font-size: 13px;">No sales or purchase data recorded for this period.</div>`;
+      container.innerHTML = `<div style="margin: auto; text-align: center; padding: 40px 20px; color: var(--color-text-muted); font-size: 13px;">No sales or purchase activity for this period.</div>`;
       return;
     }
 
@@ -189,11 +202,20 @@ window.ReportsApp = {
     }
 
     let maxVal = 100;
+    let totalSales = 0;
+    let totalPurchases = 0;
     salesTrend.forEach(s => {
       const pVal = purchasesMap[s.date] || 0;
+      totalSales += (s.sales || 0);
+      totalPurchases += pVal;
       if (s.sales > maxVal) maxVal = s.sales;
       if (pVal > maxVal) maxVal = pVal;
     });
+
+    if (totalSales === 0 && totalPurchases === 0) {
+      container.innerHTML = `<div style="margin: auto; text-align: center; padding: 40px 20px; color: var(--color-text-muted); font-size: 13px;">No sales or purchase activity for this period.</div>`;
+      return;
+    }
 
     container.innerHTML = salesTrend.map(s => {
       const pAmt = purchasesMap[s.date] || 0;

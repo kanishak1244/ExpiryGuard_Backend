@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports & Analytics — ExpiryGuard ERP</title>
+  <title>Reports & Analytics — DawaiFlow ERP</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -183,9 +183,6 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Reports & Analytics</h1>
-          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
-            Comprehensive sales turnover, purchase analysis, profit margins, inventory valuation, and GST overview.
-          </p>
         </div>
         
         <div class="topbar-right">
@@ -229,16 +226,16 @@
           </div>
         </div>
 
-        <!-- Actionable Insights Banner (if alerts exist) -->
+        <!-- Actionable Expiry Loss Risk Warning Banner -->
         <div class="insight-alert-box" id="insights-banner" style="display: none;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">💡</span>
+            <span style="font-size: 20px;">⚠️</span>
             <div>
-              <strong id="insight-title" style="color: var(--color-text-primary); font-size: 13.5px;"></strong>
+              <strong id="insight-title" style="color: var(--color-text-primary); font-size: 13.5px;">Expiry Loss Risk Warning</strong>
               <div id="insight-message" style="font-size: 12.5px; color: var(--color-text-secondary); margin-top: 2px;"></div>
             </div>
           </div>
-          <a id="insight-action-link" href="#" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">View</a>
+          <a id="insight-action-link" href="inventory.html?filter=expiring" class="btn btn-secondary" style="font-size: 12px; padding: 4px 12px; text-decoration: none; font-weight: 600;">Review Expiry Risk</a>
         </div>
 
         <!-- High-Level Financial & Operational KPI Grid -->
@@ -246,7 +243,7 @@
           <div class="kpi-card">
             <span class="kpi-title">Gross Sales Revenue</span>
             <div class="kpi-num" id="rep-total-sales" style="color: var(--status-safe, #10B981);">₹0.00</div>
-            <div class="kpi-desc" id="rep-bills-sub">0 Bills (Avg ₹0)</div>
+            <div class="kpi-desc" id="rep-bills-sub">0 Bills (Avg ₹0.00)</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-title">Gross Profit</span>
@@ -256,21 +253,21 @@
           <div class="kpi-card">
             <span class="kpi-title">Total Purchases</span>
             <div class="kpi-num" id="rep-total-purchases">₹0.00</div>
-            <div class="kpi-desc" id="rep-purchases-sub">0 Purchase Invoices</div>
+            <div class="kpi-desc" id="rep-purchases-sub">0 Invoices (Avg ₹0.00)</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-title">Inventory Valuation (Cost)</span>
             <div class="kpi-num" id="rep-stock-cost">₹0.00</div>
-            <div class="kpi-desc" id="rep-stock-mrp-sub">MRP: ₹0.00</div>
+            <div class="kpi-desc" id="rep-stock-mrp-sub">MRP Value: ₹0.00</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-title">Expiring Soon (≤30d)</span>
             <div class="kpi-num" id="rep-expiring-count" style="color: var(--status-warning, #F59E0B);">0</div>
-            <div class="kpi-desc" id="rep-expiry-risk-sub">₹0 at Risk</div>
+            <div class="kpi-desc" id="rep-expiry-risk-sub">₹0.00 at Risk</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-title">Khata Receivables</span>
-            <div class="kpi-num" id="rep-receivables">₹0.00</div>
+            <div class="kpi-num" id="rep-receivables" style="color: #10B981;">₹0.00</div>
             <div class="kpi-desc" id="rep-payables-sub">Payables: ₹0.00</div>
           </div>
         </div>
