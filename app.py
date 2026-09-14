@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set, Union
 from datetime import datetime, timedelta, date
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response, status, BackgroundTasks, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, Response, status, BackgroundTasks, Query, WebSocket, WebSocketDisconnect, Body
 import mimetypes
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -262,7 +262,7 @@ class FastCacheManager:
 
 fast_cache = FastCacheManager()
 
-app = FastAPI(title="ExpiryGuard API", version="1.0.0")
+app = FastAPI(title="DawaiFlow API", version="1.0.0")
 
 @app.on_event("startup")
 def warmup_database():
@@ -1003,7 +1003,7 @@ def get_current_browser_session(
         "status": "authenticated",
         "user_id": current_user.id,
         "owner_name": current_user.owner_name,
-        "shop_name": current_user.shop_name or "ExpiryGuard Pharmacy",
+        "shop_name": current_user.shop_name or "DawaiFlow Pharmacy",
         "email": current_user.email,
         "phone": current_user.phone,
         "address": current_user.address,
@@ -2146,11 +2146,73 @@ def export_sales_csv(
         fast_cache.invalidate_user(current_user.id, tag="sales")
 
     headers = {
-        "Content-Disposition": "attachment; filename=expiryguard_sales_export.csv",
+        "Content-Disposition": "attachment; filename=dawaiflow_sales_export.csv",
         "X-Exported-Count": str(exported_count),
         "Access-Control-Expose-Headers": "X-Exported-Count, Content-Disposition"
     }
     return Response(content=csv_content, media_type="text/csv", headers=headers)
+
+
+# ---------------- SALES RETURN ENDPOINTS ---------------- #
+
+@app.get("/api/sales/search-by-medicine")
+def search_sales_by_medicine_endpoint(
+    query: str = Query(..., min_length=1, description="Medicine name, barcode, or bill number"),
+    limit: int = 50,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return crud.search_sales_by_medicine(db=db, user_id=current_user.id, query=query, limit=limit)
+
+
+@app.post("/api/sales/returns", response_model=schemas.ProcessReturnResponse)
+def process_sale_return_endpoint(
+    req: schemas.ProcessReturnRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        return_items_data = [item.dict() for item in req.items]
+        res = crud.process_sale_return_atomic(
+            db=db,
+            user_id=current_user.id,
+            sale_id=req.sale_id,
+            return_items=return_items_data,
+            reason=req.reason,
+            staff_id=getattr(current_user, "staff_id", None)
+        )
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process return: {str(e)}")
+
+
+@app.get("/api/sales/returns/today")
+def get_today_returns_endpoint(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return crud.get_today_returns_summary(db=db, user_id=current_user.id)
+
+
+@app.get("/api/sales/returns")
+def get_returns_history_endpoint(
+    search: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return crud.get_returns_history(
+        db=db,
+        user_id=current_user.id,
+        search=search,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit
+    )
 
 
 @app.get("/reports/export/inventory")
@@ -2185,7 +2247,7 @@ def export_inventory_csv(
         ])
     
     output.seek(0)
-    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=expiryguard_inventory_export.csv"})
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=dawaiflow_inventory_export.csv"})
 
 
 # ---------------- CA CONNECT & GST FINANCIAL REPORT ENDPOINTS ---------------- #
@@ -2842,7 +2904,7 @@ def download_inventory_import_template(
     stream = template_generator.generate_inventory_import_template()
     
     headers = {
-        "Content-Disposition": 'attachment; filename="ExpiryGuard_Inventory_Import_Template.xlsx"',
+        "Content-Disposition": 'attachment; filename="DawaiFlow_Inventory_Import_Template.xlsx"',
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
     return Response(
@@ -3561,20 +3623,14 @@ def delete_inventory_stock(
 @limiter.limit("60/minute")
 def delete_all_inventory_stock(
     request: Request,
-    payload: schemas.InventoryDeleteAllRequest,
+    payload: Optional[schemas.InventoryDeleteAllRequest] = Body(None),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
     Bulk soft-delete for all active stock items belonging to the authenticated shop.
-    Requires explicit confirmation flag in request body (confirm: true).
+    Supports 60-day recovery window.
     """
-    if not payload.confirm:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Explicit confirmation flag (confirm: true) is required to delete all stock."
-        )
-
     res = crud.soft_delete_all_inventory_items(
         db=db,
         user_id=current_user.id
@@ -5235,11 +5291,11 @@ def download_inventory_import_template():
     Returns standardized inventory import template file (.xlsx or .csv).
     Allows users to download standard structure before bulk uploading medicines.
     """
-    template_path = os.path.join(os.path.dirname(__file__), "ExpiryGuard_Inventory_Import_Template.xlsx")
+    template_path = os.path.join(os.path.dirname(__file__), "DawaiFlow_Inventory_Import_Template.xlsx")
     if os.path.exists(template_path):
         return FileResponse(
             path=template_path,
-            filename="ExpiryGuard_Inventory_Import_Template.xlsx",
+            filename="DawaiFlow_Inventory_Import_Template.xlsx",
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     csv_content = (
@@ -5251,7 +5307,7 @@ def download_inventory_import_template():
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=ExpiryGuard_Inventory_Import_Template.csv"}
+        headers={"Content-Disposition": "attachment; filename=DawaiFlow_Inventory_Import_Template.csv"}
     )
 
 
@@ -5553,7 +5609,7 @@ def get_dashboard_summary(
         for d, val in sorted(sales_by_date.items())
     ]
 
-    # 6. ExpiryGuard Intelligence
+    # 6. DawaiFlow Intelligence
     intelligence_text = f"{low_stock_count} medicines are below reorder levels requiring restock."
     target_module = "Inventory"
     if expired_count > 0:
@@ -5635,6 +5691,8 @@ def get_dashboard_summary(
         "today_revenue": round(today_sales, 2) if can_view_financials else 0.0,
         "expiring_soon_count": expiring_soon_count if can_view_inventory else 0,
         "expired_count": expired_count if can_view_inventory else 0,
+        "low_stock_count": low_stock_count if can_view_inventory else 0,
+        "dead_stock_count": crud.get_inventory_summary(db=db, user_id=user_id).get("dead_stock", 0) if can_view_inventory else 0,
         "today_returns_amount": round(today_returns_amount, 2) if can_view_financials else 0.0,
         
         # Payment breakdown summary
@@ -6710,7 +6768,7 @@ def _build_job_payload_dict(sale: models.Sale, shop: models.User, printer: Optio
             "items": items_list,
         },
         "shop": {
-            "shop_name": shop.shop_name or "ExpiryGuard Pharmacy",
+            "shop_name": shop.shop_name or "DawaiFlow Pharmacy",
             "owner_name": shop.owner_name or "",
             "gstin": getattr(shop, "gstin", None) or shop.gst_number or "07AABCE1234F1Z5",
             "address": getattr(shop, "address", None) or "Main Market, New Delhi - 110001",

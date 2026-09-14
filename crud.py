@@ -5726,7 +5726,7 @@ def search_sales_by_medicine(db: Session, user_id: int, query: str, limit: int =
     return results
 
 
-def process_sale_return(
+def process_sale_return_atomic(
     db: Session,
     user_id: int,
     sale_id: int,
