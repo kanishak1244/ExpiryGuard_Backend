@@ -146,12 +146,11 @@
       </div>
     </aside>
 
-    <!-- Main Content Wrapper -->
+    /* Main Content Wrapper */
     <div class="main-wrapper">
       <header class="topbar">
         <div>
           <h1 class="page-title">Khata & Customer Credit Directory</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Manage customer ledger accounts, track outstanding credit, record collections, and view overdue accounts.</p>
         </div>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Add New Customer</button>
@@ -167,14 +166,14 @@
             <span class="kpi-value" id="kpi-customers">0</span>
             <span style="font-size: 11px; color: var(--muted-text);">Total registered customers</span>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" style="border-left: 3px solid #E11D48;">
             <span class="kpi-label">Total Outstanding</span>
-            <span class="kpi-value" id="kpi-outstanding" style="color: #E11D48;">₹0.00</span>
+            <span class="kpi-value" id="kpi-outstanding" style="color: #E11D48; font-weight: 800; font-size: 22px;">₹0.00</span>
             <span style="font-size: 11px; color: var(--muted-text);">Pending customer credit</span>
           </div>
-          <div class="kpi-card">
+          <div class="kpi-card" style="border-left: 3px solid #EA580C;">
             <span class="kpi-label">Due / Overdue Balance</span>
-            <span class="kpi-value" id="kpi-overdue" style="color: #EA580C;">₹0.00</span>
+            <span class="kpi-value" id="kpi-overdue" style="color: #EA580C; font-weight: 800; font-size: 22px;">₹0.00</span>
             <span style="font-size: 11px; color: var(--muted-text);">Sales outstanding >30 days</span>
           </div>
           <div class="kpi-card">
@@ -185,62 +184,67 @@
         </div>
 
         <!-- Split Grid layout -->
-        <div class="grid-2">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;" class="khata-main-grid">
           
           <!-- Left Panel: Customer credit ledger list -->
           <div class="card">
-            <div class="card-header" style="border-bottom: none; margin-bottom: 0;">
+            <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 8px;">
               <h3 class="panel-title">Khata Accounts Directory</h3>
             </div>
             
             <!-- Filters & Search Toolbar inside card -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 16px;">
-              <input type="text" id="khata-search-input" class="form-input" placeholder="🔍 Search customer name or phone number..." oninput="filterKhataCustomers()">
-              <select id="khata-status-filter" class="form-input" onchange="filterKhataCustomers()">
-                <option value="ALL">All Accounts</option>
-                <option value="OUTSTANDING">Outstanding Balance Only</option>
-                <option value="PAID">Fully Settled Only</option>
-                <option value="OVERDUE">Overdue Accounts Only</option>
-              </select>
-            </div>
+            <div class="card-body" style="padding-top: 0;">
+              <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                <input type="text" id="khata-search-input" class="form-input" placeholder="🔍 Search customer name or phone number..." oninput="filterKhataCustomers()" style="flex: 2; min-width: 220px;">
+                <select id="khata-status-filter" class="form-input" onchange="filterKhataCustomers()" style="flex: 1; min-width: 150px;">
+                  <option value="ALL">All Accounts</option>
+                  <option value="OUTSTANDING">Outstanding</option>
+                  <option value="PAID">Settled</option>
+                </select>
+              </div>
 
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Customer Name</th>
-                    <th>Phone Number</th>
-                    <th style="text-align: right;">Outstanding (₹)</th>
-                    <th style="text-align: center;">Status</th>
-                    <th style="text-align: center;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="khata-tbody">
-                  <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--muted-text);">Loading customer list...</td></tr>
-                </tbody>
-              </table>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 28%;">Customer Name</th>
+                      <th style="width: 22%;">Phone Number</th>
+                      <th style="width: 22%; text-align: right;">Outstanding (₹)</th>
+                      <th style="width: 13%; text-align: center;">Status</th>
+                      <th style="width: 15%; text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="khata-tbody">
+                    <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--muted-text);">Loading customer list...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <!-- Right Panel: High-risk Analytics -->
+          <!-- Right Panel: Top Outstanding Accounts & Settled -->
           <div style="display: flex; flex-direction: column; gap: 20px;">
-            <!-- Highest Outstanding list -->
+            <!-- Top Outstanding Accounts -->
             <div class="card">
               <div class="card-header">
-                <h3 class="panel-title">Highest Outstanding Bookings</h3>
+                <h3 class="panel-title">Top Outstanding Accounts</h3>
               </div>
-              <div id="highest-outstanding-list" style="display: flex; flex-direction: column; gap: 10px;">
-                <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading analysis...</p>
+              <div class="card-body" style="padding-top: 8px;">
+                <div id="highest-outstanding-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading analysis...</p>
+                </div>
               </div>
             </div>
 
-            <!-- Recent Collections -->
+            <!-- Recent Settled Payments -->
             <div class="card">
               <div class="card-header">
                 <h3 class="panel-title">Recent Settled Payments</h3>
               </div>
-              <div id="recent-payments-list" style="display: flex; flex-direction: column; gap: 10px;">
-                <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading history...</p>
+              <div class="card-body" style="padding-top: 8px;">
+                <div id="recent-payments-list" style="display: flex; flex-direction: column; gap: 8px;">
+                  <p style="color: var(--muted-text); font-size: 13px; text-align: center;">Loading history...</p>
+                </div>
               </div>
             </div>
           </div>
@@ -489,24 +493,26 @@
     function renderKhataCustomersTable(customersList) {
       const tbody = document.getElementById('khata-tbody');
       if (customersList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No Khata customer accounts found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 32px 16px; color: var(--muted-text);"><div style="font-size: 24px; margin-bottom: 4px;">📖</div><div style="font-weight: 600;">No Khata customer accounts found</div></td></tr>';
         return;
       }
 
       tbody.innerHTML = customersList.map(c => {
         const outstanding = c.pending_amount || 0.0;
         let badge = '<span class="badge badge-success">Settled</span>';
+        let amountColor = 'var(--status-safe, #16A34A)';
         if (outstanding > 0) {
           badge = '<span class="badge badge-danger">Outstanding</span>';
+          amountColor = '#DC2626';
         }
         return `
           <tr>
             <td><strong>${escapeHtml(c.name)}</strong></td>
             <td>${escapeHtml(c.phone || 'N/A')}</td>
-            <td style="text-align: right; font-weight: bold; font-family: monospace;">₹${outstanding.toFixed(2)}</td>
+            <td style="text-align: right; font-weight: 800; font-family: monospace; font-size: 14px; color: ${amountColor};">₹${outstanding.toFixed(2)}</td>
             <td style="text-align: center;">${badge}</td>
             <td style="text-align: center;">
-              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12.5px;" onclick="openLedgerModal(${c.id}, '${escapeHtml(c.name)}')">📄 Ledger / Detail</button>
+              <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12.5px; font-weight: 600;" onclick="openLedgerModal(${c.id}, '${escapeHtml(c.name).replace(/'/g, "\\'")}')">📄 Ledger / Detail</button>
             </td>
           </tr>
         `;
@@ -514,26 +520,29 @@
     }
 
     function renderAnalytics(list) {
-      // 1. Highest Outstanding
+      // 1. Top Outstanding Accounts
       const sortedOutstanding = [...list].sort((a, b) => (b.pending_amount || 0) - (a.pending_amount || 0)).slice(0, 5);
       const highList = document.getElementById('highest-outstanding-list');
       if (sortedOutstanding.filter(c => c.pending_amount > 0).length === 0) {
-        highList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text);">All credit accounts settled!</p>';
+        highList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text); padding: 12px 0;">No outstanding credit</p>';
       } else {
         highList.innerHTML = sortedOutstanding.filter(c => c.pending_amount > 0).map(c => `
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding: 8px 0; cursor: pointer; transition: background 0.15s ease;"
+               onclick="openLedgerModal(${c.id}, '${escapeHtml(c.name).replace(/'/g, "\\'")}')"
+               onmouseover="this.style.background='var(--bg-hover, #F8FAFC)'"
+               onmouseout="this.style.background='transparent'">
             <div>
-              <strong style="font-size:13.5px;">${escapeHtml(c.name)}</strong>
-              <div style="font-size:11px; color: var(--muted-text);">${escapeHtml(c.phone)}</div>
+              <strong style="font-size:13.5px; color: var(--dark-text);">${escapeHtml(c.name)}</strong>
+              <div style="font-size:11.5px; color: var(--muted-text);">${escapeHtml(c.phone || 'N/A')}</div>
             </div>
-            <strong style="color: var(--error-red); font-family: monospace;">₹${c.pending_amount.toFixed(2)}</strong>
+            <strong style="color: #DC2626; font-family: monospace; font-size: 14px; font-weight: 800;">₹${c.pending_amount.toFixed(2)}</strong>
           </div>
         `).join('');
       }
 
-      // 2. Fetch payments received across all customers (mock/recent settlements list)
+      // 2. Recent Settled Payments
       const recentList = document.getElementById('recent-payments-list');
-      recentList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text);">Settle history is kept on detailed ledger sheets.</p>';
+      recentList.innerHTML = '<p style="font-size:13px; text-align:center; color: var(--muted-text); padding: 12px 0;">No recent settlements</p>';
     }
 
     function filterKhataCustomers() {
@@ -548,10 +557,8 @@
 
       if (status === 'OUTSTANDING') {
         filtered = filtered.filter(c => (c.pending_amount || 0) > 0);
-      } else if (status === 'PAID') {
+      } else if (status === 'PAID' || status === 'SETTLED') {
         filtered = filtered.filter(c => (c.pending_amount || 0) === 0);
-      } else if (status === 'OVERDUE') {
-        filtered = filtered.filter(c => (c.pending_amount || 0) > 0); // Simplification: any outstanding
       }
 
       renderKhataCustomersTable(filtered);
