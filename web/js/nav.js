@@ -60,7 +60,7 @@ window.CANONICAL_NAV_ITEMS = [
   {
     id: 'returns',
     href: 'returns.html',
-    label: "Today's Returns",
+    label: "Returns & Refunds",
     permission: 'PURCHASE_RETURN',
     iconSvg: '<svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>'
   },
@@ -235,7 +235,7 @@ window.ExpiryNav = {
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
         <button type="button" class="drawer-close-btn" onclick="event.preventDefault(); event.stopPropagation(); window.ExpiryNav.closeDrawer();" aria-label="Close main menu" style="margin-left: auto; background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); position: relative; z-index: 1002; pointer-events: auto;">
           <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>

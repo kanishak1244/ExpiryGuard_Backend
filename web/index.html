@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ExpiryGuard — AI-Powered Pharmacy ERP</title>
+  <title>DawaiFlow — AI-Powered Pharmacy ERP</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -46,7 +46,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -86,7 +86,7 @@
         </a>
         <a href="returns.html" class="nav-item" data-nav-id="returns">
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          <span class="nav-text">Today's Returns</span>
+          <span class="nav-text">Returns & Refunds</span>
         </a>
         <a href="reports.html" class="nav-item" data-nav-id="reports">
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
@@ -113,10 +113,10 @@
     <div class="main-wrapper">
       
       <!-- Topbar -->
-      <header class="topbar">
-        <h1 class="page-title">Dashboard Overview</h1>
+      <header class="topbar" style="margin-bottom: 20px;">
+        <h1 class="page-title" style="font-size: 22px; font-weight: 800;">Dashboard</h1>
         <div class="topbar-right" style="display: flex; align-items: center; gap: 12px;">
-          <a href="billing.html" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; padding: 8px 16px; font-weight: 700; font-size: 13.5px;">
+          <a href="billing.html" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; text-decoration: none; padding: 8px 18px; font-weight: 700; font-size: 14px;">
             <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>+ New Bill</span>
           </a>
@@ -130,103 +130,159 @@
       <!-- Content Body -->
       <main class="content-body">
         
-        <!-- 6 KPI Summary Cards -->
-        <div class="grid-6">
-          <div class="kpi-card">
-            <span class="kpi-label">Total Stock Items</span>
-            <span class="kpi-value" id="kpi-total-products">0</span>
-            <span class="kpi-sub positive">Active Inventory</span>
+        <!-- SECTION 1: TODAY OPERATIONAL METRICS -->
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 10px;">
+            📅 TODAY
           </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Today's Bills</span>
-            <span class="kpi-value" id="kpi-sales-count">0</span>
-            <span class="kpi-sub positive">Completed Sales</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Today's Revenue</span>
-            <span class="kpi-value" id="kpi-revenue">₹0</span>
-            <span class="kpi-sub positive">GST Included</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Expiring Soon (60d)</span>
-            <span class="kpi-value" id="kpi-expiring">0</span>
-            <span class="kpi-sub warning">Sell First (FEFO)</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Expired Medicines</span>
-            <span class="kpi-value" id="kpi-expired">0</span>
-            <span class="kpi-sub danger">Do Not Sell</span>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Today's Returns</span>
-            <span class="kpi-value" id="kpi-returns">₹0</span>
-            <span class="kpi-sub danger">Refunded</span>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+            <!-- Today's Bills -->
+            <div class="kpi-card" style="padding: 16px 20px;">
+              <span class="kpi-label" style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Today's Bills</span>
+              <span class="kpi-value" id="kpi-sales-count" style="font-size: 24px; font-weight: 800; color: var(--color-text-primary); margin: 4px 0;">0</span>
+              <span class="kpi-sub positive" style="font-size: 12px;">Completed sales</span>
+            </div>
+
+            <!-- Today's Sales -->
+            <div class="kpi-card" style="padding: 16px 20px; cursor: pointer;" onclick="window.location.href='sales.html'" title="Click to view Live Sales">
+              <span class="kpi-label" style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Today's Sales</span>
+              <span class="kpi-value" id="kpi-revenue" style="font-size: 24px; font-weight: 800; color: var(--color-text-primary); margin: 4px 0;">₹0.00</span>
+              <span class="kpi-sub positive" style="font-size: 12px;">GST included</span>
+            </div>
+
+            <!-- Pending Payments -->
+            <div class="kpi-card" style="padding: 16px 20px; cursor: pointer;" onclick="window.location.href='khata.html'" title="Click to view Khata Ledger">
+              <span class="kpi-label" style="font-size: 12.5px; font-weight: 600; color: var(--color-text-muted);">Pending Payments</span>
+              <span class="kpi-value" id="kpi-pending-summary" style="font-size: 18px; font-weight: 800; color: #D97706; margin: 4px 0;">0 due</span>
+              <span class="kpi-sub warning" style="font-size: 12px;">Outstanding credit</span>
+            </div>
           </div>
         </div>
 
-        <!-- Quick Action Cards (Connected Shortcuts - Symmetrical 6 Cards) -->
-        <div class="grid-6" style="margin-bottom: 24px;">
-          <div class="quick-action-card primary" style="cursor: pointer;" onclick="openAddInventoryModal()">
-            <div class="action-icon">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.5;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </div>
+        <!-- SECTION 2: INVENTORY NEEDS ATTENTION -->
+        <div style="margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
             <div>
-              <div class="action-title">+ Add Inventory</div>
-              <div class="action-desc">Scan bills or search catalog</div>
+              <h2 style="font-size: 16px; font-weight: 700; color: var(--color-text-primary); margin: 0;">Inventory Needs Attention</h2>
+              <div style="font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px;">Issues that may cause stock loss or missed sales.</div>
+            </div>
+            <a href="inventory.html" style="font-size: 12.5px; font-weight: 600; color: var(--color-brand-deep, #0D9488); text-decoration: none;">View All Inventory →</a>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+            <!-- Expired Medicines -->
+            <div class="alert-card danger-alert" onclick="window.location.href='inventory.html?filter=expired'" style="cursor: pointer; background: var(--color-surface-bg, #FFFFFF); border: 1px solid var(--color-border, #E2E8F0); border-left: 4px solid #EF4444; border-radius: 8px; padding: 14px 16px; transition: transform 0.12s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">🔴</span>
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text-primary);">Expired Medicines</span>
+                </div>
+                <span id="kpi-expired" style="font-size: 20px; font-weight: 800; color: #EF4444;">0</span>
+              </div>
+              <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #EF4444; display: flex; align-items: center; justify-content: space-between;">
+                <span>Review expired stock</span>
+                <span>→</span>
+              </div>
+            </div>
+
+            <!-- Expiring Soon -->
+            <div class="alert-card warning-alert" onclick="window.location.href='inventory.html?filter=expiring'" style="cursor: pointer; background: var(--color-surface-bg, #FFFFFF); border: 1px solid var(--color-border, #E2E8F0); border-left: 4px solid #F97316; border-radius: 8px; padding: 14px 16px; transition: transform 0.12s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">🟠</span>
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text-primary);">Expiring Soon</span>
+                </div>
+                <span id="kpi-expiring" style="font-size: 20px; font-weight: 800; color: #F97316;">0</span>
+              </div>
+              <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #F97316; display: flex; align-items: center; justify-content: space-between;">
+                <span>Review expiry risk</span>
+                <span>→</span>
+              </div>
+            </div>
+
+            <!-- Low Stock -->
+            <div class="alert-card caution-alert" onclick="window.location.href='inventory.html?filter=lowstock'" style="cursor: pointer; background: var(--color-surface-bg, #FFFFFF); border: 1px solid var(--color-border, #E2E8F0); border-left: 4px solid #EAB308; border-radius: 8px; padding: 14px 16px; transition: transform 0.12s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">🟡</span>
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text-primary);">Low Stock</span>
+                </div>
+                <span id="kpi-low-stock" style="font-size: 20px; font-weight: 800; color: #CA8A04;">0</span>
+              </div>
+              <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #CA8A04; display: flex; align-items: center; justify-content: space-between;">
+                <span>Review low stock</span>
+                <span>→</span>
+              </div>
+            </div>
+
+            <!-- Dead Stock -->
+            <div class="alert-card dead-alert" onclick="window.location.href='inventory.html?filter=deadstock'" style="cursor: pointer; background: var(--color-surface-bg, #FFFFFF); border: 1px solid var(--color-border, #E2E8F0); border-left: 4px solid #8B5CF6; border-radius: 8px; padding: 14px 16px; transition: transform 0.12s ease;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">🟣</span>
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-text-primary);">Dead Stock</span>
+                </div>
+                <span id="kpi-dead-stock" style="font-size: 20px; font-weight: 800; color: #8B5CF6;">0</span>
+              </div>
+              <div style="margin-top: 8px; font-size: 12px; font-weight: 600; color: #8B5CF6; display: flex; align-items: center; justify-content: space-between;">
+                <span>Review dead stock</span>
+                <span>→</span>
+              </div>
             </div>
           </div>
-          <a href="inventory.html" class="quick-action-card">
-            <div class="action-icon">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-            </div>
-            <div>
-              <div class="action-title">Live Inventory</div>
-              <div class="action-desc">Stock batches & FEFO expiry</div>
-            </div>
-          </a>
-          <a href="documents.html" class="quick-action-card">
-            <div class="action-icon">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            </div>
-            <div>
-              <div class="action-title">Documents & OCR</div>
-              <div class="action-desc">Invoices & AI bill extraction</div>
-            </div>
-          </a>
-          <a href="suppliers.html" class="quick-action-card">
-            <div class="action-icon">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            </div>
-            <div>
-              <div class="action-title">Suppliers</div>
-              <div class="action-desc">Distributor directory & CRM</div>
-            </div>
-          </a>
-          <a href="sales.html" class="quick-action-card">
-            <div class="action-icon">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-            </div>
-            <div>
-              <div class="action-title">Live Sales</div>
-              <div class="action-desc">POS sales & customer bills</div>
-            </div>
-          </a>
-          <a href="khata.html" class="quick-action-card">
-            <div class="action-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #16A34A;">
-              <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-            </div>
-            <div>
-              <div class="action-title">Khata Ledger</div>
-              <div class="action-desc">Credit sales & collections</div>
-            </div>
-          </a>
         </div>
 
-        <!-- Live Sales Feed Panel -->
-        <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Live Transactions Feed (Auto-Syncing)</h2>
-            <a href="sales.html" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">View All Sales</a>
+        <!-- SECTION 3: QUICK ACTIONS -->
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--color-text-muted); text-transform: uppercase; margin-bottom: 10px;">⚡ QUICK ACTIONS</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div class="quick-action-card primary" style="cursor: pointer; padding: 12px 16px;" onclick="openAddInventoryModal()">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </div>
+              <div>
+                <div class="action-title" style="font-size: 13.5px;">+ Add Inventory</div>
+                <div class="action-desc" style="font-size: 11.5px;">Scan bills or excel entry</div>
+              </div>
+            </div>
+
+            <a href="billing.html" class="quick-action-card" style="padding: 12px 16px; text-decoration: none;">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2;"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+              </div>
+              <div>
+                <div class="action-title" style="font-size: 13.5px;">Create New Bill</div>
+                <div class="action-desc" style="font-size: 11.5px;">POS billing & invoices</div>
+              </div>
+            </a>
+
+            <a href="inventory.html" class="quick-action-card" style="padding: 12px 16px; text-decoration: none;">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+              </div>
+              <div>
+                <div class="action-title" style="font-size: 13.5px;">Live Inventory</div>
+                <div class="action-desc" style="font-size: 11.5px;">Stock batches & FEFO</div>
+              </div>
+            </a>
+
+            <a href="reports.html" class="quick-action-card" style="padding: 12px 16px; text-decoration: none;">
+              <div class="action-icon">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              </div>
+              <div>
+                <div class="action-title" style="font-size: 13.5px;">Smart Restock</div>
+                <div class="action-desc" style="font-size: 11.5px;">Reorder recommendations</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- SECTION 4: RECENT SALES -->
+        <div class="panel" style="margin-bottom: 24px;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="panel-title" style="font-size: 15px;">Recent Sales</h2>
+            <a href="sales.html" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12.5px;">View All Sales →</a>
           </div>
           <div class="table-responsive">
             <table class="data-table">
@@ -241,27 +297,30 @@
                 </tr>
               </thead>
               <tbody id="live-sales-table-body">
-                <tr><td colspan="6" style="text-align: center; color: var(--muted-text); padding: 20px;">Loading live transactions...</td></tr>
+                <tr><td colspan="6" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Loading recent sales...</td></tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Pending Payments Ledger Panel -->
-        <div class="panel" id="pending-payments-panel" style="margin-top: 24px;">
+        <!-- SECTION 5: PENDING PAYMENTS LEDGER -->
+        <div class="panel" id="pending-payments-panel">
           <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <h2 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+              <h2 class="panel-title" style="display: flex; align-items: center; gap: 8px; font-size: 15px;">
                 <span>⏳</span>
-                <span>Pending Payments Ledger</span>
+                <span>Pending Payments</span>
                 <span class="badge badge-warning" id="pending-payments-count-badge" style="font-size: 11.5px;">0 Pending</span>
               </h2>
               <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">
                 Customers with outstanding credit/unsettled bills.
               </div>
             </div>
-            <div style="font-weight: 700; font-size: 14px; color: var(--status-warning);" id="total-pending-amount-header">
-              Total Outstanding: ₹0.00
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--status-warning, #D97706);" id="total-pending-amount-header">
+                Total Outstanding: ₹0.00
+              </div>
+              <a href="khata.html" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12.5px;">View Ledger →</a>
             </div>
           </div>
           <div class="table-responsive">
@@ -278,7 +337,7 @@
                 </tr>
               </thead>
               <tbody id="pending-payments-table-body">
-                <tr><td colspan="7" style="text-align: center; color: var(--muted-text); padding: 20px;">No pending payments. All bills cleared! 🎉</td></tr>
+                <tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 20px;">No pending payments. All bills cleared! 🎉</td></tr>
               </tbody>
             </table>
           </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings & Bills — ExpiryGuard ERP</title>
+  <title>Settings & Bills — DawaiFlow ERP</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -364,7 +364,7 @@
         </a>
         <a href="returns.html" class="nav-item" data-nav-id="returns">
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          <span class="nav-text">Today's Returns</span>
+          <span class="nav-text">Returns & Refunds</span>
         </a>
         <a href="reports.html" class="nav-item" data-nav-id="reports">
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
@@ -880,7 +880,7 @@
                   <div>
                     <h3 class="panel-title">📦 Data Migration & Legacy Software Import</h3>
                     <p style="font-size: 13.5px; color: var(--color-text-muted); margin-top: 4px;">
-                      Migrate historical sales bills, product catalogs, and master records from your previous pharmacy software (Marg ERP, MargBooks, Vyapar, Tally, etc.) into ExpiryGuard without altering active inventory balances.
+                      Migrate historical sales bills, product catalogs, and master records from your previous pharmacy software (Marg ERP, MargBooks, Vyapar, Tally, etc.) into DawaiFlow without altering active inventory balances.
                     </p>
                   </div>
                 </div>
@@ -1145,13 +1145,13 @@
             <div id="panel-about" class="settings-panel">
               <div class="card">
                 <div class="card-header">
-                  <h3 class="panel-title">ℹ️ About ExpiryGuard ERP</h3>
+                  <h3 class="panel-title">ℹ️ About DawaiFlow ERP</h3>
                 </div>
                 <div class="card-body">
-                  <h4>ExpiryGuard ERP v2.0.0 (Production Build)</h4>
+                  <h4>DawaiFlow ERP v2.0.0 (Production Build)</h4>
                   <p style="font-size: 14px; color: var(--muted-text); margin-top: 8px;">
                     AI-Powered Billing, Inventory & Expiry Prevention SaaS for Indian Pharmacies.<br>
-                    Integrated with Dawaiflow AI for Instant Medicine & Invoice Scanning.
+                    Integrated with DawaiFlow AI for Instant Medicine & Invoice Scanning.
                   </p>
                 </div>
               </div>
@@ -1414,7 +1414,7 @@
       if (!file) return;
 
       if (!file.name.endsWith('.dfbk')) {
-        alert("Invalid file format. Please select an encrypted ExpiryGuard .dfbk backup archive.");
+        alert("Invalid file format. Please select an encrypted DawaiFlow .dfbk backup archive.");
         event.target.value = '';
         return;
       }

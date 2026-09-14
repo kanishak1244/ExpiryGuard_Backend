@@ -4,6 +4,9 @@
  */
 
 let selectedBillReturnData = null;
+let activeReturnsPeriod = 'today';
+let customStartDate = '';
+let customEndDate = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('returns-page')) {
@@ -15,6 +18,82 @@ function initReturnsPage() {
   loadTodayReturns();
 }
 
+function formatDateYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getPeriodDates(period) {
+  const now = new Date();
+
+  if (period === 'today') {
+    const todayStr = formatDateYMD(now);
+    return { start: todayStr, end: todayStr };
+  } else if (period === 'yesterday') {
+    const yest = new Date(now);
+    yest.setDate(now.getDate() - 1);
+    const yestStr = formatDateYMD(yest);
+    return { start: yestStr, end: yestStr };
+  } else if (period === 'week') {
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(now.setDate(diff));
+    return { start: formatDateYMD(monday), end: formatDateYMD(new Date()) };
+  } else if (period === 'month') {
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { start: formatDateYMD(firstDay), end: formatDateYMD(new Date()) };
+  } else if (period === 'all') {
+    return { start: '', end: '' };
+  } else if (period === 'custom') {
+    return { start: customStartDate, end: customEndDate };
+  }
+  return { start: formatDateYMD(now), end: formatDateYMD(now) };
+}
+
+function setReturnsPeriod(period) {
+  activeReturnsPeriod = period;
+
+  // Update active pill button styling
+  document.querySelectorAll('#returns-period-pills button').forEach(btn => {
+    if (btn.getAttribute('data-period') === period) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  const customContainer = document.getElementById('returns-custom-date-container');
+  if (period === 'custom') {
+    if (customContainer) customContainer.style.display = 'flex';
+    const fromInput = document.getElementById('returns-date-from');
+    const toInput = document.getElementById('returns-date-to');
+    if (fromInput && !fromInput.value) fromInput.value = formatDateYMD(new Date());
+    if (toInput && !toInput.value) toInput.value = formatDateYMD(new Date());
+  } else {
+    if (customContainer) customContainer.style.display = 'none';
+    loadTodayReturns();
+  }
+}
+
+function applyCustomDateRange() {
+  const fromVal = document.getElementById('returns-date-from') ? document.getElementById('returns-date-from').value : '';
+  const toVal = document.getElementById('returns-date-to') ? document.getElementById('returns-date-to').value : '';
+
+  if (!fromVal || !toVal) {
+    alert('Please select both From and To dates for custom range.');
+    return;
+  }
+
+  customStartDate = fromVal;
+  customEndDate = toVal;
+  loadTodayReturns();
+}
+
+window.setReturnsPeriod = setReturnsPeriod;
+window.applyCustomDateRange = applyCustomDateRange;
+
 async function loadTodayReturns() {
   const tableBody = document.getElementById('returns-list-body');
   const refundTotalEl = document.getElementById('returns-total-refund');
@@ -25,10 +104,12 @@ async function loadTodayReturns() {
 
   try {
     const searchQuery = document.getElementById('returns-search-input') ? document.getElementById('returns-search-input').value.trim() : '';
-    let url = '/api/sales/returns/today';
-    if (searchQuery) {
-      url = `/api/sales/returns?search=${encodeURIComponent(searchQuery)}`;
-    }
+    const { start, end } = getPeriodDates(activeReturnsPeriod);
+
+    let url = '/api/sales/returns?limit=1000';
+    if (start) url += `&start_date=${encodeURIComponent(start)}`;
+    if (end) url += `&end_date=${encodeURIComponent(end)}`;
+    if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
     const res = await fetch(url, {
       headers: {
@@ -66,12 +147,37 @@ async function loadTodayReturns() {
     if (itemsCountEl) itemsCountEl.textContent = `${totalItems} items`;
 
     if (returnsList.length === 0) {
+      let mainEmptyMsg = "No returns found for today.";
+      let subEmptyMsg = "Process a return to see it appear here.";
+
+      if (activeReturnsPeriod === 'yesterday') {
+        mainEmptyMsg = "No returns found for yesterday.";
+        subEmptyMsg = "Try selecting a different time period or clear search.";
+      } else if (activeReturnsPeriod === 'week') {
+        mainEmptyMsg = "No returns found this week.";
+        subEmptyMsg = "Try selecting a different time period or clear search.";
+      } else if (activeReturnsPeriod === 'month') {
+        mainEmptyMsg = "No returns found this month.";
+        subEmptyMsg = "Try selecting a different time period or clear search.";
+      } else if (activeReturnsPeriod === 'all') {
+        mainEmptyMsg = "No return records found.";
+        subEmptyMsg = "Process a return to see it appear here.";
+      } else if (activeReturnsPeriod === 'custom') {
+        mainEmptyMsg = "No returns found for the selected date range.";
+        subEmptyMsg = "Try choosing different dates or clear search.";
+      }
+
+      if (searchQuery) {
+        mainEmptyMsg = `No return records matching "${escapeHtml(searchQuery)}" found.`;
+        subEmptyMsg = "Try adjusting your search or selecting a broader time period.";
+      }
+
       tableBody.innerHTML = `
         <tr>
           <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 28px 16px;">
             <div style="font-size: 22px; margin-bottom: 4px;">🔄</div>
-            <div style="font-weight: 700; font-size: 14px; color: var(--color-text-primary);">No returns processed today</div>
-            <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">Process a return to see it appear here.</div>
+            <div style="font-weight: 700; font-size: 14px; color: var(--color-text-primary);">${mainEmptyMsg}</div>
+            <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 2px;">${subEmptyMsg}</div>
           </td>
         </tr>
       `;
