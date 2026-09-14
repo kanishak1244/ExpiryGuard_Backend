@@ -66,8 +66,11 @@ WEB_DIR = BASE_DIR / "web"
 PUBLIC_SITE_DIR = BASE_DIR / "public_site"
 PUBLIC_SITE_DIST = PUBLIC_SITE_DIR / "dist"
 PUBLIC_SERVE_DIR = PUBLIC_SITE_DIST if (PUBLIC_SITE_DIST / "index.html").exists() else PUBLIC_SITE_DIR
-os.makedirs(WEB_DIR, exist_ok=True)
-os.makedirs(PUBLIC_SITE_DIR, exist_ok=True)
+try:
+    os.makedirs(WEB_DIR, exist_ok=True)
+    os.makedirs(PUBLIC_SITE_DIR, exist_ok=True)
+except Exception:
+    pass
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 ALLOWED_IMAGE_TYPES = {
@@ -519,9 +522,11 @@ if not firebase_admin._apps:
 
 # Upload Storage Directory Setup (Public static mount removed for tenant privacy & security)
 UPLOADS_BASE_DIR = (BASE_DIR / "uploads").resolve()
-DOCUMENTS_DIR = (UPLOADS_BASE_DIR / "documents").resolve()
-os.makedirs(UPLOADS_BASE_DIR, exist_ok=True)
-os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+try:
+    os.makedirs(UPLOADS_BASE_DIR, exist_ok=True)
+    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+except Exception:
+    pass
 
 
 # Database Tables & Scheduler are started cleanly during the FastAPI startup event below

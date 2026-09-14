@@ -58,8 +58,8 @@ RUN groupadd -g 10001 dawaiflow && \
 # Copy application source code (ignoring caches & local venvs via .dockerignore)
 COPY . /app
 
-# Ensure correct file permissions
-RUN chown -R dawaiflow:dawaiflow /app && \
+# Ensure correct file permissions for virtual environment and application
+RUN chown -R dawaiflow:dawaiflow /opt/venv /app && \
     mkdir -p /app/uploads /app/backups && \
     chown -R dawaiflow:dawaiflow /app/uploads /app/backups
 
@@ -69,4 +69,4 @@ USER dawaiflow
 EXPOSE 8000
 
 # Production entrypoint using Uvicorn ASGI server with absolute venv path and dynamic $PORT expansion
-CMD ["sh", "-c", "exec /opt/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'"]
+CMD exec /opt/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'

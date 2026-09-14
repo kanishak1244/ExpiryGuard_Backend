@@ -30,8 +30,10 @@ import models
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
-BACKUPS_DIR = (BASE_DIR / "backups").resolve()
-os.makedirs(BACKUPS_DIR, exist_ok=True)
+try:
+    os.makedirs(BACKUPS_DIR, exist_ok=True)
+except Exception:
+    pass
 
 BACKUP_VERSION = 1
 SCHEMA_VERSION = 1

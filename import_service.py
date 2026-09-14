@@ -58,8 +58,10 @@ HEADER_ALIASES: Dict[str, List[str]] = {
     ]
 }
 
-TEMP_CACHE_DIR = os.path.join(os.path.dirname(__file__), "temp_import_cache")
-os.makedirs(TEMP_CACHE_DIR, exist_ok=True)
+try:
+    os.makedirs(TEMP_CACHE_DIR, exist_ok=True)
+except Exception:
+    pass
 
 def normalize_header(header: str) -> str:
     """Normalize string for header comparison by lowercasing and stripping special chars."""
