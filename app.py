@@ -416,7 +416,19 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With", "X-CSRF-Token"],
 )
 # Rate Limiter Setup (Supports distributed Redis backend if REDIS_URL is configured)
-redis_storage_uri = os.getenv("REDIS_URL") or "memory://"
+redis_storage_uri = "memory://"
+redis_url_env = os.getenv("REDIS_URL")
+if redis_url_env:
+    try:
+        import redis
+        r_client = redis.Redis.from_url(redis_url_env, socket_timeout=0.5, socket_connect_timeout=0.5)
+        r_client.ping()
+        redis_storage_uri = redis_url_env
+        logger.info("[Startup] Connected to Redis rate limiting storage.")
+    except Exception as r_err:
+        logger.warning(f"[Startup] Redis URL specified but unreachable ({r_err}). Falling back to memory:// storage.")
+        redis_storage_uri = "memory://"
+
 limiter = Limiter(key_func=get_remote_address, storage_uri=redis_storage_uri)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
