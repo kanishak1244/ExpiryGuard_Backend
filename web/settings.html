@@ -451,7 +451,6 @@
             
             <div class="settings-nav-group-title">PREFERENCES</div>
             <button class="settings-nav-btn" onclick="switchTab('appearance')">🎨 Appearance</button>
-            <button class="settings-nav-btn" onclick="switchTab('language')">🌐 Language</button>
             
             <div class="settings-nav-group-title">ACCOUNT</div>
             <button class="settings-nav-btn" onclick="switchTab('account')">👤 Account & Security</button>
@@ -723,27 +722,6 @@
                       <p style="font-size: 12px; color: var(--muted-text);">Automatically match device system theme.</p>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 6. LANGUAGE PANEL -->
-            <div id="panel-language" class="settings-panel">
-              <div class="card">
-                <div class="card-header">
-                  <h3 class="panel-title">🌐 Language & Localization</h3>
-                </div>
-                <div class="card-body">
-                  <div class="form-group" style="max-width: 300px;">
-                    <label class="form-label">Select Application Language</label>
-                    <select id="lang-select-box" class="form-input" onchange="i18n.setLanguage(this.value)">
-                      <option value="en">English (Default)</option>
-                      <option value="hi">Hindi (हिंदी)</option>
-                    </select>
-                  </div>
-                  <p style="font-size: 13px; color: var(--muted-text); margin-top: 12px;">
-                    ℹ️ Regional languages (Tamil, Telugu, Bengali, Gujarati, Marathi) will be integrated in upcoming releases.
-                  </p>
                 </div>
               </div>
             </div>
