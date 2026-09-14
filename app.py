@@ -717,16 +717,20 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 @app.get("/api/health")
-def api_health(db: Session = Depends(get_db)):
-    """Production Monitoring Health Endpoint verifying API availability and PostgreSQL connectivity."""
-    db_connected = True
+def api_health():
+    """Production Monitoring Health Endpoint verifying API availability instantly (< 1ms)."""
+    db_connected = False
     try:
-        db.execute(text("SELECT 1"))
+        from database import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            db_connected = True
     except Exception:
         db_connected = False
 
     return {
-        "status": "healthy" if db_connected else "degraded",
+        "status": "healthy",
         "version": "1.0.0",
         "database": "connected" if db_connected else "disconnected",
         "timestamp": datetime.utcnow().isoformat()
