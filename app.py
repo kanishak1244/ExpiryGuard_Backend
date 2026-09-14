@@ -267,23 +267,13 @@ app = FastAPI(title="DawaiFlow API", version="1.0.0")
 @app.on_event("startup")
 def warmup_database():
     try:
-        from database import SessionLocal, Base, engine
-        from sqlalchemy import text
-        from scheduler import start_scheduler
-        
-        # 1. Quick table schema creation
-        try:
-            Base.metadata.create_all(bind=engine)
-        except Exception as schema_err:
-            logger.warning(f"[Startup] Schema creation notice: {schema_err}")
-
-        # 2. Quick scheduler launch
+        # Quick scheduler launch
         try:
             start_scheduler()
         except Exception as sched_err:
             logger.warning(f"[Startup] Scheduler start notice: {sched_err}")
 
-        # 3. Quick SMTP health check
+        # Quick SMTP health check
         try:
             smtp_status = check_smtp_health(probe_network=False)
             if smtp_status.get("is_configured"):
@@ -296,12 +286,17 @@ def warmup_database():
         except Exception as smtp_err:
             logger.warning(f"[Startup] SMTP health check notice: {smtp_err}")
 
-        # 4. Offload heavy DDL migrations & index creation to background thread so Uvicorn binds port 8000 instantly (< 10ms)
+        # Offload heavy DB connection, schema creation, & DDL index migrations to background thread so Uvicorn binds port instantly (< 10ms)
         def _background_warmup():
             try:
-                from database import SessionLocal
+                from database import SessionLocal, Base, engine
                 import crud
                 import models
+                try:
+                    Base.metadata.create_all(bind=engine)
+                except Exception as schema_err:
+                    logger.warning(f"[Startup] Schema creation notice: {schema_err}")
+
                 bg_db = SessionLocal()
                 try:
                     # Index & Schema migrations
