@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Today's Returns — ExpiryGuard</title>
+  <title>Today's Returns — DawaiFlow</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -38,29 +38,39 @@
   <style>
     .returns-kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 992px) {
+      .returns-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 480px) {
+      .returns-kpi-grid {
+        grid-template-columns: 1fr;
+      }
     }
     .kpi-card {
       background-color: var(--color-surface-card);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      padding: 16px 18px;
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
       box-shadow: var(--shadow-subtle);
     }
     .kpi-title {
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--color-text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
     .kpi-num {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 800;
       color: var(--color-text-primary);
       line-height: 1.2;
@@ -68,9 +78,9 @@
       font-variant-numeric: tabular-nums;
     }
     .kpi-desc {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--color-text-muted);
-      margin-top: 2px;
+      margin-top: 1px;
     }
   </style>
 </head>
@@ -82,7 +92,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="brand-logo">
           <div class="shield-icon">🛡️</div>
-          <div class="brand-title">Expiry<span>Guard</span></div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
         </a>
       </div>
 
@@ -150,9 +160,12 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Today's Returns & Refunds</h1>
-          <p style="font-size: 13px; color: var(--color-text-muted);">Real-time patient refunds, counter returns audit, and automatic stock reversal ledger.</p>
         </div>
-        <div class="topbar-right">
+        <div class="topbar-right" style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-primary" onclick="openProcessReturnModal()" style="display: flex; align-items: center; gap: 6px; background-color: #DC2626; border-color: #DC2626; font-weight: 700; font-size: 13.5px;" title="Process Customer Item Return">
+            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+            <span>+ Process Return</span>
+          </button>
           <button class="btn btn-secondary" onclick="window.print()" style="display: flex; align-items: center; gap: 6px;" title="Print Returns Summary">
             <svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
             <span>Print Sheet</span>
@@ -166,7 +179,7 @@
 
       <main class="content-body">
         
-        <!-- Summary KPI Cards -->
+        <!-- Summary KPI Cards (4 Cards) -->
         <div class="returns-kpi-grid">
           <div class="kpi-card">
             <span class="kpi-title">Today's Total Refund</span>
@@ -179,31 +192,42 @@
             <div class="kpi-desc">Completed return transactions today</div>
           </div>
           <div class="kpi-card">
+            <span class="kpi-title">Total Returned Items</span>
+            <div class="kpi-num" id="returns-items-count" style="color: #0D9488;">0 items</div>
+            <div class="kpi-desc">Total medicine strips/units returned</div>
+          </div>
+          <div class="kpi-card">
             <span class="kpi-title">Stock Reversal Status</span>
-            <div class="kpi-num" id="returns-stock-status" style="color: var(--status-safe); font-size: 20px;">Automated FEFO</div>
+            <div class="kpi-num" id="returns-stock-status" style="color: var(--status-safe); font-size: 17px;">Automated FEFO</div>
             <div class="kpi-desc">Stock restored to active inventory</div>
           </div>
         </div>
 
         <!-- Table Panel -->
         <div class="panel">
-          <div class="panel-header">
-            <h2 class="panel-title">Processed Returns & Stock Adjustments Log</h2>
+          <div class="panel-header" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; padding: 14px 18px;">
+            <h2 class="panel-title" style="margin: 0;">Processed Returns & Stock Adjustments Log</h2>
+            
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 380px;">
+              <input type="text" id="returns-search-input" class="form-input" placeholder="🔍 Search medicine, bill no, customer..." style="font-size: 13px; padding: 6px 12px;" oninput="loadTodayReturns()">
+            </div>
           </div>
 
           <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 15%;">Return ID</th>
-                  <th style="width: 20%;">Original Bill</th>
-                  <th style="width: 25%;">Reason</th>
-                  <th style="width: 20%;">Refunded Amount</th>
-                  <th style="width: 20%;">Time Processed</th>
+                  <th style="width: 12%;">Return ID</th>
+                  <th style="width: 18%;">Original Bill</th>
+                  <th style="width: 25%;">Returned Medicine</th>
+                  <th style="width: 10%; text-align: center;">Qty</th>
+                  <th style="width: 15%;">Refund Amount</th>
+                  <th style="width: 20%;">Reason</th>
+                  <th style="width: 18%;">Date & Pharmacist</th>
                 </tr>
               </thead>
               <tbody id="returns-list-body">
-                <tr><td colspan="5" style="text-align: center; color: var(--color-text-muted); padding: 32px;">Loading returns log...</td></tr>
+                <tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 32px;">Loading returns log...</td></tr>
               </tbody>
             </table>
           </div>
@@ -220,5 +244,6 @@
   <script src="js/app.js?v=9.0"></script>
   <script src="js/add_inventory_flow.js?v=9.0"></script>
   <script src="js/billing_flow.js?v=9.0"></script>
+  <script src="js/returns_flow.js?v=9.0"></script>
 </body>
 </html>
