@@ -38,31 +38,46 @@
   <style>
     .settings-layout {
       display: grid;
-      grid-template-columns: 220px 1fr;
-      gap: 20px;
+      grid-template-columns: 230px 1fr;
+      gap: 24px;
       margin-top: 16px;
+      align-items: start;
     }
     .settings-nav {
       background-color: var(--color-surface-card);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 8px;
+      border-radius: var(--radius-md, 8px);
+      padding: 10px;
       display: flex;
       flex-direction: column;
       gap: 3px;
       height: fit-content;
+      position: sticky;
+      top: 20px;
+    }
+    .settings-nav-group-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--color-text-muted);
+      padding: 10px 10px 3px 10px;
+      margin-top: 6px;
+    }
+    .settings-nav-group-title:first-child {
+      margin-top: 0;
     }
     .settings-nav-btn {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;
+      padding: 8.5px 12px;
       border: none;
       background: transparent;
-      color: var(--color-text-muted);
-      font-size: 13.5px;
+      color: var(--color-text-secondary);
+      font-size: 13px;
       font-weight: 500;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-sm, 6px);
       cursor: pointer;
       text-align: left;
       transition: all 0.12s ease;
@@ -72,15 +87,41 @@
       color: var(--color-text-primary);
     }
     .settings-nav-btn.active {
-      background-color: var(--color-brand-deep);
+      background-color: var(--color-brand-deep, #10B981);
       color: #FFFFFF !important;
       font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    .settings-content {
+      max-width: 860px;
+      width: 100%;
     }
     .settings-panel {
       display: none;
     }
     .settings-panel.active {
       display: block;
+    }
+    @media (max-width: 768px) {
+      .settings-layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .settings-nav {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 8px;
+        white-space: nowrap;
+        gap: 6px;
+      }
+      .settings-nav-group-title {
+        display: none;
+      }
+      .settings-nav-btn {
+        padding: 8px 12px;
+        font-size: 12.5px;
+      }
     }
     .switch {
       position: relative;
@@ -391,15 +432,7 @@
     <div class="main-wrapper">
       <header class="topbar">
         <div>
-          <h1 class="page-title" data-i18n="settingsTitle">System Management</h1>
-          <p style="font-size: 13px; color: var(--muted-text);">Configure pharmacy profile, billing options, themes, and manage invoices.</p>
-        </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <select id="header-lang-select" class="form-input" style="width: auto; padding: 6px 12px;" onchange="i18n.setLanguage(this.value)">
-            <option value="en">🌐 English</option>
-            <option value="hi">🌐 Hindi (हिंदी)</option>
-          </select>
-          <button id="theme-toggle-btn" class="btn btn-secondary" onclick="toggleTheme()">🌙 Dark Mode</button>
+          <h1 class="page-title" data-i18n="settingsTitle">Settings</h1>
         </div>
       </header>
 
@@ -407,14 +440,27 @@
         <div class="settings-layout">
           <!-- Settings Category Sub-Navigation -->
           <div class="settings-nav">
+            <div class="settings-nav-group-title">PHARMACY</div>
             <button class="settings-nav-btn active" onclick="switchTab('pharmacy')">🏪 Pharmacy Profile</button>
+            
+            <div class="settings-nav-group-title">BILLING</div>
             <button class="settings-nav-btn" onclick="switchTab('billing-prefs')">🧾 Billing & Invoice</button>
+            
+            <div class="settings-nav-group-title">COMMUNICATION</div>
             <button class="settings-nav-btn" onclick="switchTab('notifications')">🔔 Notifications</button>
+            
+            <div class="settings-nav-group-title">PREFERENCES</div>
             <button class="settings-nav-btn" onclick="switchTab('appearance')">🎨 Appearance</button>
             <button class="settings-nav-btn" onclick="switchTab('language')">🌐 Language</button>
+            
+            <div class="settings-nav-group-title">ACCOUNT</div>
             <button class="settings-nav-btn" onclick="switchTab('account')">👤 Account & Security</button>
+            
+            <div class="settings-nav-group-title">RECORDS</div>
             <button class="settings-nav-btn" onclick="switchTab('bills-docs')">📄 Bills Archive</button>
             <button class="settings-nav-btn" onclick="switchTab('deleted-stock')">♻️ Recently Deleted</button>
+            
+            <div class="settings-nav-group-title">DATA</div>
             <button class="settings-nav-btn" onclick="switchTab('data')">💾 Data & Backup</button>
             <button class="settings-nav-btn" onclick="switchTab('migration')">📦 Data Migration</button>
           </div>
@@ -516,7 +562,7 @@
                       <label class="form-label">Invoice Footer / Terms & Conditions</label>
                       <textarea id="prof-terms" class="form-input" rows="3"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary">Save Pharmacy Info</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
                   </form>
                 </div>
               </div>
