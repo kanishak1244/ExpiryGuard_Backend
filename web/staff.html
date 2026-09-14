@@ -214,9 +214,6 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Staff & Users Management</h1>
-          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
-            Manage team accounts, assign roles & permissions, toggle account status, and administer staff credentials.
-          </p>
         </div>
         <div class="topbar-right">
           <button class="btn btn-primary" id="btn-open-add-staff" onclick="StaffApp.openAddModal()" style="display: flex; align-items: center; gap: 6px;">
@@ -240,42 +237,44 @@
             <div class="kpi-desc">Authorized to sign in</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-title">Pharmacists & Billing</span>
-            <div class="kpi-num" id="stat-front-staff">0</div>
-            <div class="kpi-desc">Counter & sales operators</div>
+            <span class="kpi-title">Pharmacists</span>
+            <div class="kpi-num" id="stat-pharmacists-count">0</div>
+            <div class="kpi-desc">Licensed pharmacy staff</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-title">Accountants & Inventory</span>
-            <div class="kpi-num" id="stat-back-staff">0</div>
-            <div class="kpi-desc">Audit & stock managers</div>
+            <span class="kpi-title">Billing & Other Staff</span>
+            <div class="kpi-num" id="stat-other-staff">0</div>
+            <div class="kpi-desc">Billing, inventory & accounts</div>
           </div>
         </div>
 
         <!-- Filter & Search Bar -->
-        <div class="card" style="padding: 14px 18px; margin-bottom: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 220px; position: relative;">
-            <input type="text" id="staff-search-input" class="form-control" placeholder="Search staff by name, username, phone..." oninput="StaffApp.filterStaff()">
+        <div class="card" style="padding: 12px 16px; margin-bottom: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 2; min-width: 220px;">
+              <input type="text" id="staff-search-input" class="form-control" placeholder="Search staff by name, username, phone..." oninput="StaffApp.filterStaff()">
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+              <select id="staff-role-filter" class="form-control" onchange="StaffApp.filterStaff()">
+                <option value="">All Roles</option>
+                <option value="PHARMACIST">Pharmacist</option>
+                <option value="BILLING_STAFF">Billing Staff</option>
+                <option value="INVENTORY_STAFF">Inventory Staff</option>
+                <option value="ACCOUNTANT">Accountant</option>
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 130px;">
+              <select id="staff-status-filter" class="form-control" onchange="StaffApp.filterStaff()">
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </div>
+            <button class="btn btn-secondary" onclick="StaffApp.loadStaff()" style="display: flex; align-items: center; gap: 6px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              <span>Refresh</span>
+            </button>
           </div>
-          <div style="width: 180px;">
-            <select id="staff-role-filter" class="form-control" onchange="StaffApp.filterStaff()">
-              <option value="">All Roles</option>
-              <option value="PHARMACIST">Pharmacist</option>
-              <option value="BILLING_STAFF">Billing Staff</option>
-              <option value="INVENTORY_STAFF">Inventory Staff</option>
-              <option value="ACCOUNTANT">Accountant</option>
-            </select>
-          </div>
-          <div style="width: 140px;">
-            <select id="staff-status-filter" class="form-control" onchange="StaffApp.filterStaff()">
-              <option value="">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
-          </div>
-          <button class="btn btn-secondary" onclick="StaffApp.loadStaff()" style="display: flex; align-items: center; gap: 6px;">
-            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-            <span>Refresh</span>
-          </button>
         </div>
 
         <!-- Staff Table Panel -->
@@ -284,13 +283,13 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Staff Member</th>
-                  <th>Username</th>
-                  <th>Assigned Role</th>
-                  <th>Contact Info</th>
-                  <th>Status</th>
-                  <th>Last Login</th>
-                  <th style="text-align: right;">Actions</th>
+                  <th style="width: 20%;">Staff Member</th>
+                  <th style="width: 14%;">Username</th>
+                  <th style="width: 14%;">Assigned Role</th>
+                  <th style="width: 18%;">Contact Info</th>
+                  <th style="width: 10%;">Status</th>
+                  <th style="width: 12%;">Last Login</th>
+                  <th style="width: 12%; text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody id="staff-table-body">

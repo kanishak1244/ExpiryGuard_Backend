@@ -78,24 +78,18 @@ window.StaffApp = {
   renderStats() {
     const total = this.staffList.length;
     const active = this.staffList.filter(s => (s.status || '').toUpperCase() === 'ACTIVE').length;
-    const front = this.staffList.filter(s => {
-      const r = (s.role || '').toUpperCase();
-      return r === 'PHARMACIST' || r === 'BILLING_STAFF';
-    }).length;
-    const back = this.staffList.filter(s => {
-      const r = (s.role || '').toUpperCase();
-      return r === 'ACCOUNTANT' || r === 'INVENTORY_STAFF';
-    }).length;
+    const pharmacists = this.staffList.filter(s => (s.role || '').toUpperCase() === 'PHARMACIST').length;
+    const otherStaff = this.staffList.filter(s => (s.role || '').toUpperCase() !== 'PHARMACIST').length;
 
     const elTotal = document.getElementById('stat-total-staff');
     const elActive = document.getElementById('stat-active-staff');
-    const elFront = document.getElementById('stat-front-staff');
-    const elBack = document.getElementById('stat-back-staff');
+    const elPharmacists = document.getElementById('stat-pharmacists-count');
+    const elOther = document.getElementById('stat-other-staff');
 
     if (elTotal) elTotal.textContent = total;
     if (elActive) elActive.textContent = active;
-    if (elFront) elFront.textContent = front;
-    if (elBack) elBack.textContent = back;
+    if (elPharmacists) elPharmacists.textContent = pharmacists;
+    if (elOther) elOther.textContent = otherStaff;
   },
 
   filterStaff() {
@@ -162,7 +156,10 @@ window.StaffApp = {
     if (!tbody) return;
 
     if (!list || list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">No staff members found matching criteria.</td></tr>`;
+      const emptyMsg = (!this.staffList || this.staffList.length === 0)
+        ? 'No staff members registered yet. Click "+ Add Staff Member" to add team accounts.'
+        : 'No staff members match your search or filter criteria.';
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">${emptyMsg}</td></tr>`;
       return;
     }
 
