@@ -43,7 +43,7 @@ window.BranchesApp = {
     if (Array.isArray(cachedBranches) && cachedBranches.length > 0) {
       this.branchList = cachedBranches;
       this.renderStats();
-      this.renderBranchesTable(this.branchList);
+      this.filterBranches();
     } else if (tbody && !tbody.children.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">Loading store branches...</td></tr>`;
     }
@@ -52,7 +52,7 @@ window.BranchesApp = {
       const data = await api.getStoreBranches();
       this.branchList = Array.isArray(data) ? data : [];
       this.renderStats();
-      this.renderBranchesTable(this.branchList);
+      this.filterBranches();
     } catch (err) {
       console.error('Failed to load branches:', err);
       if (tbody && (!this.branchList || this.branchList.length === 0)) {
@@ -78,12 +78,34 @@ window.BranchesApp = {
     if (elCities) elCities.textContent = cities.size;
   },
 
+  filterBranches() {
+    const searchVal = (document.getElementById('branch-search-input')?.value || '').toLowerCase().trim();
+    if (!searchVal) {
+      this.renderBranchesTable(this.branchList);
+      return;
+    }
+
+    const filtered = this.branchList.filter(b => {
+      const name = (b.branch_name || '').toLowerCase();
+      const code = (b.code || '').toLowerCase();
+      const city = (b.city || '').toLowerCase();
+      const phone = (b.phone || '').toLowerCase();
+      const address = (b.address || '').toLowerCase();
+      return name.includes(searchVal) || code.includes(searchVal) || city.includes(searchVal) || phone.includes(searchVal) || address.includes(searchVal);
+    });
+
+    this.renderBranchesTable(filtered);
+  },
+
   renderBranchesTable(list) {
     const tbody = document.getElementById('branches-table-body');
     if (!tbody) return;
 
     if (!list || list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">No store branches configured yet.</td></tr>`;
+      const emptyMsg = (!this.branchList || this.branchList.length === 0)
+        ? 'No store branches yet.'
+        : 'No branches match your search.';
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px;">${emptyMsg}</td></tr>`;
       return;
     }
 
@@ -94,7 +116,7 @@ window.BranchesApp = {
         : `<span class="status-badge-inactive">○ Inactive</span>`;
 
       const mainBadge = b.is_main
-        ? `<span class="main-branch-chip">★ Main HQ</span>`
+        ? `<span class="main-branch-chip">★ Main Branch</span>`
         : '';
 
       const toggleActionLabel = isActive ? 'Deactivate' : 'Activate';

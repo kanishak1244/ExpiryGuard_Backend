@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Store Branches Directory — ExpiryGuard</title>
+  <title>Store Branches Directory — DawaiFlow</title>
   <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
   <script>
     (function() {
@@ -184,9 +184,6 @@
       <header class="topbar">
         <div>
           <h1 class="page-title">Store Branches Directory</h1>
-          <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 2px;">
-            Manage pharmacy branch locations, branch codes, contact phone numbers, and operational status.
-          </p>
         </div>
         <div class="topbar-right">
           <button class="btn btn-primary" id="btn-open-add-branch" onclick="BranchesApp.openAddModal()" style="display: flex; align-items: center; gap: 6px;">
@@ -210,7 +207,7 @@
             <div class="kpi-desc">Currently operational</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-title">Main Headquarters</span>
+            <span class="kpi-title">Main Branch</span>
             <div class="kpi-num" id="stat-main-branch-name" style="font-size: 18px; font-weight: 700; color: #8B5CF6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
             <div class="kpi-desc">Primary billing store</div>
           </div>
@@ -221,19 +218,32 @@
           </div>
         </div>
 
+        <!-- Search Toolbar -->
+        <div class="card" style="padding: 12px 16px; margin-bottom: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 240px;">
+              <input type="text" id="branch-search-input" class="form-control" placeholder="Search branches by name, code, city, phone..." oninput="BranchesApp.filterBranches()">
+            </div>
+            <button class="btn btn-secondary" onclick="BranchesApp.loadBranches()" style="display: flex; align-items: center; gap: 6px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Branches Table Panel -->
         <div class="panel">
           <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Branch Name</th>
-                  <th>Code</th>
-                  <th>City / Location</th>
-                  <th>Contact Phone</th>
-                  <th>Address</th>
-                  <th>Status</th>
-                  <th style="text-align: right;">Actions</th>
+                  <th style="width: 22%;">Branch Name</th>
+                  <th style="width: 10%;">Code</th>
+                  <th style="width: 16%;">City / Location</th>
+                  <th style="width: 15%;">Contact Phone</th>
+                  <th style="width: 18%;">Address</th>
+                  <th style="width: 9%;">Status</th>
+                  <th style="width: 10%; text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody id="branches-table-body">
@@ -288,7 +298,7 @@
 
           <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
             <input type="checkbox" id="branch-form-main" style="width: 16px; height: 16px; cursor: pointer;">
-            <label for="branch-form-main" style="margin: 0; cursor: pointer; font-size: 13px;">Set as Main Headquarters Branch</label>
+            <label for="branch-form-main" style="margin: 0; cursor: pointer; font-size: 13px;">Set as Main Branch</label>
           </div>
         </div>
         <div class="modal-footer">
