@@ -68,9 +68,5 @@ USER dawaiflow
 
 EXPOSE 8000
 
-# Health check against dedicated health endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
-
-# Production entrypoint using Uvicorn ASGI server with resilient Python port resolver
-CMD ["python", "-c", "import os, subprocess, sys; p = os.environ.get('PORT', '').strip() or '8000'; sys.exit(subprocess.call([sys.executable, '-m', 'uvicorn', 'app:app', '--host', '0.0.0.0', '--port', p, '--workers', '1', '--proxy-headers', '--forwarded-allow-ips', '*']))"]
+# Production entrypoint using Uvicorn ASGI server
+CMD uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'
