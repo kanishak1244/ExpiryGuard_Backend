@@ -48,7 +48,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
     VIRTUAL_ENV="/opt/venv" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH="/app"
+    PYTHONPATH="/app" \
+    PORT=8000
 
 # Create unprivileged system user for secure application execution
 RUN groupadd -g 10001 dawaiflow && \
@@ -71,5 +72,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Production entrypoint using Uvicorn ASGI server (dynamically respects Railway $PORT)
-CMD ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'"]
+# Production entrypoint using Uvicorn ASGI server with resilient Python port resolver
+CMD ["python", "-c", "import os, subprocess, sys; p = os.environ.get('PORT', '').strip() or '8000'; sys.exit(subprocess.call(['uvicorn', 'app:app', '--host', '0.0.0.0', '--port', p, '--workers', '1', '--proxy-headers', '--forwarded-allow-ips', '*']))"]
