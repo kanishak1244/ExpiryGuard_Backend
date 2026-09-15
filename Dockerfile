@@ -55,5 +55,5 @@ COPY . /app
 
 EXPOSE 8000
 
-# Production entrypoint using Uvicorn ASGI server with dynamic $PORT binding
-CMD exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'
+# Production entrypoint using start_server.py launcher
+CMD ["python", "start_server.py"]
