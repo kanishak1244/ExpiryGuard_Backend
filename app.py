@@ -992,9 +992,11 @@ def reset_password(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
         db.rollback()
-        logger.error(f"[Password Reset Error] {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Reset failed: {str(e)}")
+        logger.error(f"[Password Reset Error] {e}\n{tb}")
+        raise HTTPException(status_code=400, detail=f"Reset error: {str(e)} | STACK: {tb[:300]}")
 
 
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
