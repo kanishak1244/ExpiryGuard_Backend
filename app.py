@@ -486,24 +486,37 @@ security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
 
 def safe_hash_password(password: str) -> str:
-    """Hashes password safely, truncating to 72 UTF-8 bytes to comply with bcrypt limits without throwing exceptions."""
+    """Hashes password safely using SHA-256 pre-hashing + bcrypt to completely bypass bcrypt's 72-byte limit."""
     if not password:
         return pwd_context.hash("")
-    pwd_bytes = password.encode("utf-8")[:72]
-    return pwd_context.hash(pwd_bytes.decode("utf-8", "ignore"))
+    import hashlib, base64
+    pre_hashed = base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest()).decode("ascii")
+    return pwd_context.hash(pre_hashed)
 
 def safe_verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Safely verifies passwords, handling passlib exceptions or legacy plain-text password fallback without crashing with HTTP 500."""
+    """Safely verifies passwords against SHA-256 pre-hashed bcrypt, standard bcrypt, and legacy plain text."""
     if not plain_password or not hashed_password:
         return False
+    import hashlib, base64
+    pre_hashed = base64.b64encode(hashlib.sha256(plain_password.encode("utf-8")).digest()).decode("ascii")
+
+    # 1. Try SHA-256 pre-hashed verification (32 bytes base64 = 44 chars)
+    try:
+        if pwd_context.verify(pre_hashed, hashed_password):
+            return True
+    except Exception:
+        pass
+
+    # 2. Try standard passlib verify with 72-char truncation
     try:
         pwd_bytes = plain_password.encode("utf-8")[:72]
         safe_pwd = pwd_bytes.decode("utf-8", "ignore")
         if pwd_context.verify(safe_pwd, hashed_password):
             return True
-    except Exception as exc:
-        logger.warning(f"[Auth Notice] Passlib verify exception: {exc}")
+    except Exception:
+        pass
 
+    # 3. Legacy plain-text fallback
     try:
         if plain_password.strip() == hashed_password.strip():
             return True
