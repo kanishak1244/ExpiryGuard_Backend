@@ -6170,7 +6170,7 @@ def create_staff_member(
 
     # Hash password if provided, or default to a secure temporary password
     raw_password = (req.password or "staff1234").strip()
-    hashed_pwd = pwd_context.hash(raw_password)
+    hashed_pwd = safe_hash_password(raw_password)
     encrypted_pwd = encrypt_staff_password(raw_password)
 
     normalized_role = permissions.normalize_role(req.role)
@@ -6276,7 +6276,7 @@ def reset_staff_password(
         raise HTTPException(status_code=404, detail="Staff member not found")
 
     new_pwd = req.new_password.strip()
-    staff.password = pwd_context.hash(new_pwd)
+    staff.password = safe_hash_password(new_pwd)
     staff.encrypted_password = encrypt_staff_password(new_pwd)
     db.commit()
 
@@ -6371,7 +6371,7 @@ def update_staff_credentials(
         new_pwd = req.password.strip()
         if len(new_pwd) < 4:
             raise HTTPException(status_code=400, detail="Password must be at least 4 characters long.")
-        staff.password = pwd_context.hash(new_pwd)
+        staff.password = safe_hash_password(new_pwd)
         staff.encrypted_password = encrypt_staff_password(new_pwd)
 
     db.commit()
