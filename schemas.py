@@ -20,6 +20,11 @@ class UserLogin(BaseModel):
     password: str
 
 
+class PasswordResetRequest(BaseModel):
+    email: str
+    new_password: str
+
+
 class User(BaseModel):
     id: int
     email: str
