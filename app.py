@@ -601,6 +601,7 @@ if not firebase_admin._apps:
 
 # Upload Storage Directory Setup (Public static mount removed for tenant privacy & security)
 UPLOADS_BASE_DIR = (BASE_DIR / "uploads").resolve()
+DOCUMENTS_DIR = (UPLOADS_BASE_DIR / "documents").resolve()
 try:
     os.makedirs(UPLOADS_BASE_DIR, exist_ok=True)
     os.makedirs(DOCUMENTS_DIR, exist_ok=True)
