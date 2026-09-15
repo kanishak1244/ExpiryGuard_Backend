@@ -289,6 +289,31 @@ def warmup_database():
         except Exception as smtp_err:
             logger.warning(f"[Startup] SMTP health check notice: {smtp_err}")
 
+        # Synchronous Core Table Column Verification
+        try:
+            from database import engine
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS drug_license_no VARCHAR DEFAULT 'DL-2026-PHARMA-01';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_url VARCHAR;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_and_conditions TEXT DEFAULT '1. Goods once sold will not be taken back without original bill.\\n2. Expiry dates checked at sales time.';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_payment_method VARCHAR DEFAULT 'CASH';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invoice_prefix VARCHAR DEFAULT 'INV';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_gst_breakdown BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_hsn BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_batch_expiry BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_customer_info BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS expiry_alerts_enabled BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS low_stock_alerts_enabled BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_notifications_enabled BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_confirmation_required BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_save_enabled BOOLEAN DEFAULT TRUE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language VARCHAR DEFAULT 'en';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_theme VARCHAR DEFAULT 'light';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gstin VARCHAR DEFAULT '07AABCE1234F1Z5';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_number VARCHAR DEFAULT '07AABCE1234F1Z5';"))
+        except Exception as sync_schema_err:
+            logger.warning(f"[Startup Schema Notice] {sync_schema_err}")
+
         # Offload heavy DB connection, schema creation, & DDL index migrations to background thread so Uvicorn binds port instantly (< 10ms)
         def _background_warmup():
             try:
@@ -934,13 +959,20 @@ def reset_password(
     data: schemas.PasswordResetRequest,
     db: Session = Depends(get_db),
 ):
-    user = db.query(models.User).filter(models.User.email.ilike(data.email.strip())).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Account with this email address was not found")
+    try:
+        user = db.query(models.User).filter(models.User.email.ilike(data.email.strip())).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Account with this email address was not found")
 
-    user.password = pwd_context.hash(data.new_password[:72])
-    db.commit()
-    return {"message": "Password updated successfully. You can now log in."}
+        user.password = pwd_context.hash(data.new_password[:72])
+        db.commit()
+        return {"message": "Password updated successfully. You can now log in."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Password Reset Error] {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Reset failed: {str(e)}")
 
 
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
