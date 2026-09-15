@@ -349,6 +349,25 @@ def warmup_database():
                         bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES staff_members(id);"))
                         bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS staff_name VARCHAR;"))
                         bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_staff_id ON sales(staff_id);"))
+
+                        # User profile & settings schema migrations
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS drug_license_no VARCHAR DEFAULT 'DL-2026-PHARMA-01';"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_url VARCHAR;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_and_conditions TEXT DEFAULT '1. Goods once sold will not be taken back without original bill.\\n2. Expiry dates checked at sales time.';"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_payment_method VARCHAR DEFAULT 'CASH';"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS invoice_prefix VARCHAR DEFAULT 'INV';"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_gst_breakdown BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_hsn BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_batch_expiry BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS show_customer_info BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS expiry_alerts_enabled BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS low_stock_alerts_enabled BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_notifications_enabled BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_confirmation_required BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_save_enabled BOOLEAN DEFAULT TRUE;"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language VARCHAR DEFAULT 'en';"))
+                        bg_db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_theme VARCHAR DEFAULT 'light';"))
+
                         # Pilot leads notification tracking schema
                         bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'PENDING';"))
                         bg_db.execute(text("ALTER TABLE pilot_leads ADD COLUMN IF NOT EXISTS notification_error TEXT;"))
@@ -874,31 +893,38 @@ def register(
     user: schemas.UserCreate,
     db: Session = Depends(get_db),
 ):
-    existing = db.query(models.User).filter(models.User.email.ilike(user.email.strip())).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        existing = db.query(models.User).filter(models.User.email.ilike(user.email.strip())).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-    if user.phone and user.phone.strip():
-        existing_phone = db.query(models.User).filter(models.User.phone == user.phone.strip()).first()
-        if existing_phone:
-            raise HTTPException(status_code=400, detail="Phone number already registered")
+        if user.phone and user.phone.strip():
+            existing_phone = db.query(models.User).filter(models.User.phone == user.phone.strip()).first()
+            if existing_phone:
+                raise HTTPException(status_code=400, detail="Phone number already registered")
 
-    hashed_password = pwd_context.hash(user.password)
-    new_user = models.User(
-        shop_name=user.shop_name,
-        owner_name=user.owner_name,
-        email=user.email.strip().lower(),
-        password=hashed_password,
-        phone=user.phone.strip() if user.phone else None,
-        address=user.address.strip() if user.address else None,
-        gstin=user.gstin.strip() if user.gstin else "07AABCE1234F1Z5",
-        gst_number=user.gstin.strip() if user.gstin else "07AABCE1234F1Z5",
-    )
+        hashed_password = pwd_context.hash(user.password)
+        new_user = models.User(
+            shop_name=user.shop_name.strip() if user.shop_name else "DawaiFlow Pharmacy",
+            owner_name=user.owner_name.strip() if user.owner_name else "Pharmacy Owner",
+            email=user.email.strip().lower(),
+            password=hashed_password,
+            phone=user.phone.strip() if user.phone else None,
+            address=user.address.strip() if user.address else None,
+            gstin=user.gstin.strip() if user.gstin else "07AABCE1234F1Z5",
+            gst_number=user.gstin.strip() if user.gstin else "07AABCE1234F1Z5",
+        )
 
-    db.add(new_user)
-    db.commit()
+        db.add(new_user)
+        db.commit()
 
-    return {"message": "User registered successfully"}
+        return {"message": "User registered successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Registration Exception] Failed to register '{user.email}': {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm

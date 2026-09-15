@@ -700,7 +700,8 @@ class ApiClient {
 
           const regData = await regRes.json();
           if (!regRes.ok) {
-            throw new Error(regData.message || regData.detail || 'Registration failed.');
+            const errorMsg = typeof regData.detail === 'string' ? regData.detail : (regData.message || (Array.isArray(regData.detail) ? regData.detail.map(d => d.msg).join(', ') : 'Registration failed.'));
+            throw new Error(errorMsg);
           }
 
           authSuccess.textContent = 'Registration successful! Logging in...';
