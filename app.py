@@ -483,7 +483,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 # Security Setup (Dual-mode: Bearer Token + HttpOnly Session Cookie)
 security = HTTPBearer(auto_error=False)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
 
 def safe_hash_password(password: str) -> str:
     """Hashes password safely, truncating to 72 UTF-8 bytes to comply with bcrypt limits without throwing exceptions."""
