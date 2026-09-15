@@ -1695,7 +1695,7 @@ function openCreateBillModal() {
             <div style="display: flex; align-items: center; gap: 10px;">
               <div style="font-size: 28px;">🧾</div>
               <div>
-                <h2 style="margin: 0; font-size: 18px; color: var(--color-brand-deep);">Create New Retail Sale Bill — ExpiryGuard Quick POS</h2>
+                <h2 style="margin: 0; font-size: 18px; color: var(--color-brand-deep);">Create New Retail Sale Bill — DawaiFlow Quick POS</h2>
                 <div style="font-size: 12px; color: var(--color-text-muted);">High-speed keyboard billing, automated FEFO batch selection & GST invoice generation</div>
               </div>
             </div>

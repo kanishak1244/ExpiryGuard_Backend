@@ -55,7 +55,7 @@ const TRANSLATIONS = {
     language: "Language",
     notifications: "Notifications",
     dataManagement: "Data & Backup",
-    about: "About ExpiryGuard",
+    about: "About DawaiFlow",
 
     // Common Buttons & Labels
     saveChanges: "Save Changes",
@@ -118,7 +118,7 @@ const TRANSLATIONS = {
     language: "भाषा",
     notifications: "सूचनाएं एवं अलर्ट",
     dataManagement: "डेटा बैकअप एवं निर्यात",
-    about: "ExpiryGuard के बारे में",
+    about: "DawaiFlow के बारे में",
 
     // Common Buttons & Labels
     saveChanges: "बदलाव सहेजें",

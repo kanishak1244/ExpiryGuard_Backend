@@ -14,7 +14,7 @@ class ApiService {
     'http://192.168.29.8:8000',   // Local Wi-Fi LAN host
     'http://127.0.0.1:8000',      // Local desktop loopback
     'http://localhost:8000',      // Standard localhost
-    'https://app.expiryguard.com',// Production backend
+    'https://api.dawaiflow.com',// Production backend
   ];
 
   static void setBaseUrl(String url) {
@@ -122,7 +122,7 @@ class ApiService {
       'http://192.168.29.8:8000',
       'http://127.0.0.1:8000',
       'http://localhost:8000',
-      'https://app.expiryguard.com',
+      'https://api.dawaiflow.com',
     ];
 
     for (final base in candidateUrls) {
@@ -520,6 +520,77 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
       throw Exception('Failed to load customer ledger');
+    }
+  }
+
+  /// Search original sales bills by medicine name or bill number
+  static Future<List<dynamic>> searchSalesByMedicine(String query) async {
+    await ensureAuthenticated();
+    final uri = Uri.parse('$_baseUrl/api/sales/search-by-medicine?query=${Uri.encodeComponent(query)}');
+    final response = await http.get(uri, headers: _getHeaders());
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to search sales by medicine');
+    }
+  }
+
+  /// Process item return and restore database inventory stock
+  static Future<Map<String, dynamic>> processSaleReturn({
+    required int saleId,
+    required int saleItemId,
+    required int returnQuantity,
+    String? reason,
+  }) async {
+    await ensureAuthenticated();
+    final uri = Uri.parse('$_baseUrl/api/sales/returns');
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({
+        'sale_id': saleId,
+        'reason': reason ?? 'Customer Return',
+        'items': [
+          {
+            'sale_item_id': saleItemId,
+            'return_quantity': returnQuantity,
+          }
+        ]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      final err = jsonDecode(response.body);
+      throw Exception(err['detail'] ?? 'Failed to process return');
+    }
+  }
+
+  /// Fetch today's returned items and refund summary
+  static Future<Map<String, dynamic>> fetchTodayReturns() async {
+    await ensureAuthenticated();
+    final uri = Uri.parse('$_baseUrl/api/sales/returns/today');
+    final response = await http.get(uri, headers: _getHeaders());
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Failed to load today returns summary');
+    }
+  }
+
+  /// Fetch filterable returns history
+  static Future<List<dynamic>> fetchReturnsHistory({String? query}) async {
+    await ensureAuthenticated();
+    var url = '$_baseUrl/api/sales/returns';
+    if (query != null && query.isNotEmpty) {
+      url += '?search=${Uri.encodeComponent(query)}';
+    }
+    final response = await http.get(Uri.parse(url), headers: _getHeaders());
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Failed to load returns history');
     }
   }
 }
