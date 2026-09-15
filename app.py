@@ -485,12 +485,21 @@ app.add_middleware(SlowAPIMiddleware)
 security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def safe_hash_password(password: str) -> str:
+    """Hashes password safely, truncating to 72 UTF-8 bytes to comply with bcrypt limits without throwing exceptions."""
+    if not password:
+        return pwd_context.hash("")
+    pwd_bytes = password.encode("utf-8")[:72]
+    return pwd_context.hash(pwd_bytes.decode("utf-8", "ignore"))
+
 def safe_verify_password(plain_password: str, hashed_password: str) -> bool:
     """Safely verifies passwords, handling passlib exceptions or legacy plain-text password fallback without crashing with HTTP 500."""
     if not plain_password or not hashed_password:
         return False
     try:
-        if pwd_context.verify(plain_password[:72], hashed_password):
+        pwd_bytes = plain_password.encode("utf-8")[:72]
+        safe_pwd = pwd_bytes.decode("utf-8", "ignore")
+        if pwd_context.verify(safe_pwd, hashed_password):
             return True
     except Exception as exc:
         logger.warning(f"[Auth Notice] Passlib verify exception: {exc}")
@@ -928,7 +937,7 @@ def register(
             if existing_phone:
                 raise HTTPException(status_code=400, detail="Phone number already registered")
 
-        hashed_password = pwd_context.hash(user.password[:72])
+        hashed_password = safe_hash_password(user.password)
         new_user = models.User(
             shop_name=user.shop_name.strip() if user.shop_name else "DawaiFlow Pharmacy",
             owner_name=user.owner_name.strip() if user.owner_name else "Pharmacy Owner",
@@ -964,7 +973,7 @@ def reset_password(
         if not user:
             raise HTTPException(status_code=404, detail="Account with this email address was not found")
 
-        user.password = pwd_context.hash(data.new_password[:72])
+        user.password = safe_hash_password(data.new_password)
         db.commit()
         return {"message": "Password updated successfully. You can now log in."}
     except HTTPException:
