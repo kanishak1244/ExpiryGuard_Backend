@@ -346,7 +346,7 @@ class ApiClient {
       ConfirmModal({
         isOpen: true,
         title: 'Want to log out?',
-        message: 'Are you sure you want to log out of ExpiryGuard ERP? You will need to enter your credentials to log back in.',
+        message: 'Are you sure you want to log out of DawaiFlow ERP? You will need to enter your credentials to log back in.',
         confirmText: 'Logout',
         cancelText: 'Cancel',
         icon: '🔒',
@@ -421,7 +421,7 @@ class ApiClient {
             <div style="width: 56px; height: 56px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 28px;">
               🛡️
             </div>
-            <h2 id="auth-title" style="font-size: 24px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px; letter-spacing: -0.5px;">ExpiryGuard</h2>
+            <h2 id="auth-title" style="font-size: 24px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px; letter-spacing: -0.5px;">DawaiFlow</h2>
             <p id="auth-subtitle" style="font-size: 13px; color: #94A3B8;">Sign in to access pharmacy counter & inventory</p>
           </div>
 
@@ -440,7 +440,7 @@ class ApiClient {
                 <input type="password" id="login-password" class="form-input" required placeholder="Enter password" style="width: 100%; padding: 11px 14px; background: #1E293B; border: 1px solid #475569; border-radius: 10px; color: #FFFFFF; font-size: 13px; box-sizing: border-box;">
               </div>
               <button type="submit" id="btn-submit-login" class="btn btn-primary" style="width: 100%; padding: 12px; background: #10B981; border: none; border-radius: 10px; color: #FFFFFF; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
-                Log In to ExpiryGuard →
+                Log In to DawaiFlow →
               </button>
             </form>
             <div style="margin-top: 20px; text-align: center; font-size: 13px; color: #94A3B8;">
@@ -527,7 +527,7 @@ class ApiClient {
       modal.querySelector('#link-show-register').addEventListener('click', () => {
         loginPanel.style.display = 'none';
         registerPanel.style.display = 'block';
-        authTitle.textContent = 'Create ExpiryGuard Account';
+        authTitle.textContent = 'Create DawaiFlow Account';
         authSubtitle.textContent = 'Step-by-step owner & pharmacy registration';
         authError.style.display = 'none';
         authSuccess.style.display = 'none';
@@ -536,7 +536,7 @@ class ApiClient {
       modal.querySelector('#link-show-login').addEventListener('click', () => {
         registerPanel.style.display = 'none';
         loginPanel.style.display = 'block';
-        authTitle.textContent = 'ExpiryGuard';
+        authTitle.textContent = 'DawaiFlow';
         authSubtitle.textContent = 'Sign in to access pharmacy counter & inventory';
         authError.style.display = 'none';
         authSuccess.style.display = 'none';
@@ -634,7 +634,7 @@ class ApiClient {
           authError.style.display = 'block';
         } finally {
           submitBtn.disabled = false;
-          submitBtn.textContent = 'Log In to ExpiryGuard →';
+          submitBtn.textContent = 'Log In to DawaiFlow →';
         }
       });
 
@@ -862,7 +862,7 @@ class ApiClient {
     const blobUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = blobUrl;
-    a.download = 'expiryguard_sales_export.csv';
+    a.download = 'dawaiflow_sales_export.csv';
     document.body.appendChild(a);
     a.click();
     a.remove();

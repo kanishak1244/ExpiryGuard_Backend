@@ -92,7 +92,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
         wa_phone = "91" + clean_phone
     else:
         wa_phone = clean_phone
-    whatsapp_url = f"https://wa.me/{wa_phone}?text=Hi%20{full_name.split()[0]}%2C%20thank%20you%20for%20requesting%20early%20pilot%20access%20to%20ExpiryGuard%20for%20{pharmacy_name}!"
+    whatsapp_url = f"https://wa.me/{wa_phone}?text=Hi%20{full_name.split()[0]}%2C%20thank%20you%20for%20requesting%20early%20pilot%20access%20to%20DawaiFlow%20for%20{pharmacy_name}!"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -111,7 +111,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
           <tr>
             <td style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); padding: 24px 30px; text-align: left;">
               <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
-                🛡️ Expiry<span style="color: #10B981;">Guard</span>
+                🛡️ Dawai<span style="color: #10B981;">Flow</span>
               </div>
               <p style="margin: 6px 0 0 0; color: #94A3B8; font-size: 13px; font-weight: 500;">Instant Pilot Access Lead Notification</p>
             </td>
@@ -186,7 +186,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
           <tr>
             <td style="background-color: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 14px 30px; text-align: center;">
               <p style="margin: 0; color: #94A3B8; font-size: 11.5px;">
-                Sent automatically by ExpiryGuard AI Platform Backend • Real-time Pilot Lead Alert
+                Sent automatically by DawaiFlow AI Platform Backend • Real-time Pilot Lead Alert
               </p>
             </td>
           </tr>
@@ -212,7 +212,7 @@ def format_pilot_lead_plain_text(lead_data: Dict[str, Any]) -> str:
     lead_id = lead_data.get("id", "N/A")
 
     return f"""==================================================
-EXPIRYGUARD — NEW PILOT ACCESS REQUEST
+DAWAIFLOW — NEW PILOT ACCESS REQUEST
 ==================================================
 
 A new pharmacy lead has just signed up for the pilot:
@@ -230,7 +230,7 @@ A new pharmacy lead has just signed up for the pilot:
 --------------------------------------------------
 Call Pharmacist: tel:{phone}
 --------------------------------------------------
-Automated alert sent by ExpiryGuard Platform.
+Automated alert sent by DawaiFlow Platform.
 """
 
 
@@ -806,7 +806,7 @@ def send_ca_report_email(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ExpiryGuard - Pharmacy GST & Financial Reports</title>
+  <title>DawaiFlow - Pharmacy GST & Financial Reports</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 30px 15px;">
@@ -818,7 +818,7 @@ def send_ca_report_email(
           <tr>
             <td style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); padding: 24px 30px; text-align: left;">
               <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
-                🛡️ Expiry<span style="color: #10B981;">Guard</span> ERP
+                🛡️ Dawai<span style="color: #10B981;">Flow</span> ERP
               </div>
               <p style="margin: 6px 0 0 0; color: #94A3B8; font-size: 13px; font-weight: 500;">CA Connect — Official Financial & GST Data Package</p>
             </td>
@@ -916,7 +916,7 @@ def send_ca_report_email(
           <tr>
             <td style="background-color: #F1F5F9; padding: 20px 30px; text-align: center; border-top: 1px solid #E2E8F0;">
               <p style="margin: 0; color: #94A3B8; font-size: 12px;">
-                Generated securely by <strong>ExpiryGuard AI Pharmacy ERP System</strong>.<br>
+                Generated securely by <strong>DawaiFlow AI Pharmacy ERP System</strong>.<br>
                 This automated email was triggered directly by {owner_name} ({sender_email}).
               </p>
             </td>
@@ -931,10 +931,10 @@ def send_ca_report_email(
 
     try:
         msg = MIMEMultipart("mixed")
-        msg["Subject"] = f"📑 ExpiryGuard — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})"
+        msg["Subject"] = f"📑 DawaiFlow — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})"
         
         # SENDER IDENTITY: Display Shopkeeper Name & Pharmacy Name, set Reply-To to Shopkeeper's Email
-        sender_display_name = f"{owner_name} ({pharmacy_name}) via ExpiryGuard"
+        sender_display_name = f"{owner_name} ({pharmacy_name}) via DawaiFlow"
         msg["From"] = f"{sender_display_name} <{cfg['user']}>"
         msg["Reply-To"] = f"{owner_name} <{sender_email}>"
         msg["To"] = ca_email

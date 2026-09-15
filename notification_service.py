@@ -220,7 +220,7 @@ def calculate_expiry_digest_buckets(user_id: int, db, include_items: bool = True
         lines.append(f"🔵 {buckets['9m']['count']} expiring within 9 months")
 
     if lines:
-        body = "Time for your medicine expiry review.\n" + "\n".join(lines) + "\nTap to review inventory in ExpiryGuard."
+        body = "Time for your medicine expiry review.\n" + "\n".join(lines) + "\nTap to review inventory in DawaiFlow."
     else:
         body = "All inventory medicines are healthy. No items expiring within 9 months."
 

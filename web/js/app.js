@@ -310,7 +310,7 @@ function initDashboard() {
 
   const updateDashboardUI = (summary, sales = null) => {
     if (summary) {
-      // Render Shop Info
+      // Render Shop Info & Dynamic Greeting
       if (summary.shop_name) {
         if (window.ExpiryNav && typeof window.ExpiryNav.updateShopName === 'function') {
           window.ExpiryNav.updateShopName(summary.shop_name, summary.role);
@@ -325,19 +325,32 @@ function initDashboard() {
       if (totalEl) totalEl.textContent = summary.total_products || 0;
 
       const salesEl = document.getElementById('kpi-sales-count');
-      if (salesEl) salesEl.textContent = summary.today_sales_count || 0;
+      if (salesEl) salesEl.textContent = Number(summary.today_sales_count || 0).toLocaleString('en-IN');
 
       const revEl = document.getElementById('kpi-revenue');
-      if (revEl) revEl.textContent = `₹${(summary.today_revenue || 0).toLocaleString('en-IN')}`;
+      if (revEl) revEl.textContent = `₹${(summary.today_revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
       const expEl = document.getElementById('kpi-expiring');
-      if (expEl) expEl.textContent = summary.expiring_soon_count || 0;
+      if (expEl) expEl.textContent = Number(summary.expiring_soon_count || 0).toLocaleString('en-IN');
 
       const expdEl = document.getElementById('kpi-expired');
-      if (expdEl) expdEl.textContent = summary.expired_count || 0;
+      if (expdEl) expdEl.textContent = Number(summary.expired_count || 0).toLocaleString('en-IN');
+
+      const lowEl = document.getElementById('kpi-low-stock');
+      if (lowEl) lowEl.textContent = Number(summary.low_stock_count !== undefined ? summary.low_stock_count : (summary.needs_attention?.low_stock_count || 0)).toLocaleString('en-IN');
+
+      const deadEl = document.getElementById('kpi-dead-stock');
+      if (deadEl) deadEl.textContent = Number(summary.dead_stock_count !== undefined ? summary.dead_stock_count : 0).toLocaleString('en-IN');
 
       const retEl = document.getElementById('kpi-returns');
-      if (retEl) retEl.textContent = `₹${(summary.today_returns_amount || 0).toLocaleString('en-IN')}`;
+      if (retEl) retEl.textContent = `₹${(summary.today_returns_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+      const pendSumEl = document.getElementById('kpi-pending-summary');
+      if (pendSumEl) {
+        const pCount = Array.isArray(summary.pending_payments_list) ? summary.pending_payments_list.length : 0;
+        const pTotal = summary.pending_payments_total || 0;
+        pendSumEl.textContent = `${pCount} customer${pCount === 1 ? '' : 's'} • ₹${pTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+      }
 
       // Render Pending Payments Ledger
       if (summary.pending_payments_list) {
@@ -528,9 +541,20 @@ window.setInventoryFilter = function(filterKey) {
   currentFilter = filterKey;
   inventoryCurrentPage = 1;
   document.querySelectorAll('.filter-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.filter === filterKey);
+    const bFilter = (b.dataset.filter || '').toLowerCase();
+    const fk = (filterKey || '').toLowerCase();
+    const isMatch = bFilter === fk || 
+                    (fk.includes('dead') && bFilter.includes('dead')) ||
+                    (fk.includes('risk') && bFilter.includes('risk')) ||
+                    (fk === 'expiring' && bFilter === 'expiring');
+    b.classList.toggle('active', isMatch);
   });
   fetchInventoryPage();
+
+  const tablePanel = document.querySelector('.panel');
+  if (tablePanel) {
+    tablePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 };
 
 window.changeInventoryPage = function(delta) {
@@ -683,10 +707,10 @@ function initInventory() {
       const s = intel.summary || {};
       const totalProducts = intel.total_products !== undefined ? intel.total_products : (s.total_products !== undefined ? s.total_products : 0);
       const totalStockValue = intel.total_stock_value !== undefined ? intel.total_stock_value : (s.total_stock_value !== undefined ? s.total_stock_value : 0);
-      const expiringSoonCount = s.expiring_soon_count !== undefined ? s.expiring_soon_count : (intel.expiring_30d_count !== undefined ? intel.expiring_30d_count : (s.expiry_risk || 0));
-      const expiredCount = s.expired_count !== undefined ? s.expired_count : (intel.expired_count !== undefined ? intel.expired_count : 0);
-      const lowStockCount = s.low_stock_count !== undefined ? s.low_stock_count : (intel.low_stock_count !== undefined ? intel.low_stock_count : (s.critical_restock || 0));
-      const deadStockCount = s.dead_stock_count !== undefined ? s.dead_stock_count : (intel.dead_stock_count !== undefined ? intel.dead_stock_count : (s.dead_stock || 0));
+      const expiringSoonCount = intel.expiring_30_days !== undefined ? intel.expiring_30_days : (intel.expiring_30d_count !== undefined ? intel.expiring_30d_count : (s.expiring_30_days !== undefined ? s.expiring_30_days : (s.expiry_risk || 0)));
+      const expiredCount = intel.expired !== undefined ? intel.expired : (intel.expired_count !== undefined ? intel.expired_count : (s.expired !== undefined ? s.expired : 0));
+      const lowStockCount = intel.low_stock !== undefined ? intel.low_stock : (intel.low_stock_count !== undefined ? intel.low_stock_count : (s.low_stock !== undefined ? s.low_stock : (s.critical_restock || 0)));
+      const deadStockCount = intel.dead_stock !== undefined ? intel.dead_stock : (intel.dead_stock_count !== undefined ? intel.dead_stock_count : (s.dead_stock !== undefined ? s.dead_stock : 0));
 
       const totalEl = document.getElementById('kpi-total-products');
       if (totalEl) totalEl.textContent = Number(totalProducts).toLocaleString('en-IN');
@@ -795,7 +819,13 @@ function initInventory() {
 
   // Initial load in the background
   loadIntelligence();
-  fetchInventoryPage();
+  const urlParams = new URLSearchParams(window.location.search);
+  const filterParam = urlParams.get('filter') || urlParams.get('filter_key');
+  if (filterParam && typeof window.setInventoryFilter === 'function') {
+    window.setInventoryFilter(filterParam);
+  } else {
+    fetchInventoryPage();
+  }
 }
 
 function onStockSelectionChange(productId, isChecked) {
@@ -1055,13 +1085,42 @@ let salesSearchQuery = '';
 let salesCustomFrom = null;
 let salesCustomTo = null;
 let salesSearchDebounceTimer = null;
+let salesInitialAutoCheckDone = false;
 
 function initSales() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramSource = urlParams.get('source') || urlParams.get('type') || urlParams.get('sales_type');
+  const paramPeriod = urlParams.get('period') || urlParams.get('range');
+
+  if (paramSource) {
+    if (paramSource === 'historical') {
+      salesActiveType = 'historical';
+      salesActivePeriod = 'all_time';
+    } else if (paramSource === 'live') {
+      salesActiveType = 'live';
+    } else {
+      salesActiveType = 'all';
+    }
+    const typeSelect = document.getElementById('sales-type-select');
+    if (typeSelect) typeSelect.value = salesActiveType;
+  }
+
+  if (paramPeriod) {
+    salesActivePeriod = paramPeriod;
+  }
+
+  // Highlight active period button tab
+  document.querySelectorAll('.sales-period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-period') === salesActivePeriod);
+  });
+
+  updateSalesSummaryLabel();
+
   // Load cached sales immediately for 0ms visual delay if on default 'today' view
   try {
-    const preloaderSales = window.AppDataPreloader ? window.AppDataPreloader.get('/sales?skip=0&limit=50&period=today') : null;
+    const preloaderSales = window.AppDataPreloader ? window.AppDataPreloader.get(`/sales?skip=0&limit=50&period=${salesActivePeriod}`) : null;
     const cachedSales = preloaderSales
-      || (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/sales?skip=0&limit=50&period=today'))
+      || (window.api && typeof window.api.getCached === 'function' && window.api.getCached(`/sales?skip=0&limit=50&period=${salesActivePeriod}`))
       || (localStorage.getItem('expiryguard_cached_sales') ? JSON.parse(localStorage.getItem('expiryguard_cached_sales')) : null);
     if (Array.isArray(cachedSales) && cachedSales.length > 0 && salesActivePeriod === 'today' && !salesSearchQuery) {
       renderSalesList(cachedSales);
@@ -1102,6 +1161,28 @@ async function loadSalesFeed(showLoading = true) {
   try {
     const sales = await api.getSales(skip, salesPageLimit, null, options);
     if (Array.isArray(sales)) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasExplicitPeriodInUrl = urlParams.has('period') || urlParams.has('range');
+
+      // Auto-fallback: If default initial load is 'today' and returned 0 sales, check if user has 'all_time' sales (e.g. imported old bills)
+      if (!salesInitialAutoCheckDone && salesActivePeriod === 'today' && sales.length === 0 && !salesSearchQuery && !hasExplicitPeriodInUrl) {
+        salesInitialAutoCheckDone = true;
+        try {
+          const allTimeSales = await api.getSales(0, salesPageLimit, null, { ...options, period: 'all_time' });
+          if (Array.isArray(allTimeSales) && allTimeSales.length > 0) {
+            salesActivePeriod = 'all_time';
+            document.querySelectorAll('.sales-period-btn').forEach(btn => {
+              btn.classList.toggle('active', btn.getAttribute('data-period') === 'all_time');
+            });
+            updateSalesSummaryLabel();
+            renderSalesList(allTimeSales);
+            updateSalesPagination(allTimeSales.length);
+            return;
+          }
+        } catch (checkErr) {}
+      }
+      salesInitialAutoCheckDone = true;
+
       if (salesActivePeriod === 'today' && !salesSearchQuery && salesCurrentPage === 1) {
         localStorage.setItem('expiryguard_cached_sales', JSON.stringify(sales));
       }
@@ -1234,9 +1315,16 @@ function renderSalesList(sales) {
   if (!tbody) return;
 
   if (!sales || sales.length === 0) {
+    const periodLabel = salesActivePeriod === 'today' ? 'today' : (salesActivePeriod === 'yesterday' ? 'yesterday' : salesActivePeriod);
     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted); padding: 36px 16px;">
-      <div style="font-size: 14px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px;">No transactions found</div>
-      <div style="font-size: 12px; color: var(--color-text-muted);">Try selecting "All Time", adjusting your date range, or clearing search.</div>
+      <div style="font-size: 15px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 6px;">No transactions found for ${periodLabel}</div>
+      <div style="font-size: 13px; color: var(--color-text-muted); max-width: 480px; margin: 0 auto 16px auto;">
+        ${salesActivePeriod === 'today' ? 'No new counter bills were created today. If you imported old bills from Marg/Excel or want to see past bills, click below.' : 'Try selecting "All Time", adjusting your date range, or clearing search.'}
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn btn-primary btn-sm" onclick="selectSalesPeriod('all_time')" style="padding: 6px 14px; font-weight: 600;">📅 View All Time Sales & Imported Bills</button>
+        ${salesActiveType !== 'all' ? `<button class="btn btn-secondary btn-sm" onclick="onSalesTypeChange('all'); const sel = document.getElementById('sales-type-select'); if (sel) sel.value='all';" style="padding: 6px 14px;">Show All Sales (Live + Imported)</button>` : ''}
+      </div>
     </td></tr>`;
     return;
   }
@@ -1465,17 +1553,18 @@ function initReturns() {
   });
 
   const loadReturns = async () => {
+    if (typeof window.loadTodayReturns === 'function') {
+      await window.loadTodayReturns();
+      return;
+    }
     try {
       const returns = await api.getTodaysReturns();
-      if (Array.isArray(returns)) {
-        localStorage.setItem('expiryguard_cached_returns', JSON.stringify(returns));
-        renderReturnsList(returns);
-      }
+      renderReturnsList(returns);
     } catch (err) {
       console.error('Returns load error:', err);
       const container = document.getElementById('returns-list-body');
       if (container && !container.innerHTML.trim()) {
-        container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--status-danger); padding: 24px;">Failed to load returns log: ${escapeHtml(err.message)}</td></tr>`;
+        container.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--status-danger); padding: 24px;">Failed to load returns log: ${escapeHtml(err.message)}</td></tr>`;
       }
     }
   };
@@ -1484,37 +1573,97 @@ function initReturns() {
   api.startPolling(loadReturns, 5000);
 }
 
-function renderReturnsList(returns) {
+function renderReturnsList(returnsData) {
   const container = document.getElementById('returns-list-body');
   if (!container) return;
 
-  const totalRefund = (Array.isArray(returns) ? returns : []).reduce((sum, r) => sum + (Number(r.return_amount) || 0), 0);
+  let returnsList = [];
+  let totalRefund = 0;
+  let returnsCount = 0;
+  let totalItems = 0;
+
+  if (Array.isArray(returnsData)) {
+    returnsList = returnsData;
+    returnsCount = returnsList.length;
+    returnsList.forEach(r => {
+      totalRefund += (r.refund_amount || r.return_amount || 0);
+      totalItems += (r.returned_quantity || r.quantity || 1);
+    });
+  } else if (returnsData && typeof returnsData === 'object') {
+    returnsList = returnsData.returns || [];
+    returnsCount = returnsData.total_returns_count || returnsList.length;
+    totalRefund = returnsData.total_return_value || 0;
+    totalItems = returnsData.total_items_returned_count || 0;
+  }
+
   const refundEl = document.getElementById('returns-total-refund');
   if (refundEl) {
-    refundEl.textContent = `₹${totalRefund.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    refundEl.textContent = `₹${totalRefund.toFixed(2)}`;
   }
   const countEl = document.getElementById('returns-count');
   if (countEl) {
-    countEl.textContent = (Array.isArray(returns) ? returns : []).length;
+    countEl.textContent = returnsCount;
+  }
+  const itemsCountEl = document.getElementById('returns-items-count');
+  if (itemsCountEl) {
+    itemsCountEl.textContent = `${totalItems} items`;
   }
 
-  if (!returns || returns.length === 0) {
-    container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--color-text-muted); padding: 32px 16px;">
-      <div style="font-size: 14px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px;">No returns recorded today</div>
-      <div style="font-size: 12px; color: var(--color-text-muted);">Patient returns and stock adjustments will be listed here.</div>
+  if (!returnsList || returnsList.length === 0) {
+    container.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 36px 16px;">
+      <div style="font-size: 24px; margin-bottom: 6px;">🔄</div>
+      <div style="font-weight: 600; font-size: 14px; color: var(--color-text-primary);">No returned items recorded today</div>
+      <div style="font-size: 12.5px; color: var(--color-text-muted); margin-top: 2px;">Patient returns and stock adjustments will be listed here.</div>
     </td></tr>`;
     return;
   }
 
-  container.innerHTML = returns.map(r => `
-    <tr>
-      <td><strong class="num-tabular">#RET-${r.id}</strong></td>
-      <td><span class="num-tabular">${escapeHtml(r.bill_number ? `Bill #${r.bill_number}` : `Bill #${r.sale_id}`)}</span></td>
-      <td>${escapeHtml(r.reason || 'Patient Return')}</td>
-      <td><strong class="num-currency" style="color: var(--status-danger);">₹${Number(r.return_amount || 0).toFixed(2)}</strong></td>
-      <td class="num-date" style="color: var(--color-text-muted);">${r.created_at ? new Date(r.created_at).toLocaleTimeString() : '-'}</td>
-    </tr>
-  `).join('');
+  container.innerHTML = returnsList.map(r => {
+    const returnId = r.return_id || r.id || 'N/A';
+    const rawBill = r.bill_number ? String(r.bill_number) : (r.sale_id ? `BILL-${r.sale_id}` : 'N/A');
+    const billNo = rawBill.toLowerCase().startsWith('bill') ? rawBill : `Bill #${rawBill}`;
+    const customer = r.customer_name || 'Walk-in Customer';
+    const medName = r.product_name || 'Medicine Item';
+    const batchNo = r.batch_number;
+    const qty = r.returned_quantity || r.quantity || 1;
+    const refundAmt = r.refund_amount || r.return_amount || 0;
+    const reasonText = r.reason || 'Customer Return';
+    const pharmacist = r.processed_by || 'Pharmacist';
+    const dateStr = (r.returned_at || r.created_at) ? new Date(r.returned_at || r.created_at).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true
+    }) : '-';
+
+    return `
+      <tr>
+        <td style="font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; color: var(--color-text-primary);">
+          #RET-${returnId}
+        </td>
+        <td>
+          <div style="font-family: var(--font-mono); font-weight: 700; color: var(--color-brand-deep,#0D9488); font-size: 13px;">
+            ${escapeHtml(billNo)}
+          </div>
+          <div style="font-size: 11.5px; color: var(--color-text-muted);">${escapeHtml(customer)}</div>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: var(--color-text-primary); font-size: 13.5px;">${escapeHtml(medName)}</div>
+          ${batchNo ? `<span style="font-size: 11px; background: rgba(13,148,136,0.1); color: #0D9488; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Batch: ${escapeHtml(batchNo)}</span>` : ''}
+        </td>
+        <td style="font-family: var(--font-mono); font-weight: 800; font-size: 14px; text-align: center; color: #DC2626;">
+          ${qty}
+        </td>
+        <td style="font-family: var(--font-mono); font-weight: 800; font-size: 14px; color: #DC2626;">
+          ₹${Number(refundAmt).toFixed(2)}
+        </td>
+        <td style="font-size: 12.5px; color: var(--color-text-secondary);">
+          ${escapeHtml(reasonText)}
+        </td>
+        <td style="font-size: 12px; color: var(--color-text-muted);">
+          ${dateStr}<br>
+          <span style="font-size: 11px; color: var(--color-text-secondary);">By ${escapeHtml(pharmacist)}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 /* ==========================================================================

@@ -274,6 +274,7 @@ class Sale(Base):
     discount_amount = Column(Float, nullable=False, default=0.0)
     tax_amount = Column(Float, nullable=False, default=0.0)
     total_amount = Column(Float, nullable=False, default=0.0)
+    total_returned_amount = Column(Float, nullable=False, default=0.0)
 
     # GST Compliance Fields
     is_interstate = Column(Boolean, default=False)
@@ -356,6 +357,7 @@ class SaleItem(Base):
     # Frozen snapshot data
     product_name = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
+    returned_quantity = Column(Integer, nullable=False, default=0)
     unit_price = Column(Float, nullable=False)
     discount = Column(Float, default=0.0)
     total_price = Column(Float, nullable=False)

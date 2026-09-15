@@ -29,7 +29,7 @@ def _create_infographic_image_bytes() -> io.BytesIO:
 
     # Main Title Header Banner
     draw.rectangle([0, 0, width, 60], fill="#0F766E") # Emerald Teal Header
-    draw.text((25, 18), "ExpiryGuard - Bulk Inventory Import Quick Reference Guide", fill="#FFFFFF", font=font_title)
+    draw.text((25, 18), "DawaiFlow - Bulk Inventory Import Quick Reference Guide", fill="#FFFFFF", font=font_title)
 
     # Card 1: WHAT YOU NEED TO ADD (Green Border Card)
     draw.rounded_rectangle([25, 80, 525, 495], radius=12, fill="#1E293B", outline="#10B981", width=2)
@@ -166,7 +166,7 @@ def generate_inventory_import_template() -> io.BytesIO:
         # Add Excel Cell Comment explaining field requirement & format
         comment = openpyxl.comments.Comment(
             text=f"{'REQUIRED ★' if is_req else 'OPTIONAL'}\n\n{comment_text}",
-            author="ExpiryGuard"
+            author="DawaiFlow"
         )
         comment.width = 220
         comment.height = 70
@@ -287,7 +287,7 @@ def generate_inventory_import_template() -> io.BytesIO:
     # 1. Main Title Banner (Merged A1:F2)
     ws_guide.merge_cells("A1:F2")
     title_cell = ws_guide["A1"]
-    title_cell.value = "ExpiryGuard — How to Fill Your Inventory Template"
+    title_cell.value = "DawaiFlow — How to Fill Your Inventory Template"
     title_cell.font = Font(name=FONT_FAMILY, size=16, bold=True, color="FFFFFF")
     title_cell.fill = PatternFill(start_color=BRAND_TEAL, end_color=BRAND_TEAL, fill_type="solid")
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -296,7 +296,7 @@ def generate_inventory_import_template() -> io.BytesIO:
     ws_guide.row_dimensions[2].height = 24
 
     # Subtitle
-    ws_guide["A4"].value = "Follow this quick visual guide to prepare your Excel file before uploading to ExpiryGuard."
+    ws_guide["A4"].value = "Follow this quick visual guide to prepare your Excel file before uploading to DawaiFlow."
     ws_guide["A4"].font = Font(name=FONT_FAMILY, size=11, bold=True, color=BRAND_DARK_NAVY)
     ws_guide.row_dimensions[4].height = 20
 
@@ -479,7 +479,7 @@ def generate_inventory_import_template() -> io.BytesIO:
         "2. Fill in your inventory medicines row by row starting from Row 2.",
         "3. Check that all ★ required columns (medicine_name, batch_no, expiry_date, quantity, prices) are completed.",
         "4. Save this Excel file on your computer.",
-        "5. Go to ExpiryGuard Web App -> Add Inventory -> Bulk Import.",
+        "5. Go to DawaiFlow Web App -> Add Inventory -> Bulk Import.",
         "6. Upload your saved Excel file to instantly import all stock!",
     ]
 

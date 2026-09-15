@@ -8,7 +8,7 @@ export const WHATSAPP_NUMBER = '919817066533';
 
 export const APP_CONFIG = {
   productName: 'DawaiFlow',
-  brandName: 'DawaiFlow (Powered by ExpiryGuard)',
+  brandName: 'DawaiFlow',
   spelling: 'D-A-W-A-I-F-L-O-W',
   tagline: 'More time for your pharmacy. Less time managing software.',
   description:
@@ -28,7 +28,7 @@ export const APP_CONFIG = {
 
   // Location & Corporate Details (with explicit placeholders where statutory formal incorporation is pending)
   location: 'Sonipat, Haryana, India',
-  legalEntityPlaceholder: '[LEGAL ENTITY NAME: Kanishak Vashist, trading as DawaiFlow / ExpiryGuard]',
+  legalEntityPlaceholder: '[LEGAL ENTITY NAME: Kanishak Vashist, trading as DawaiFlow]',
   registeredOfficePlaceholder: '[REGISTERED OFFICE ADDRESS: Sonipat, Haryana, India — Street address to be updated upon corporate incorporation]',
   cinPlaceholder: '[CIN: To be updated upon corporate incorporation]',
   gstinPlaceholder: '[GSTIN: To be updated upon tax registration]',

@@ -150,7 +150,7 @@ def generate_invoice_pdf(sale_data: dict, shop_data: dict) -> bytes:
     story = []
 
     # 1. Shop Header & GSTIN
-    shop_name = shop_data.get("shop_name") or "ExpiryGuard Pharmacy"
+    shop_name = shop_data.get("shop_name") or "DawaiFlow Pharmacy"
     gstin = shop_data.get("gstin") or shop_data.get("gst_number") or "07AABCE1234F1Z5"
     address = shop_data.get("address") or "Main Market, New Delhi - 110001"
     phone = shop_data.get("phone") or "+91-9876543210"

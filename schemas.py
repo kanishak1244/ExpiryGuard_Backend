@@ -1647,4 +1647,86 @@ class HeldBillResumeResponse(BaseModel):
     has_stock_shortage: bool
 
 
+# ==========================================
+# SALES RETURN SCHEMAS
+# ==========================================
+
+class ReturnItemRequest(BaseModel):
+    sale_item_id: int
+    return_quantity: int = Field(gt=0)
+
+class ProcessReturnRequest(BaseModel):
+    sale_id: int
+    items: List[ReturnItemRequest]
+    reason: Optional[str] = None
+
+class SaleItemReturnInfo(BaseModel):
+    sale_item_id: int
+    product_id: Optional[int] = None
+    product_name: str
+    batch_number: Optional[str] = None
+    unit_price: float
+    unit_type: str = "strip"
+    originally_sold_quantity: int
+    already_returned_quantity: int
+    available_return_quantity: int
+    gst_percentage: float = 0.0
+
+class SaleSearchResult(BaseModel):
+    sale_id: int
+    bill_number: str
+    sale_date: datetime
+    customer_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    doctor_name: Optional[str] = None
+    payment_method: str
+    payment_status: str
+    matching_item: SaleItemReturnInfo
+    all_items: List[SaleItemReturnInfo] = []
+
+class ReturnProcessedItemInfo(BaseModel):
+    return_item_id: int
+    sale_item_id: int
+    product_id: Optional[int] = None
+    product_name: str
+    batch_number: Optional[str] = None
+    returned_quantity: int
+    unit_price: float
+    return_total: float
+
+class ProcessReturnResponse(BaseModel):
+    success: bool
+    message: str
+    return_id: int
+    sale_id: int
+    bill_number: str
+    total_refund_amount: float
+    returned_items: List[ReturnProcessedItemInfo]
+    processed_at: datetime
+
+class TodayReturnItemRecord(BaseModel):
+    return_id: int
+    return_item_id: int
+    sale_id: int
+    bill_number: str
+    product_name: str
+    batch_number: Optional[str] = None
+    returned_quantity: int
+    unit_price: float
+    refund_amount: float
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    reason: Optional[str] = None
+    processed_by: Optional[str] = None
+    returned_at: datetime
+
+class TodayReturnsSummaryResponse(BaseModel):
+    total_returns_count: int
+    total_items_returned_count: int
+    total_return_value: float
+    returns: List[TodayReturnItemRecord]
+
+
+
 

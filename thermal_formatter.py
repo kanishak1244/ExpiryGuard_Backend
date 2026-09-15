@@ -169,7 +169,7 @@ def build_thermal_receipt_bytes(
         builder.align("center")
         builder.double_size(True)
         builder.bold(True)
-        shop_name = str(shop.get("shop_name") or shop.get("name") or "EXPIRYGUARD PHARMACY").strip()
+        shop_name = str(shop.get("shop_name") or shop.get("name") or "DAWAIFLOW PHARMACY").strip()
         builder.text_line(shop_name.upper())
 
         builder.double_size(False)
