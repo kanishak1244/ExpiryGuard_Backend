@@ -485,40 +485,53 @@ app.add_middleware(SlowAPIMiddleware)
 security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
 
+import bcrypt
+
 def safe_hash_password(password: str) -> str:
-    """Hashes password safely using SHA-256 pre-hashing + bcrypt to completely bypass bcrypt's 72-byte limit."""
+    """Hashes password safely using direct bcrypt + SHA-256 pre-hashing, 100% immune to passlib bugs."""
     if not password:
-        return pwd_context.hash("")
+        password = ""
     import hashlib, base64
-    pre_hashed = base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest()).decode("ascii")
-    return pwd_context.hash(pre_hashed)
+    pre_hashed = base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pre_hashed, salt).decode("utf-8")
 
 def safe_verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Safely verifies passwords against SHA-256 pre-hashed bcrypt, standard bcrypt, and legacy plain text."""
+    """Safely verifies passwords against direct bcrypt, passlib hashes, and legacy plain text."""
     if not plain_password or not hashed_password:
         return False
     import hashlib, base64
-    pre_hashed = base64.b64encode(hashlib.sha256(plain_password.encode("utf-8")).digest()).decode("ascii")
 
-    # 1. Try SHA-256 pre-hashed verification (32 bytes base64 = 44 chars)
+    safe_plain = plain_password.strip()
+    safe_hashed = hashed_password.strip()
+
+    # 1. Direct bcrypt check on pre-hashed SHA-256 bytes
     try:
-        if pwd_context.verify(pre_hashed, hashed_password):
+        pre_hashed = base64.b64encode(hashlib.sha256(plain_password.encode("utf-8")).digest())
+        if bcrypt.checkpw(pre_hashed, safe_hashed.encode("utf-8")):
             return True
     except Exception:
         pass
 
-    # 2. Try standard passlib verify with 72-char truncation
+    # 2. Direct bcrypt check on raw bytes (truncated to 72 bytes)
+    try:
+        raw_bytes = plain_password.encode("utf-8")[:72]
+        if bcrypt.checkpw(raw_bytes, safe_hashed.encode("utf-8")):
+            return True
+    except Exception:
+        pass
+
+    # 3. Passlib verify fallback
     try:
         pwd_bytes = plain_password.encode("utf-8")[:72]
-        safe_pwd = pwd_bytes.decode("utf-8", "ignore")
-        if pwd_context.verify(safe_pwd, hashed_password):
+        if pwd_context.verify(pwd_bytes.decode("utf-8", "ignore"), safe_hashed):
             return True
     except Exception:
         pass
 
-    # 3. Legacy plain-text fallback
+    # 4. Legacy plain-text fallback
     try:
-        if plain_password.strip() == hashed_password.strip():
+        if safe_plain == safe_hashed:
             return True
     except Exception:
         pass
