@@ -48,25 +48,12 @@ ENV PATH="/opt/venv/bin:$PATH" \
     VIRTUAL_ENV="/opt/venv" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH="/app" \
-    PORT=8000
-
-# Create unprivileged system user for secure application execution
-RUN groupadd -g 10001 dawaiflow && \
-    useradd -u 10001 -g dawaiflow -s /bin/bash -m dawaiflow
+    PYTHONPATH="/app"
 
 # Copy application source code (ignoring caches & local venvs via .dockerignore)
 COPY . /app
 
-# Ensure correct file permissions for virtual environment and application
-RUN chown -R dawaiflow:dawaiflow /opt/venv /app && \
-    mkdir -p /app/uploads /app/backups && \
-    chown -R dawaiflow:dawaiflow /app/uploads /app/backups
-
-# Switch to non-root execution
-USER dawaiflow
-
 EXPOSE 8000
 
-# Production entrypoint using Uvicorn ASGI server with absolute venv path and dynamic $PORT expansion
-CMD exec /opt/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'
+# Production entrypoint using Uvicorn ASGI server with dynamic $PORT binding
+CMD exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*'
