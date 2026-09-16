@@ -76,6 +76,7 @@ def get_smtp_config() -> Dict[str, Any]:
 
 def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
     """Generates a clean, professional HTML email template for new pilot request notifications."""
+    import re
     pharmacy_name = lead_data.get("pharmacy_name", "N/A")
     full_name = lead_data.get("full_name", "N/A")
     phone = lead_data.get("phone", "N/A")
@@ -85,6 +86,22 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
     biggest_problem = lead_data.get("biggest_problem") or "None specified"
     created_at = lead_data.get("created_at") or datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC")
     lead_id = lead_data.get("id", "N/A")
+
+    # Extract email or outlets if embedded in combined details string
+    email_address = lead_data.get("email")
+    if not email_address and isinstance(biggest_problem, str):
+        email_match = re.search(r'\[Email:\s*([^\]]+)\]', biggest_problem, re.IGNORECASE)
+        if email_match:
+            email_address = email_match.group(1).strip()
+
+    email_row = ""
+    if email_address:
+        email_row = f"""<tr>
+                  <td style="padding: 12px 16px; font-weight: 600; color: #334155; font-size: 13px; border-bottom: 1px solid #F1F5F9;">Email Address</td>
+                  <td style="padding: 12px 16px; color: #1E293B; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F1F5F9;">
+                    <a href="mailto:{email_address}" style="color: #2563EB; text-decoration: underline;">{email_address}</a>
+                  </td>
+                </tr>"""
 
     # Clean phone for WhatsApp action link (strip non-digits, prepend 91 if 10-digit Indian number)
     clean_phone = "".join(filter(str.isdigit, str(phone)))
@@ -139,6 +156,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
                   <td style="padding: 12px 16px; font-weight: 600; color: #334155; font-size: 13px; border-bottom: 1px solid #F1F5F9;">Contact Person</td>
                   <td style="padding: 12px 16px; color: #1E293B; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F1F5F9;">{full_name}</td>
                 </tr>
+                {email_row}
                 <tr>
                   <td style="padding: 12px 16px; font-weight: 600; color: #334155; font-size: 13px; border-bottom: 1px solid #F1F5F9;">Phone Number</td>
                   <td style="padding: 12px 16px; color: #1E293B; font-size: 14px; border-bottom: 1px solid #F1F5F9;">
@@ -160,7 +178,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
                   <td style="padding: 12px 16px; color: #1E293B; font-size: 14px; border-bottom: 1px solid #F1F5F9;">{bills_per_day}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 12px 16px; font-weight: 600; color: #334155; font-size: 13px; border-bottom: 1px solid #F1F5F9;">Biggest Pain Point</td>
+                  <td style="padding: 12px 16px; font-weight: 600; color: #334155; font-size: 13px; border-bottom: 1px solid #F1F5F9;">Biggest Pain Point / Details</td>
                   <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-style: italic; line-height: 1.5; border-bottom: 1px solid #F1F5F9;">"{biggest_problem}"</td>
                 </tr>
                 <tr>
@@ -201,6 +219,7 @@ def format_pilot_lead_html(lead_data: Dict[str, Any]) -> str:
 
 def format_pilot_lead_plain_text(lead_data: Dict[str, Any]) -> str:
     """Generates plain text fallback email."""
+    import re
     pharmacy_name = lead_data.get("pharmacy_name", "N/A")
     full_name = lead_data.get("full_name", "N/A")
     phone = lead_data.get("phone", "N/A")
@@ -211,6 +230,14 @@ def format_pilot_lead_plain_text(lead_data: Dict[str, Any]) -> str:
     created_at = lead_data.get("created_at") or datetime.utcnow().strftime("%d %b %Y, %I:%M %p UTC")
     lead_id = lead_data.get("id", "N/A")
 
+    email_address = lead_data.get("email")
+    if not email_address and isinstance(biggest_problem, str):
+        email_match = re.search(r'\[Email:\s*([^\]]+)\]', biggest_problem, re.IGNORECASE)
+        if email_match:
+            email_address = email_match.group(1).strip()
+
+    email_line = f"• Email Address:         {email_address}\n" if email_address else ""
+
     return f"""==================================================
 DAWAIFLOW — NEW PILOT ACCESS REQUEST
 ==================================================
@@ -219,7 +246,7 @@ A new pharmacy lead has just signed up for the pilot:
 
 • Pharmacy Name:         {pharmacy_name}
 • Contact Person:        {full_name}
-• Phone Number:          {phone}
+{email_line}• Phone Number:          {phone}
 • City / Location:       {city}
 • Current Billing Setup: {current_billing}
 • Daily Bill Volume:     {bills_per_day}
@@ -353,6 +380,62 @@ def send_email_via_brevo(
         return False, "brevo:https", err_msg
 
 
+def send_email_via_sendgrid(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: str,
+    from_name: str = "DawaiFlow Pilot Alerts",
+    reply_to: Optional[str] = None,
+) -> Tuple[bool, str, str]:
+    """
+    Sends email via SendGrid HTTPS REST API (port 443).
+    Bypasses cloud platform SMTP port restrictions.
+    """
+    api_key = (os.getenv("SENDGRID_API_KEY") or "").strip()
+    if not api_key:
+        return False, "sendgrid", "SENDGRID_API_KEY not configured"
+
+    import urllib.request
+    import json
+
+    sender_email = (
+        os.getenv("SENDGRID_SENDER_EMAIL")
+        or os.getenv("SMTP_USER")
+        or "vashistkanishak9@gmail.com"
+    ).strip()
+    payload: Dict[str, Any] = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": sender_email, "name": from_name},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": plain_text},
+            {"type": "text/html", "value": html_content},
+        ],
+    }
+    if reply_to:
+        payload["reply_to"] = {"email": reply_to}
+
+    try:
+        req = urllib.request.Request(
+            "https://api.sendgrid.com/v3/mail/send",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "DawaiFlow-Backend/1.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            logger.info(f"[EMAIL NOTIFICATION] Successfully sent alert via SendGrid HTTPS API to {to_email}")
+            return True, "sendgrid:https", ""
+    except Exception as e:
+        err_msg = f"SendGrid API error: {type(e).__name__}: {str(e)}"
+        logger.warning(f"[EMAIL NOTIFICATION WARNING] {err_msg}")
+        return False, "sendgrid:https", err_msg
+
+
 def send_email_with_fallback(
     msg: MIMEMultipart,
     cfg: Dict[str, Any],
@@ -364,7 +447,7 @@ def send_email_with_fallback(
     """
     Sends email with multi-layer resilience:
     1. Direct SMTP with both DNS hostname and forced IPv4 resolution (Port 587 STARTTLS & Port 465 Direct SSL).
-    2. Automatic HTTPS API fallback (Resend, Brevo) if cloud firewall blocks SMTP sockets.
+    2. Automatic HTTPS API fallback (Resend, Brevo, SendGrid) if cloud firewall blocks SMTP sockets.
     Returns (success: bool, provider_label: str, error_details: str).
     """
     host = cfg["host"]
@@ -374,31 +457,41 @@ def send_email_with_fallback(
     email_subject = subject or msg.get("Subject", "DawaiFlow Notification")
 
     # If HTTPS API is explicitly configured, try it first to avoid blocked socket delays
-    if os.getenv("RESEND_API_KEY"):
-        if html_content and plain_text:
-            ok, prov, err = send_email_via_resend(
-                to_email=recipient,
-                subject=email_subject,
-                html_content=html_content,
-                plain_text=plain_text,
-                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
-                reply_to=cfg.get("user") or None,
-            )
-            if ok:
-                return True, prov, ""
+    if os.getenv("RESEND_API_KEY") and html_content and plain_text:
+        ok, prov, err = send_email_via_resend(
+            to_email=recipient,
+            subject=email_subject,
+            html_content=html_content,
+            plain_text=plain_text,
+            from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+            reply_to=cfg.get("user") or None,
+        )
+        if ok:
+            return True, prov, ""
 
-    if os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY"):
-        if html_content and plain_text:
-            ok, prov, err = send_email_via_brevo(
-                to_email=recipient,
-                subject=email_subject,
-                html_content=html_content,
-                plain_text=plain_text,
-                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
-                reply_to=cfg.get("user") or None,
-            )
-            if ok:
-                return True, prov, ""
+    if (os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY")) and html_content and plain_text:
+        ok, prov, err = send_email_via_brevo(
+            to_email=recipient,
+            subject=email_subject,
+            html_content=html_content,
+            plain_text=plain_text,
+            from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+            reply_to=cfg.get("user") or None,
+        )
+        if ok:
+            return True, prov, ""
+
+    if os.getenv("SENDGRID_API_KEY") and html_content and plain_text:
+        ok, prov, err = send_email_via_sendgrid(
+            to_email=recipient,
+            subject=email_subject,
+            html_content=html_content,
+            plain_text=plain_text,
+            from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+            reply_to=cfg.get("user") or None,
+        )
+        if ok:
+            return True, prov, ""
 
     # SMTP Attempts: Ports 587 and 465
     primary_port = cfg.get("port", 587)
@@ -460,6 +553,19 @@ def send_email_with_fallback(
 
         if os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY"):
             ok, prov, err = send_email_via_brevo(
+                to_email=recipient,
+                subject=email_subject,
+                html_content=html_content,
+                plain_text=plain_text,
+                from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
+                reply_to=cfg.get("user") or None,
+            )
+            if ok:
+                return True, prov, ""
+            errors.append(err)
+
+        if os.getenv("SENDGRID_API_KEY"):
+            ok, prov, err = send_email_via_sendgrid(
                 to_email=recipient,
                 subject=email_subject,
                 html_content=html_content,
@@ -700,6 +806,7 @@ def check_smtp_health(probe_network: bool = False) -> Dict[str, Any]:
             "ADMIN_NOTIFICATION_EMAIL": bool(os.getenv("ADMIN_NOTIFICATION_EMAIL")),
             "RESEND_API_KEY": bool(os.getenv("RESEND_API_KEY")),
             "BREVO_API_KEY": bool(os.getenv("BREVO_API_KEY")),
+            "SENDGRID_API_KEY": bool(os.getenv("SENDGRID_API_KEY")),
         }
     }
 

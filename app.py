@@ -5678,9 +5678,9 @@ def get_dashboard_summary(
     # 2. Consolidated Product & Inventory Health Aggregation in 1 query
     prod_agg = db.query(
         func.count(models.Product.id).label("total"),
-        func.sum(case((models.Product.quantity <= 20, 1), else_=0)).label("low_stock"),
-        func.sum(case(((models.Product.expiry_date >= today_ist) & (models.Product.expiry_date <= today_ist + timedelta(days=60)), 1), else_=0)).label("expiring_soon"),
-        func.sum(case((models.Product.expiry_date < today_ist, 1), else_=0)).label("expired"),
+        func.sum(case(((models.Product.quantity > 0) & (models.Product.quantity <= 20), 1), else_=0)).label("low_stock"),
+        func.sum(case(((models.Product.quantity > 0) & (models.Product.expiry_date >= today_ist) & (models.Product.expiry_date <= today_ist + timedelta(days=60)), 1), else_=0)).label("expiring_soon"),
+        func.sum(case(((models.Product.quantity > 0) & (models.Product.expiry_date < today_ist), 1), else_=0)).label("expired"),
         func.sum(models.Product.quantity * func.coalesce(models.Product.purchase_price, 0.0)).label("stock_val")
     ).filter(
         models.Product.user_id == user_id,
@@ -7971,6 +7971,33 @@ def redirect_deprecated_web_ai_billing():
 
 # Mount Pharmacist Web Dashboard
 app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
+
+# Mount Static Assets & Mobile APK Distribution Directory
+STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.get("/app/version")
+@app.get("/api/app/version")
+def get_mobile_app_version():
+    """
+    Mobile App Auto-Updater Version Check Endpoint.
+    Returns latest published version, APK download URL, and release notes.
+    """
+    version_file = STATIC_DIR / "version.json"
+    if version_file.exists():
+        try:
+            with open(version_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "version": "1.0.1",
+        "build_number": 2,
+        "download_url": "https://api.dawaiflow.com/static/dawaiflow-latest.apk",
+        "release_notes": "Dashboard functional fixes & Smart Action Center live updates",
+        "min_supported_version": "1.0.0"
+    }
 
 # Mount Public Landing Website Asset Directories (for root / access)
 if (PUBLIC_SERVE_DIR / "assets").exists():

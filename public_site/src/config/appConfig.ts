@@ -49,6 +49,16 @@ export const APP_CONFIG = {
   },
 };
 
+export const PILOT_WHATSAPP_MESSAGE = 'Hello Founder, I want to be a part of your DawaiFlow pilot testing.';
+
+/**
+ * Generates official WhatsApp click-to-chat URL for pilot request submission.
+ * Message: "Hello Founder, I want to be a part of your DawaiFlow pilot testing."
+ */
+export const getPilotWhatsAppUrl = (): string => {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(PILOT_WHATSAPP_MESSAGE)}`;
+};
+
 /**
  * Generates official WhatsApp click-to-chat URL with pre-filled inquiry message.
  * Formats:

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, Send, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { PilotApplication } from '../types';
-import { getWhatsAppInquiryUrl } from '../config/appConfig';
+import { getWhatsAppInquiryUrl, getPilotWhatsAppUrl } from '../config/appConfig';
 
 interface PilotModalProps {
   isOpen: boolean;
@@ -28,10 +28,8 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-
     setErrorMessage(null);
 
     // Client-side validation
@@ -43,48 +41,15 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
 
     setIsSubmitting(true);
 
-    // Format combined problem / notes containing outlets and email
-    let combinedDetails = '';
-    if (formData.numPharmacies) {
-      combinedDetails += `[Pharmacies: ${formData.numPharmacies}]`;
-    }
-    if (formData.email?.trim()) {
-      combinedDetails += ` [Email: ${formData.email.trim()}]`;
-    }
-    if (formData.notes?.trim()) {
-      combinedDetails += `\nWorkflow Notes: ${formData.notes.trim()}`;
-    }
-
-    const payload = {
-      full_name: formData.contactPerson.trim(),
-      pharmacy_name: formData.pharmacyName.trim(),
-      city: formData.city.trim(),
-      phone: cleanPhone,
-      current_billing_method: formData.currentBillingMethod || 'Any Existing Software',
-      bills_per_day: formData.estimatedDailyBills || '50–100',
-      biggest_problem: combinedDetails.trim() || undefined,
-    };
-
     try {
-      const response = await fetch('/api/pilot-leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server returned ${response.status}`);
-      }
-
+      // Directly open WhatsApp click-to-chat with pre-filled pilot message
+      const whatsappUrl = getPilotWhatsAppUrl();
+      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
       setIsSubmitted(true);
     } catch (err: any) {
-      console.error('Pilot request submission error:', err);
+      console.error('WhatsApp redirect error:', err);
       setErrorMessage(
-        err.message || 'Could not submit your pilot request. Please check your connection and try again.'
+        'Could not open WhatsApp automatically. Please click the WhatsApp button below to connect directly.'
       );
     } finally {
       setIsSubmitting(false);
