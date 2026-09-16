@@ -44,7 +44,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
     try {
       // Directly open WhatsApp click-to-chat with pre-filled pilot message
       const whatsappUrl = getPilotWhatsAppUrl();
-      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      window.location.href = whatsappUrl;
       setIsSubmitted(true);
     } catch (err: any) {
       console.error('WhatsApp redirect error:', err);
@@ -80,23 +80,20 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
               <CheckCircle2 className="w-6 h-6 text-[#526B5A]" />
             </div>
 
-            <h3 className="text-xl font-semibold text-[#202522]">Pilot Request Received</h3>
+            <h3 className="text-xl font-semibold text-[#202522]">Opening WhatsApp...</h3>
 
             <p className="text-sm text-[#5E625D] max-w-md mx-auto leading-relaxed">
-              Thank you for your interest in DawaiFlow for{' '}
-              <strong className="text-[#202522]">{formData.pharmacyName}</strong>. Our team will contact you at{' '}
-              <span className="font-mono text-[#202522]">{formData.phone}</span> to coordinate your walkthrough.
+              Redirecting to WhatsApp to send your pilot inquiry for{' '}
+              <strong className="text-[#202522]">{formData.pharmacyName}</strong>. If WhatsApp did not open automatically, click the button below.
             </p>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <a
-                href={getWhatsAppInquiryUrl(formData.contactPerson)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto px-5 py-2.5 bg-transparent hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                href={getPilotWhatsAppUrl()}
+                className="w-full sm:w-auto px-5 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4 text-[#25D366]" />
-                <span>Chat on WhatsApp</span>
+                <span>Open WhatsApp</span>
               </a>
 
               <button
@@ -105,7 +102,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                   setIsSubmitted(false);
                   onClose();
                 }}
-                className="w-full sm:w-auto px-6 py-2.5 bg-[#526B5A] hover:bg-[#43584a] text-white font-medium rounded-lg text-sm transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2.5 bg-transparent hover:bg-[#EDECE6] text-[#202522] border border-[#DCDDD5] font-medium rounded-lg text-sm transition-colors cursor-pointer"
               >
                 Done
               </button>
@@ -129,9 +126,7 @@ export const PilotModal: React.FC<PilotModalProps> = ({ isOpen, onClose, onOpenL
                   <span>{errorMessage}</span>
                   <div className="mt-1">
                     <a
-                      href={getWhatsAppInquiryUrl(formData.contactPerson)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={getPilotWhatsAppUrl()}
                       className="underline font-medium hover:text-red-900 inline-flex items-center gap-1"
                     >
                       <MessageCircle className="w-3 h-3 text-[#25D366]" />
