@@ -4392,17 +4392,13 @@ def billing_search_products(
     if not clean_q:
         return []
 
-    res = crud.get_products(
+    return crud.get_billing_search_products(
         db=db,
         user_id=current_user.id,
-        search=clean_q,
+        query=clean_q,
         search_mode=search_mode,
         limit=limit,
-        sort_by="fefo",
-        include_total=False
     )
-    items = res["items"] if isinstance(res, dict) and "items" in res else (res if isinstance(res, list) else [])
-    return items
 
 
 @app.post("/search-product", response_model=List[schemas.Product])
