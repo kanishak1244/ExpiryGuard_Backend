@@ -285,15 +285,13 @@ def get_products(
 
         if fk in ["instock", "in_stock"]:
             base_query = base_query.filter(models.Product.quantity > 0)
-        elif fk in ["lowstock", "low_stock"]:
-            base_query = base_query.filter(models.Product.quantity > 0, models.Product.quantity <= 10)
+        elif fk in ["lowstock", "low_stock", "low_stock_alert"]:
+            base_query = base_query.filter(models.Product.quantity > 0, models.Product.quantity <= 20)
         elif fk in ["outofstock", "out_of_stock"]:
             base_query = base_query.filter(models.Product.quantity == 0)
-        elif fk in ["expiring", "expiring_30d", "expiring_soon"]:
-            base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date.between(today_dt, thirty_days_later_dt))
-        elif fk in ["expiring_60d", "expiry_risk", "expiry_risk_batches", "at_risk"]:
+        elif fk in ["expiring", "expiring_30d", "expiring_60d", "expiring_soon", "expiry_risk", "expiry_risk_batches", "at_risk"]:
             base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date.between(today_dt, sixty_days_later_dt))
-        elif fk == "expired":
+        elif fk in ["expired", "expired_batches", "expired_stock"]:
             base_query = base_query.filter(models.Product.quantity > 0, models.Product.expiry_date < today_dt)
         elif fk in ["deadstock", "dead_stock", "dead_stock_items"]:
             dt_90d = datetime.utcnow() - timedelta(days=90)

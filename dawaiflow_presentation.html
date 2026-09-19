@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawaiflow — Hackathon Presentation Deck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-canvas: #090D16;
+      --bg-slide: #0F172A;
+      --bg-card: #1E293B;
+      --border-subtle: #334155;
+      --border-focus: #10B981;
+      --primary-emerald: #10B981;
+      --primary-emerald-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.18);
+      --text-white: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-white);
+      font-family: var(--font-main);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Deck Viewport (16:9 Aspect Ratio Container) */
+    .deck-viewport {
+      position: relative;
+      width: 95vw;
+      height: 53.43vw; /* 16:9 aspect ratio */
+      max-width: 1440px;
+      max-height: 810px;
+      background-color: var(--bg-slide);
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header Ribbon on every slide */
+    .deck-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo-badge {
+      width: 28px;
+      height: 28px;
+      background: var(--primary-emerald);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    .brand-logo-badge svg {
+      width: 16px;
+      height: 16px;
+      stroke: #fff;
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-white);
+    }
+
+    .brand-tag {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+
+    .topbar-right-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .slide-badge-theme {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .slide-counter-chip {
+      background: rgba(255, 255, 255, 0.07);
+      padding: 3px 10px;
+      border-radius: 6px;
+      color: var(--text-white);
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Slide Stage */
+    .slide-stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 34px 48px;
+      display: none;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    /* Standard Slide Typography */
+    .slide-eyebrow {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--primary-emerald);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slide-eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--primary-emerald);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .slide-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      color: var(--text-white);
+      margin-bottom: 8px;
+    }
+
+    .slide-subtitle {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      max-width: 860px;
+      line-height: 1.45;
+      margin-bottom: 22px;
+    }
+
+    /* Slide Content Layout Grids */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      flex: 1;
+      align-items: center;
+    }
+
+    .grid-3col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      flex: 1;
+    }
+
+    .grid-4col {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* Custom Cards */
+    .deck-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .deck-card.highlight {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(16, 185, 129, 0.05) 100%);
+    }
+
+    .card-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .card-heading {
+      font-size: 16.5px;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .card-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Pill Badges */
+    .pill-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: #E2E8F0;
+    }
+
+    /* Flow Chart Chains */
+    .flow-chain {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-subtle);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      overflow-x: auto;
+    }
+
+    .flow-node {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11.5px;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .flow-node.active {
+      border-color: var(--primary-emerald);
+      color: #34D399;
+      background: rgba(16, 185, 129, 0.12);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Image Showcase Frame */
+    .screenshot-frame {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      background: #000;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      max-height: 400px;
+    }
+
+    .screenshot-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .screenshot-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.95) 80%);
+      padding: 16px 14px 8px 14px;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Before / After Table */
+    .comparison-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+      font-size: 12.5px;
+    }
+
+    .comparison-table th {
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10.5px;
+      letter-spacing: 0.05em;
+    }
+
+    .comparison-table th.col-before {
+      background: rgba(244, 63, 94, 0.1);
+      color: #FB7185;
+      border-bottom: 2px solid #F43F5E;
+    }
+
+    .comparison-table th.col-after {
+      background: rgba(16, 185, 129, 0.1);
+      color: #34D399;
+      border-bottom: 2px solid #10B981;
+    }
+
+    .comparison-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      line-height: 1.4;
+    }
+
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .comparison-table td.dim {
+      color: var(--text-secondary);
+    }
+
+    .comparison-table td.bold {
+      color: var(--text-white);
+      font-weight: 600;
+    }
+
+    /* Deck Controls Bar (Bottom) */
+    .deck-bottombar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 28px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .nav-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .deck-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-white);
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      font-family: var(--font-main);
+    }
+
+    .deck-btn:hover {
+      background: #334155;
+      border-color: var(--text-secondary);
+    }
+
+    .deck-btn.primary {
+      background: var(--primary-emerald);
+      border-color: var(--primary-emerald);
+      color: #fff;
+    }
+
+    .deck-btn.primary:hover {
+      background: var(--primary-emerald-hover);
+    }
+
+    .deck-btn kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 5px;
+      border-radius: 3px;
+      color: #CBD5E1;
+    }
+
+    /* Speaker Notes Drawer */
+    .notes-drawer {
+      position: absolute;
+      bottom: 50px;
+      left: 28px;
+      right: 28px;
+      max-height: 220px;
+      background: rgba(2, 6, 23, 0.96);
+      border: 1px solid #059669;
+      border-radius: 8px;
+      padding: 16px 20px;
+      box-shadow: 0 -10px 25px rgba(0,0,0,0.5);
+      z-index: 20;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .notes-drawer.open {
+      display: block;
+    }
+
+    .notes-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .notes-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #34D399;
+    }
+
+    .notes-content {
+      font-size: 13.5px;
+      color: #E2E8F0;
+      line-height: 1.55;
+    }
+
+    .notes-defense {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-subtle);
+      font-size: 12px;
+      color: #94A3B8;
+    }
+
+    .notes-defense strong {
+      color: #FCD34D;
+    }
+
+    /* Cover Slide (Slide 1) Special Styles */
+    .cover-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      height: 100%;
+      position: relative;
+    }
+
+    .cover-glow {
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 2;
+      max-width: 860px;
+    }
+
+    .cover-logo-icon {
+      width: 60px;
+      height: 60px;
+      background: var(--primary-emerald);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 18px auto;
+      box-shadow: 0 0 30px var(--primary-glow);
+    }
+
+    .cover-title {
+      font-size: 54px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 12px;
+      background: linear-gradient(180deg, #FFFFFF 30%, #CBD5E1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cover-headline {
+      font-size: 21px;
+      font-weight: 600;
+      color: #E2E8F0;
+      margin-bottom: 22px;
+      line-height: 1.35;
+    }
+
+    .cover-headline span {
+      color: #34D399;
+    }
+
+    .cover-pills-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .cover-bottom-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 18px;
+      width: 100%;
+    }
+
+    /* Print Stylesheet for PDF Export */
+    @media print {
+      body {
+        background: #000 !important;
+      }
+      .deck-viewport {
+        width: 100% !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .deck-bottombar, .notes-drawer {
+        display: none !important;
+      }
+      .slide {
+        display: flex !important;
+        opacity: 1 !important;
+        page-break-after: always;
+        height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-viewport" id="presentation-deck">
+    
+    <!-- Permanent Header Ribbon -->
+    <header class="deck-topbar">
+      <div class="brand-cluster">
+        <div class="brand-logo-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <span class="brand-name">DAWAIFLOW</span>
+        <span class="brand-tag">Hackathon 2026</span>
+      </div>
+
+      <div class="topbar-right-meta">
+        <span class="slide-badge-theme">Innovate Without Borders</span>
+        <span class="slide-counter-chip" id="slide-number-indicator">01 / 12</span>
+      </div>
+    </header>
+
+    <!-- Slides Stage Container -->
+    <main class="slide-stage" id="slide-stage">
+
+      <!-- ==========================================
+           SLIDE 1 — TITLE / COVER
+           ========================================== -->
+      <section class="slide active" data-slide="1" data-title="Cover">
+        <div class="cover-container">
+          <div class="cover-glow"></div>
+          <div class="cover-content">
+            <div class="cover-logo-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <circle cx="12" cy="11" r="3"/>
+              </svg>
+            </div>
+            <h1 class="cover-title">DAWAIFLOW</h1>
+            <p class="cover-headline">
+              Making everyday pharmacy work <span>faster</span>, <span>simpler</span> and <span>smarter</span>.
+            </p>
+
+            <div class="cover-pills-row">
+              <span class="pill-tag">🩺 Healthcare & MedTech</span>
+              <span class="pill-tag">⚡ Practical AI / Computer Vision</span>
+              <span class="pill-tag">📱 Web & Mobile POS</span>
+              <span class="pill-tag" style="border-color: #059669; color: #34D399;">🇮🇳 Built for Indian Retail Counters</span>
+            </div>
+
+            <div class="cover-bottom-flow">
+              <span>PURCHASE</span>
+              <span style="color: #34D399;">→</span>
+              <span>INVENTORY</span>
+              <span style="color: #34D399;">→</span>
+              <span>BILLING</span>
+              <span style="color: #34D399;">→</span>
+              <span>RETURNS</span>
+              <span style="color: #34D399;">→</span>
+              <span>BATCH & EXPIRY</span>
+              <span style="color: #34D399;">→</span>
+              <span>LIVE INSIGHTS</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 2 — THE EVERYDAY PROBLEMS IN A PHARMACY
+           ========================================== -->
+      <section class="slide" data-slide="2" data-title="The Everyday Problems in a Pharmacy">
+        <div class="slide-eyebrow">The Reality at the Counter</div>
+        <h2 class="slide-title">The Everyday Problems in a Pharmacy</h2>
+        <p class="slide-subtitle">
+          Existing pharmacy software helps digitise records, but routine operations still leave staff handling repetitive manual work.
+        </p>
+
+        <div class="grid-2col" style="align-items: stretch; gap: 20px;">
+          <!-- Left Column: Problem 01 - Billing Manual Steps -->
+          <div class="deck-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(244, 63, 94, 0.15); color: #FB7185; font-weight: 800; padding: 3px 7px; border-radius: 4px; font-size: 11.5px; font-family: var(--font-mono);">01</span>
+                  <h3 style="font-size: 16px; color: #fff;">Billing Still Involves Many Manual Steps</h3>
+                </div>
+              </div>
+              <p class="card-text" style="font-size: 12.5px; margin-bottom: 12px;">
+                A pharmacist must search for medicines, select them, enter quantities, check batch details, and print manually. Small steps repeated for every customer quickly become hours of counter delay.
+              </p>
+
+              <!-- Observation Badge -->
+              <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); padding: 8px 12px; border-radius: 6px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">⏱️</span>
+                <span style="font-size: 12px; color: #FCD34D;">
+                  <strong>Counter Observation:</strong> A routine manual billing interaction takes ~<strong>60–65 seconds</strong> per customer.
+                </span>
+              </div>
+
+              <!-- Visual Flow Comparison -->
+              <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); padding: 12px; border-radius: 8px;">
+                <div style="font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin-bottom: 6px;">Typical Current Flow</div>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: 11px; font-family: var(--font-mono); color: #E2E8F0;">
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Customer Waiting</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Search Medicine</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Select</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Enter Qty</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Check</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Bill</span>
+                  <span style="color: var(--text-muted);">→</span>
+                  <span style="background: #334155; padding: 3px 7px; border-radius: 4px;">Print</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subtle Transition to Dawaiflow -->
+            <div style="margin-top: 12px; padding: 10px 14px; background: rgba(16, 185, 129, 0.08); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 11px; color: #34D399; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Dawaiflow Approach:</span>
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-family: var(--font-mono); color: #fff;">
+                <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 2px 8px; border-radius: 4px; font-weight: 700;">SCAN</span>
+                <span style="color: #34D399;">→</span>
+                <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 2px 8px; border-radius: 4px; font-weight: 700;">REVIEW</span>
+                <span style="color: #34D399;">→</span>
+                <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 2px 8px; border-radius: 4px; font-weight: 700;">BILL</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Problems 02, 03, 04 -->
+          <div style="display: flex; flex-direction: column; gap: 10px; justify-content: space-between;">
+            
+            <!-- Problem 02 -->
+            <div class="deck-card" style="padding: 12px 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: var(--font-mono);">02</span>
+                  <h4 style="font-size: 14.5px; color: #fff;">Purchase Bills Take Time to Enter</h4>
+                </div>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
+                Suppliers provide invoices containing dozens of medicine details. Typing batch codes, expiry dates, and rates manually is repetitive and time-consuming.
+              </p>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-family: var(--font-mono); color: #94A3B8;">
+                <span style="background: #1E293B; border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px;">Supplier Bill (20–50 rows)</span>
+                <span style="color: #F43F5E;">→</span>
+                <span style="background: rgba(244, 63, 94, 0.12); color: #FB7185; border: 1px solid rgba(244, 63, 94, 0.3); padding: 3px 8px; border-radius: 4px;">Manual Keyboard Entry</span>
+              </div>
+            </div>
+
+            <!-- Problem 03 -->
+            <div class="deck-card" style="padding: 12px 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(251, 191, 36, 0.15); color: #FBBF24; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: var(--font-mono);">03</span>
+                  <h4 style="font-size: 14.5px; color: #fff;">Different Tasks Are Not Always Connected</h4>
+                </div>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
+                Billing, purchases, stock, returns, and expiry are all connected in a pharmacy. However, staff often manage them as separate chores.
+              </p>
+              <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.6); padding: 5px 10px; border-radius: 4px; border: 1px solid var(--border-subtle); font-size: 10.5px; font-family: var(--font-mono); color: #CBD5E1;">
+                <span>BILLING</span>
+                <span style="color: var(--text-muted);">|</span>
+                <span>PURCHASE</span>
+                <span style="color: var(--text-muted);">|</span>
+                <span>STOCK</span>
+                <span style="color: var(--text-muted);">|</span>
+                <span>RETURNS</span>
+                <span style="color: var(--text-muted);">|</span>
+                <span>EXPIRY</span>
+              </div>
+            </div>
+
+            <!-- Problem 04 -->
+            <div class="deck-card" style="padding: 12px 16px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="background: rgba(168, 85, 247, 0.15); color: #C084FC; font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: var(--font-mono);">04</span>
+                  <h4 style="font-size: 14.5px; color: #fff;">Batch & Expiry Information Needs Constant Attention</h4>
+                </div>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                Pharmacies stock thousands of medicines, batches, and expiry dates. Keeping track of them while serving customers and managing daily rush is difficult.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-subtle); padding: 8px 16px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 12.5px; color: var(--text-white);">
+            <strong>Fair Reality:</strong> Existing pharmacy software helps digitise records, but routine operations still leave staff handling repetitive manual work.
+          </span>
+          <span style="font-size: 11px; font-family: var(--font-mono); color: #34D399; font-weight: 700;">
+            Next Step: Dawaiflow removes this manual work →
+          </span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 3 — WHY THIS MATTERS
+           ========================================== -->
+      <section class="slide" data-slide="3" data-title="Why This Matters">
+        <div class="slide-eyebrow">Practical Impact</div>
+        <h2 class="slide-title">Why This Matters</h2>
+        <p class="slide-subtitle">
+          When routine pharmacy work is repetitive and manual, the operational cost compounds quietly every single day.
+        </p>
+
+        <div class="grid-2col">
+          <!-- Flow of compounding problems -->
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="deck-card" style="border-left: 4px solid #F43F5E;">
+              <div style="font-size: 11px; font-weight: 700; color: #FB7185; text-transform: uppercase;">Step 1</div>
+              <h4 style="font-size: 15px; color: #fff; margin: 4px 0;">Excessive Repetitive Work</h4>
+              <p style="font-size: 13px; color: var(--text-secondary);">Hours spent typing the same product names, MRPs, and batch numbers at every stage.</p>
+            </div>
+
+            <div class="deck-card" style="border-left: 4px solid #F59E0B;">
+              <div style="font-size: 11px; font-weight: 700; color: #FCD34D; text-transform: uppercase;">Step 2</div>
+              <h4 style="font-size: 15px; color: #fff; margin: 4px 0;">Rushed Counters & Manual Mistakes</h4>
+              <p style="font-size: 13px; color: var(--text-secondary);">Mistyped batch numbers, wrong GST calculations, and long waiting times for patients.</p>
+            </div>
+
+            <div class="deck-card" style="border-left: 4px solid #8B5CF6;">
+              <div style="font-size: 11px; font-weight: 700; color: #C4B5FD; text-transform: uppercase;">Step 3</div>
+              <h4 style="font-size: 15px; color: #fff; margin: 4px 0;">Silent Expiry & Inventory Desync</h4>
+              <p style="font-size: 13px; color: var(--text-secondary);">Physical shelf stock does not match the system. Expired medicines turn into dead loss.</p>
+            </div>
+          </div>
+
+          <!-- The Real Consequence Box -->
+          <div class="deck-card highlight" style="justify-content: center; text-align: center; padding: 32px 28px;">
+            <div style="font-size: 38px; margin-bottom: 14px;">⏱️ ↔️ 💊</div>
+            <h3 style="font-size: 21px; font-weight: 800; color: var(--text-white); margin-bottom: 12px;">
+              Pharmacists should spend time with patients, not typing data twice.
+            </h3>
+            <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+              In an Indian retail pharmacy, the counter is fast-paced. A pharmacist is a healthcare professional dispensing critical medications — not a data entry clerk.
+            </p>
+            <div style="margin-top: 18px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px dashed rgba(16, 185, 129, 0.3);">
+              <span style="font-size: 13px; color: #34D399; font-weight: 600;">
+                The need: One connected system that eliminates repeated typing.
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 4 — OUR SOLUTION
+           ========================================== -->
+      <section class="slide" data-slide="4" data-title="Our Solution">
+        <div class="slide-eyebrow">Product Reveal</div>
+        <h2 class="slide-title">Meet Dawaiflow</h2>
+        <p class="slide-subtitle">
+          “One simple system for the everyday work of a pharmacy.” Dawaiflow connects every pharmacy operation into a single live workflow.
+        </p>
+
+        <!-- Connected Loop Bar -->
+        <div class="flow-chain">
+          <div class="flow-node active">📸 SCAN & INTAKE</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node active">📦 LIVE INVENTORY</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node active">⚡ BILLING & POS</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node active">🖨️ THERMAL PRINT</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node active">🔄 RETURNS & RESTOCK</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node active">🛡️ FEFO EXPIRY GUARD</div>
+        </div>
+
+        <div class="grid-2col" style="gap: 20px;">
+          <!-- Product Screenshot Left -->
+          <div class="screenshot-frame">
+            <img src="public_site/assets/product/expiryguard-web-app-original.jpg" alt="Dawaiflow Real Web Dashboard">
+            <div class="screenshot-caption">
+              <span>REAL DAWAIFLOW DASHBOARD (10,000 LIVE ITEMS)</span>
+              <span style="color: #34D399;">● AUTO-SYNC ACTIVE</span>
+            </div>
+          </div>
+
+          <!-- Feature Breakdown Right -->
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="deck-card" style="padding: 14px 16px;">
+              <h4 style="font-size: 14.5px; color: #34D399; margin-bottom: 3px;">1. Connects the Entire Cycle</h4>
+              <p style="font-size: 12.5px; color: var(--text-secondary);">Stock added via purchase bill OCR immediately reflects in live inventory and is ready for billing with FEFO prioritization.</p>
+            </div>
+
+            <div class="deck-card" style="padding: 14px 16px;">
+              <h4 style="font-size: 14.5px; color: #38BDF8; margin-bottom: 3px;">2. Multi-Device by Nature</h4>
+              <p style="font-size: 12.5px; color: var(--text-secondary);">Use a smartphone camera for mobile billing and package scanning, while the counter desktop handles high-speed POS and thermal printing.</p>
+            </div>
+
+            <div class="deck-card" style="padding: 14px 16px;">
+              <h4 style="font-size: 14.5px; color: #FBBF24; margin-bottom: 3px;">3. Practical, Not Theoretical</h4>
+              <p style="font-size: 12.5px; color: var(--text-secondary);">Supports loose tablet splitting, temporary held bills for queue management, customer Khata credit ledgers, and CA tax reports.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 5 — HOW IT WORKS
+           ========================================== -->
+      <section class="slide" data-slide="5" data-title="How It Works">
+        <div class="slide-eyebrow">Real-World Flow</div>
+        <h2 class="slide-title">How Dawaiflow Works at the Counter</h2>
+        <p class="slide-subtitle">
+          From incoming stock to counter checkout — here is how data moves through Dawaiflow without re-typing.
+        </p>
+
+        <div class="grid-3col">
+          <!-- Step 1 -->
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: #34D399; font-weight: 700;">STEP 01</div>
+            <h3 class="card-heading" style="margin-top: 6px;">Intake or Scan</h3>
+            <p class="card-text" style="margin-bottom: 14px;">
+              Pharmacist uploads a photo of a distributor challan, or points their phone camera at medicine strips on the counter.
+            </p>
+            <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); padding: 10px; border-radius: 6px; font-size: 11.5px; font-family: var(--font-mono); color: #94A3B8;">
+              ✓ Reads 1–7 strips at once<br>
+              ✓ Reads paper invoices / challans<br>
+              ✓ Instant barcode pre-check
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="deck-card highlight">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: #38BDF8; font-weight: 700;">STEP 02</div>
+            <h3 class="card-heading" style="margin-top: 6px;">Intelligent Extraction & FEFO</h3>
+            <p class="card-text" style="margin-bottom: 14px;">
+              AI & local computer vision extract product names, batches, expiry, and MRP. System automatically assigns the earliest-expiring batch (FEFO).
+            </p>
+            <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); padding: 10px; border-radius: 6px; font-size: 11.5px; font-family: var(--font-mono); color: #38BDF8;">
+              ✓ Brand vs Salt distinction<br>
+              ✓ First-Expiring, First-Out (FEFO)<br>
+              ✓ Loose-tablet price math
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 12px; color: #FCD34D; font-weight: 700;">STEP 03</div>
+            <h3 class="card-heading" style="margin-top: 6px;">Instant Bill & Live Sync</h3>
+            <p class="card-text" style="margin-bottom: 14px;">
+              Tax invoice is generated in 1 click. Stock is deducted, counter printer prints receipt via Desktop Print Agent, and web dashboard updates live.
+            </p>
+            <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); padding: 10px; border-radius: 6px; font-size: 11.5px; font-family: var(--font-mono); color: #FCD34D;">
+              ✓ GST-compliant invoice<br>
+              ✓ ESC/POS thermal print (&lt;100ms)<br>
+              ✓ Live mobile ↔ desktop sync
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 18px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-subtle); padding: 10px 18px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; color: #E2E8F0;">
+            <strong>Zero Re-entry:</strong> One single scan completes billing, inventory deduction, batch tracking, and financial records simultaneously.
+          </span>
+          <span class="pill-tag" style="background: rgba(16, 185, 129, 0.15); color: #34D399; border-color: rgba(52, 211, 153, 0.3);">
+            Live Product Flow
+          </span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 6 — WHAT MAKES DAWAIFLOW DIFFERENT?
+           ========================================== -->
+      <section class="slide" data-slide="6" data-title="Differentiators">
+        <div class="slide-eyebrow">Product Philosophy</div>
+        <h2 class="slide-title">What Makes Dawaiflow Different?</h2>
+        <p class="slide-subtitle">
+          “Dawaiflow does not just manage a pharmacy. It connects the work happening inside it.”
+        </p>
+
+        <div class="grid-2col">
+          <div class="deck-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34D399; font-weight: 800; padding: 4px 8px; border-radius: 4px; font-size: 12px;">01</span>
+              <h3 style="font-size: 16px; color: #fff;">AI Where It Actually Helps</h3>
+            </div>
+            <p class="card-text">
+              Not AI for hype. AI is strictly deployed to eliminate repetitive keyboard work: reading complex medicine packaging, batch numbers, and messy paper challans.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; font-weight: 800; padding: 4px 8px; border-radius: 4px; font-size: 12px;">02</span>
+              <h3 style="font-size: 16px; color: #fff;">One Connected Data Loop</h3>
+            </div>
+            <p class="card-text">
+              Purchase intake, live inventory, counter POS billing, customer returns, and expiry tracking are not separate modules. They feed the exact same live ledger.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="background: rgba(251, 191, 36, 0.15); color: #FBBF24; font-weight: 800; padding: 4px 8px; border-radius: 4px; font-size: 12px;">03</span>
+              <h3 style="font-size: 16px; color: #fff;">Built for Indian Counter Reality</h3>
+            </div>
+            <p class="card-text">
+              Understands loose tablet strip math, holds parked bills when customers step aside to pick another item, and imports historical Marg ERP / Excel databases seamlessly.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="background: rgba(168, 85, 247, 0.15); color: #C084FC; font-weight: 800; padding: 4px 8px; border-radius: 4px; font-size: 12px;">04</span>
+              <h3 style="font-size: 16px; color: #fff;">Action Over Passive Reports</h3>
+            </div>
+            <p class="card-text">
+              Traditional software shows an expiry report after the medicine is already dead. Dawaiflow enforces FEFO at billing time, selling expiring batches first to prevent waste.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 7 — AI IN DAWAIFLOW
+           ========================================== -->
+      <section class="slide" data-slide="7" data-title="AI in Dawaiflow">
+        <div class="slide-eyebrow">Practical Intelligence</div>
+        <h2 class="slide-title">AI That Actually Helps</h2>
+        <p class="slide-subtitle">
+          AI handles repetitive reading and data extraction so pharmacy staff can focus on the work that matters.
+        </p>
+
+        <div class="grid-2col">
+          <!-- Left: Real Challan Photo -->
+          <div class="screenshot-frame" style="max-height: 380px;">
+            <img src="uploads/documents/doc_04de78fb23.jpeg" alt="Real Wholesale Challan with handwritten notes">
+            <div class="screenshot-caption">
+              <span>REAL DISTRIBUTOR CHALLAN TESTED WITH DAWAIFLOW OCR</span>
+              <span style="color: #FBBF24;">PRINTED + HANDWRITTEN</span>
+            </div>
+          </div>
+
+          <!-- Right: 3 Real AI Capabilities -->
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="deck-card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 15px; color: #34D399;">1. Distributor Challan & Invoice OCR</h4>
+                <span class="pill-tag">Gemini Vision</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+                Converts complex, multi-item printed & handwritten supplier invoices (like Marg challans) directly into structured inventory stock batches in seconds.
+              </p>
+            </div>
+
+            <div class="deck-card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 15px; color: #38BDF8;">2. Multi-Strip Counter Billing Scan</h4>
+                <span class="pill-tag">Multi-Item Vision</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+                A single smartphone photo captures 1 to 7 distinct medicine packages on the counter. AI distinguishes brand names from chemical salts, batch numbers, and expiry.
+              </p>
+            </div>
+
+            <div class="deck-card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="font-size: 15px; color: #FCD34D;">3. Local Edge Pre-Detection</h4>
+                <span class="pill-tag">OpenCV + PaddleOCR</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+                Barcodes and QR codes are detected locally in &lt;20ms before calling cloud vision, saving API costs and providing instant billing feedback.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 8 — IMPACT & BENEFITS
+           ========================================== -->
+      <section class="slide" data-slide="8" data-title="Impact & Benefits">
+        <div class="slide-eyebrow">Real Operational Transformation</div>
+        <h2 class="slide-title">What Changes for a Pharmacy?</h2>
+        <p class="slide-subtitle">
+          Practical improvements measured directly in saved minutes, fewer errors, and protected inventory value.
+        </p>
+
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th style="width: 22%; background: #1E293B; color: #94A3B8; border-bottom: 2px solid #334155;">PHARMACY TASK</th>
+              <th class="col-before" style="width: 39%;">BEFORE DAWAIFLOW</th>
+              <th class="col-after" style="width: 39%;">WITH DAWAIFLOW</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="bold">Receiving Stock</td>
+              <td class="dim">20–30 minutes typing rows of medicines, batch codes, rates, and expiry dates manually.</td>
+              <td class="bold" style="color: #34D399;">Snap 1 photo of the challan. AI populates verified inventory batches in seconds.</td>
+            </tr>
+            <tr>
+              <td class="bold">Counter Billing</td>
+              <td class="dim">Customer waits while staff writes handwritten slips or slowly searches names in old software.</td>
+              <td class="bold" style="color: #34D399;">Quick camera scan or instant 2-keystroke lookup. Bill generated & auto-printed in seconds.</td>
+            </tr>
+            <tr>
+              <td class="bold">Expiry Management</td>
+              <td class="dim">Periodic manual checking of shelves. Expired medicines discovered too late.</td>
+              <td class="bold" style="color: #34D399;">FEFO billing automatically allocates older batches first; 60-day expiry radar alerts staff.</td>
+            </tr>
+            <tr>
+              <td class="bold">Customer Returns</td>
+              <td class="dim">Manual paper math, forgotten batch adjustments, inaccurate inventory counts.</td>
+              <td class="bold" style="color: #34D399;">1-click return restores stock to the original batch and logs refund atomically.</td>
+            </tr>
+            <tr>
+              <td class="bold">Daily Closing</td>
+              <td class="dim">Hours reconciling registers, cash tallies, and preparing GST sheets for accountant.</td>
+              <td class="bold" style="color: #34D399;">Instant dashboard totals, multi-mode payment breakdown, and 1-click CA tax report share.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 14px; display: flex; justify-content: space-around; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 10px; border-radius: 8px;">
+          <span style="font-size: 12.5px; font-weight: 600; color: #34D399;">✓ Connected Operations</span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #34D399;">✓ Zero Re-typing</span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #34D399;">✓ Reduced Expiry Waste</span>
+          <span style="font-size: 12.5px; font-weight: 600; color: #34D399;">✓ Faster Customer Service</span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 9 — TECHNOLOGY
+           ========================================== -->
+      <section class="slide" data-slide="9" data-title="Technology">
+        <div class="slide-eyebrow">Technical Architecture</div>
+        <h2 class="slide-title">How We Built Dawaiflow</h2>
+        <p class="slide-subtitle">
+          Built with high-performance, proven technologies designed for low latency, offline resiliency, and hardware compatibility.
+        </p>
+
+        <div class="grid-4col">
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #38BDF8; font-weight: 700;">FRONTEND & POS</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Web & Mobile</h4>
+            <p class="card-text" style="font-size: 12px;">
+              • <strong>Web:</strong> Native ES6, CSS3, Inter + JetBrains Mono (Zero bloated JS dependencies).<br>
+              • <strong>Mobile:</strong> Flutter (Dart) Android companion app for counter camera billing.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #34D399; font-weight: 700;">BACKEND & API</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">FastAPI & Python</h4>
+            <p class="card-text" style="font-size: 12px;">
+              • Python 3.11 with FastAPI.<br>
+              • Asynchronous REST API + real-time WebSockets for sub-100ms hardware event streaming.<br>
+              • Background workers for scheduled alerts.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #FCD34D; font-weight: 700;">DATA ENGINE</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Postgres + 240k Master</h4>
+            <p class="card-text" style="font-size: 12px;">
+              • PostgreSQL with SQLAlchemy.<br>
+              • Pre-indexed Indian Medicine Catalog of <strong>240,000+ medicines</strong> with composition & HSN.<br>
+              • Atomic transactions & soft-delete.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #C084FC; font-weight: 700;">AI & HARDWARE</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Vision & Print Agent</h4>
+            <p class="card-text" style="font-size: 12px;">
+              • <strong>AI:</strong> Gemini 3.1 Flash-Lite + PaddleOCR + OpenCV.<br>
+              • <strong>Hardware:</strong> Windows Desktop Print Agent piping ESC/POS to 58mm/80mm thermal printers.
+            </p>
+          </div>
+        </div>
+
+        <!-- Architecture Flow Banner -->
+        <div style="margin-top: 18px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); padding: 10px 18px; border-radius: 8px; font-family: var(--font-mono); font-size: 11.5px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #94A3B8;">USER DEVICE (Phone / PC)</span>
+          <span style="color: #34D399;">⇄</span>
+          <span style="color: #38BDF8;">FastAPI Backend (Async)</span>
+          <span style="color: #34D399;">⇄</span>
+          <span style="color: #FCD34D;">Postgres (240k Catalog)</span>
+          <span style="color: #34D399;">⇄</span>
+          <span style="color: #C084FC;">AI Vision Engine</span>
+          <span style="color: #34D399;">⇄</span>
+          <span style="color: #34D399;">ESC/POS Print Spooler</span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 10 — FEASIBILITY & IMPLEMENTATION
+           ========================================== -->
+      <section class="slide" data-slide="10" data-title="Feasibility">
+        <div class="slide-eyebrow">Real-World Ready</div>
+        <h2 class="slide-title">Built to Work in the Real World</h2>
+        <p class="slide-subtitle">
+          Dawaiflow is not an abstract concept. It is built to work immediately on the equipment Indian pharmacies already possess.
+        </p>
+
+        <div class="grid-2col">
+          <!-- Left: Physical Reality Evidence -->
+          <div class="screenshot-frame" style="max-height: 380px;">
+            <img src="public_site/assets/product/expiryguard-mobile-app-original.jpg" alt="Vashist Pharmacy Live Pilot Screen">
+            <div class="screenshot-caption">
+              <span>LIVE PILOT RECORD: VASHIST PHARMACY (182 BILLS, ₹25,000 SALES)</span>
+              <span style="color: #34D399;">TESTED REALITY</span>
+            </div>
+          </div>
+
+          <!-- Right: 4 Feasibility Pillars -->
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="deck-card" style="padding: 10px 14px;">
+              <h4 style="font-size: 13.5px; color: #34D399;">1. Zero Hardware Cost</h4>
+              <p style="font-size: 11.5px; color: var(--text-secondary);">Works on standard Android smartphones and existing counter PCs. No expensive barcode guns or proprietary scanners needed.</p>
+            </div>
+
+            <div class="deck-card" style="padding: 10px 14px;">
+              <h4 style="font-size: 13.5px; color: #38BDF8;">2. Marg ERP & Excel Coexistence</h4>
+              <p style="font-size: 11.5px; color: var(--text-secondary);">Includes direct spreadsheet and Marg ERP import tools. Pharmacies can onboard their entire 10,000-item inventory in minutes without disruption.</p>
+            </div>
+
+            <div class="deck-card" style="padding: 10px 14px;">
+              <h4 style="font-size: 13.5px; color: #FCD34D;">3. Real Pilot Validation</h4>
+              <p style="font-size: 11.5px; color: var(--text-secondary);">Actively tested with Indian pharmacies (e.g. Vashist Pharmacy) processing 180+ bills/day, verifying live counter speed and FEFO alerts.</p>
+            </div>
+
+            <div class="deck-card" style="padding: 10px 14px;">
+              <h4 style="font-size: 13.5px; color: #C084FC;">4. Resilient & Fail-Safe</h4>
+              <p style="font-size: 11.5px; color: var(--text-secondary);">In-memory preloading for instant 0ms billing UI, dual WebSocket/HTTP print spooler, and strict transactional idempotency.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 11 — SCALABILITY
+           ========================================== -->
+      <section class="slide" data-slide="11" data-title="Scalability">
+        <div class="slide-eyebrow">Future Expansion</div>
+        <h2 class="slide-title">Where Dawaiflow Can Go Next</h2>
+        <p class="slide-subtitle">
+          “Start with one pharmacy. Scale the same connected workflow across many.”
+        </p>
+
+        <div class="grid-4col">
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #34D399; font-weight: 700;">STAGE 1 (ACTIVE)</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Single Counter</h4>
+            <p class="card-text" style="font-size: 12px;">
+              Complete connected workflow: AI invoice intake, live FEFO inventory, rapid counter billing, and thermal print spooling for independent pharmacies.
+            </p>
+          </div>
+
+          <div class="deck-card highlight">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #38BDF8; font-weight: 700;">STAGE 2 (BUILT IN CODE)</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Multi-Branch Stores</h4>
+            <p class="card-text" style="font-size: 12px;">
+              Centralized stock visibility across multiple retail outlets. Transfer stock between branches before it expires; unified owner dashboard.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #FCD34D; font-weight: 700;">STAGE 3</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Distributor Link</h4>
+            <p class="card-text" style="font-size: 12px;">
+              Automated reordering based on actual counter sales velocity and supplier payment terms. 1-click PO generation directly to distributors.
+            </p>
+          </div>
+
+          <div class="deck-card">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: #C084FC; font-weight: 700;">STAGE 4</div>
+            <h4 style="font-size: 15.5px; color: #fff; margin: 6px 0;">Network Intelligence</h4>
+            <p class="card-text" style="font-size: 12px;">
+              City-level medicine availability and shortage detection. Helping patients find scarce medicines across connected pharmacy networks.
+            </p>
+          </div>
+        </div>
+
+        <div style="margin-top: 20px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-subtle); padding: 12px 18px; border-radius: 8px; text-align: center;">
+          <span style="font-size: 13.5px; color: #E2E8F0;">
+            Every single expansion stage relies on the exact same core truth: <strong>clean, connected data captured effortlessly at the counter.</strong>
+          </span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           SLIDE 12 — CLOSING
+           ========================================== -->
+      <section class="slide" data-slide="12" data-title="Closing">
+        <div class="cover-container">
+          <div class="cover-glow"></div>
+          <div class="cover-content" style="max-width: 900px;">
+            <div class="slide-eyebrow" style="justify-content: center; margin-bottom: 10px;">Conclusion</div>
+            <h2 style="font-size: 42px; font-weight: 800; line-height: 1.15; color: #fff; margin-bottom: 14px;">
+              A Smarter Way to Run a Pharmacy
+            </h2>
+            <p style="font-size: 21px; font-weight: 600; color: #34D399; margin-bottom: 22px;">
+              “Less manual work. More connected pharmacy operations.”
+            </p>
+
+            <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 18px 28px; margin-bottom: 26px; display: inline-flex; flex-direction: column; align-items: center; gap: 8px;">
+              <span style="font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">DAWAIFLOW</span>
+              <span style="font-size: 14px; color: var(--text-secondary);">Making everyday pharmacy work faster, simpler and smarter.</span>
+            </div>
+
+            <div style="display: flex; gap: 16px; justify-content: center; align-items: center; font-size: 13px; color: var(--text-muted); font-family: var(--font-mono);">
+              <span>Healthcare & MedTech</span>
+              <span>•</span>
+              <span>Built by Team Dawaiflow</span>
+              <span>•</span>
+              <span style="color: #34D399;">Ready for Live Demo</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Speaker Notes Drawer (Toggled via button or 'N' key) -->
+    <div class="notes-drawer" id="speaker-notes-drawer">
+      <div class="notes-header">
+        <span class="notes-label" id="notes-title">SPEAKER SCRIPT — SLIDE 1</span>
+        <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Press 'N' to close</span>
+      </div>
+      <div class="notes-content" id="notes-body">
+        Spoken script loads here...
+      </div>
+      <div class="notes-defense" id="notes-defense-body">
+        <strong>Judge Defense Point:</strong> ...
+      </div>
+    </div>
+
+    <!-- Permanent Navigation Bar (Bottom) -->
+    <footer class="deck-bottombar">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <button class="deck-btn" id="prev-btn" onclick="prevSlide()">
+          <span>← Prev</span>
+          <kbd>Left</kbd>
+        </button>
+        <button class="deck-btn primary" id="next-btn" onclick="nextSlide()">
+          <span>Next →</span>
+          <kbd>Space / Right</kbd>
+        </button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="deck-btn" id="notes-toggle-btn" onclick="toggleSpeakerNotes()">
+          <span>📝 Speaker Notes</span>
+          <kbd>N</kbd>
+        </button>
+        <button class="deck-btn" onclick="toggleFullscreen()">
+          <span>⛶ Fullscreen</span>
+          <kbd>F</kbd>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    const speakerNotesData = {
+      1: {
+        title: "SLIDE 1 — TITLE & INTRODUCTION",
+        script: "Good morning esteemed judges. We are Team Dawaiflow, competing under the Innovate Without Borders theme. Dawaiflow is an AI-powered pharmacy management solution built specifically for the reality of Indian retail pharmacies. Our central idea is simple: make everyday pharmacy work faster, simpler, and smarter.",
+        defense: "Grounded in actual project code. Not a mock concept — full FastAPI backend, Flutter companion app, and native web POS."
+      },
+      2: {
+        title: "SLIDE 2 — THE EVERYDAY PROBLEMS IN A PHARMACY",
+        script: "Let us look at what actually happens inside an Indian pharmacy. Existing pharmacy software helps digitise the shop, but routine operations still leave staff handling repetitive manual work. First, billing still involves many manual steps: when a customer arrives, the pharmacist has to search for the medicine, select the right formulation, enter the quantity, verify details, and print. In our counter observation, a routine billing interaction takes around 60 to 65 seconds per customer. Repeat that for 100 or 150 customers every day, and small steps become hours of work. Second, purchase bills take time to enter: wholesale challans arrive with 20 to 50 rows of medicines that staff have to manually type. Third, different pharmacy tasks are not always connected: billing, purchases, inventory, returns, and expiry are naturally linked, but staff often manage them as separate chores. And fourth, batch and expiry information needs constant attention while managing a busy counter. Dawaiflow is built to simplify these exact repetitive steps.",
+        defense: "Fair and realistic tone: we do not claim existing software is useless. We focus on the exact repetitive manual steps that current software leaves staff doing by hand (searching, typing rows from paper challans, manually checking expiry). The 60–65s stat is clearly framed as an actual counter observation, not an invented industry claim."
+      },
+      3: {
+        title: "SLIDE 3 — WHY THIS MATTERS",
+        script: "Why does this matter? Because when everyday operations are fragmented, the cost compounds. Repetitive manual entry leads to slow queues, typographical errors, and dead stock from expired medicines. A pharmacist is a trained healthcare professional, not a data entry operator. They should be spending their time advising patients, not typing the same medicine names twice.",
+        defense: "No fake percentage statistics are used. The impact is framed directly in operational friction that every pharmacy owner acknowledges."
+      },
+      4: {
+        title: "SLIDE 4 — OUR SOLUTION (PRODUCT REVEAL)",
+        script: "This is why we built Dawaiflow. Dawaiflow is not just a billing app. It is one connected system for the everyday work of a pharmacy. When stock arrives, it enters the inventory; when a customer buys, stock is deducted; when batches near expiry, the system flags them first; and when returns occur, the original batch is restored immediately. What you see on screen is our actual working web dashboard managing over 10,000 active inventory items with live mobile synchronization.",
+        defense: "Show the real screenshot on the slide. Point out the 'Live Sync with Mobile' badge and the 10,000 active items from our actual database."
+      },
+      5: {
+        title: "SLIDE 5 — HOW IT WORKS",
+        script: "Here is how Dawaiflow works in practice. Step 1: The pharmacist uploads a photo of a distributor invoice or points their phone camera at medicines on the counter. Step 2: Dawaiflow uses computer vision to extract names, batches, expiry, and MRP, automatically applying First-Expiring, First-Out logic so older batches sell first. Step 3: A GST-compliant bill is generated instantly, stock is deducted, and our desktop agent spools the thermal receipt in under 100 milliseconds.",
+        defense: "Explain our Win32 print agent (dawaiflow_print_agent.py) that connects to actual 58mm/80mm ESC/POS counter printers via WebSockets."
+      },
+      6: {
+        title: "SLIDE 6 — WHAT MAKES DAWAIFLOW DIFFERENT?",
+        script: "What makes Dawaiflow truly different? It does not just manage a pharmacy — it connects the work happening inside it. First, AI is strictly practical: it eliminates repetitive data entry. Second, the entire workflow is a single connected loop. Third, it is built for Indian counter realities, handling loose tablet strip math and parking held bills when a patient steps aside. And fourth, it turns passive data into action: enforcing FEFO at the counter so expired medicine waste is prevented before it happens.",
+        defense: "Highlight our HeldBill model and tablets_per_strip loose tablet database architecture in models.py."
+      },
+      7: {
+        title: "SLIDE 7 — AI THAT ACTUALLY HELPS",
+        script: "Let us be transparent about AI. We do not use AI for buzzwords. In Dawaiflow, AI does three specific things. It reads complex paper invoices and challans using Gemini Vision. It detects 1 to 7 distinct medicine strips on a counter in a single photograph. And to keep operations lightning fast and zero-cost, we run local OpenCV and PaddleOCR pre-checks in under 20 milliseconds to identify barcodes and clear text before even hitting the cloud.",
+        defense: "Point to ai/multi_item_scan_service.py and ai/ocr_service.py. This dual-tier architecture demonstrates engineering maturity and cost awareness."
+      },
+      8: {
+        title: "SLIDE 8 — IMPACT & BENEFITS",
+        script: "Look at what actually changes inside the pharmacy. Receiving stock drops from 30 minutes of manual typing to snapping a photo of the bill. Billing shifts from slow typing to a camera scan or two keystrokes. Expiry management shifts from periodic shelf-digging to automatic FEFO allocation. And daily closing is transformed from hours of reconciling ledgers into an automated summary ready for the chartered accountant.",
+        defense: "Emphasize our CaProfile and CaShareLog models which allow pharmacies to share GSTR reports directly with their accountants."
+      },
+      9: {
+        title: "SLIDE 9 — HOW WE BUILT DAWAIFLOW (TECH STACK)",
+        script: "Behind Dawaiflow is a robust, production-grade technical stack. The web POS is built with native modern ES6 and CSS3 for zero runtime overhead. The mobile companion is built in Flutter. The backend is powered by Python 3.11 with FastAPI, providing asynchronous REST endpoints and real-time WebSockets. Our database uses PostgreSQL with a master catalog of over 240,000 Indian medicines. And our dedicated Windows print agent communicates directly with ESC/POS thermal printers.",
+        defense: "Cite indian_medicine_data.csv (240k records) and the lightweight dependency footprint in requirements.txt."
+      },
+      10: {
+        title: "SLIDE 10 — REAL-WORLD FEASIBILITY",
+        script: "Dawaiflow is built to work immediately in the real world. Pharmacies do not need to buy barcode scanners or specialized terminals — it works on the smartphones they already carry and the laptops they already run. It coexists with legacy tools by supporting direct Marg ERP and Excel spreadsheet imports. Most importantly, it is already deployed in an early pilot at Vashist Pharmacy, processing 180+ bills daily.",
+        defense: "Point out the live pilot lead model (PilotLead) and the authentic photo of the app running on an actual smartphone on a pharmacy counter."
+      },
+      11: {
+        title: "SLIDE 11 — WHERE DAWAIFLOW CAN GO NEXT",
+        script: "Where do we go next? Our roadmap is practical: start with single independent counters, which we already support. Step two is multi-branch stores, where our database already includes branch schema for inventory sharing between locations before medicines expire. Step three is direct distributor reordering based on live counter velocity. And step four is a connected pharmacy intelligence network helping patients find scarce life-saving drugs across local stores.",
+        defense: "Show that StoreBranch is already coded into models.py and web/branches.html."
+      },
+      12: {
+        title: "SLIDE 12 — CLOSING & INVITATION",
+        script: "In conclusion, Dawaiflow stands for less manual work and more connected pharmacy operations. It is a real product, solving a real problem, with real AI, tested with real Indian pharmacy data. Thank you, and we warmly welcome your questions and invite you to see our live demonstration.",
+        defense: "Invite judges to test a live bill creation, multi-item strip scan, or thermal print dispatch."
+      }
+    };
+
+    let currentSlide = 1;
+    const totalSlides = 12;
+    const slides = document.querySelectorAll('.slide');
+    const slideIndicator = document.getElementById('slide-number-indicator');
+    const notesDrawer = document.getElementById('speaker-notes-drawer');
+    const notesTitle = document.getElementById('notes-title');
+    const notesBody = document.getElementById('notes-body');
+    const notesDefenseBody = document.getElementById('notes-defense-body');
+
+    function updateSlide(targetSlide) {
+      if (targetSlide < 1 || targetSlide > totalSlides) return;
+      currentSlide = targetSlide;
+
+      slides.forEach((s) => {
+        s.classList.remove('active');
+        if (parseInt(s.getAttribute('data-slide')) === currentSlide) {
+          s.classList.add('active');
+        }
+      });
+
+      slideIndicator.textContent = `${String(currentSlide).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`;
+
+      const note = speakerNotesData[currentSlide];
+      if (note) {
+        notesTitle.textContent = note.title;
+        notesBody.textContent = note.script;
+        notesDefenseBody.innerHTML = `<strong>Judge Defense Point:</strong> ${note.defense}`;
+      }
+
+      document.getElementById('prev-btn').style.opacity = currentSlide === 1 ? '0.4' : '1';
+      document.getElementById('next-btn').textContent = currentSlide === totalSlides ? 'Finish' : 'Next →';
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        updateSlide(currentSlide + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        updateSlide(currentSlide - 1);
+      }
+    }
+
+    function toggleSpeakerNotes() {
+      notesDrawer.classList.toggle('open');
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn(`Error attempting to enable full-screen: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'Backspace') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        updateSlide(1);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        updateSlide(totalSlides);
+      } else if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        toggleSpeakerNotes();
+      } else if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    });
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+    document.addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, false);
+    document.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      if (touchStartX - touchEndX > 50) nextSlide();
+      if (touchEndX - touchStartX > 50) prevSlide();
+    }, false);
+
+    updateSlide(1);
+  </script>
+</body>
+</html>

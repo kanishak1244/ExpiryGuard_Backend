@@ -3,18 +3,19 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static String _baseUrl = kIsWeb ? '' : 'http://127.0.0.1:8000';
+  static String _baseUrl = 'https://api.dawaiflow.com';
   static String? _token;
   static bool _isDiscoveringBaseUrl = false;
+  static DateTime? _lastDiscoveryTime;
 
   static String get baseUrl => _baseUrl;
 
   static final List<String> _candidateUrls = [
-    'http://10.0.2.2:8000',       // Android Emulator loopback
-    'http://192.168.29.8:8000',   // Local Wi-Fi LAN host
-    'http://127.0.0.1:8000',      // Local desktop loopback
-    'http://localhost:8000',      // Standard localhost
-    'https://api.dawaiflow.com',// Production backend
+    'https://api.dawaiflow.com', // Production backend (PRIMARY ONLINE)
+    'http://10.0.2.2:8000',      // Android Emulator loopback fallback
+    'http://192.168.29.8:8000',  // Local Wi-Fi LAN host fallback
+    'http://127.0.0.1:8000',     // Local desktop loopback fallback
+    'http://localhost:8000',     // Standard localhost fallback
   ];
 
   static void setBaseUrl(String url) {
@@ -35,38 +36,59 @@ class ApiService {
   }
 
   /// Dynamically probes available backend server addresses to find the fastest responding host.
-  /// Solves Android emulator (10.0.2.2) vs physical device vs localhost connectivity timeouts.
+  /// Uses caching and parallel probing to eliminate 10s timeout delays on mobile networks.
   static Future<String> discoverWorkingBaseUrl() async {
     if (kIsWeb || _isDiscoveringBaseUrl) return _baseUrl;
+
+    // Return cached base URL if verified within the last 60 seconds
+    if (_lastDiscoveryTime != null &&
+        DateTime.now().difference(_lastDiscoveryTime!).inSeconds < 60) {
+      return _baseUrl;
+    }
+
     _isDiscoveringBaseUrl = true;
 
-    // First check if currently configured _baseUrl responds immediately
+    // First check currently configured _baseUrl with 3500ms timeout for mobile latency
     try {
-      final res = await http.get(Uri.parse('$_baseUrl/health')).timeout(const Duration(milliseconds: 1000));
+      final res = await http.get(
+        Uri.parse('$_baseUrl/health'),
+        headers: {'User-Agent': 'DawaiFlowMobile/1.0'},
+      ).timeout(const Duration(milliseconds: 3500));
       if (res.statusCode == 200) {
+        _lastDiscoveryTime = DateTime.now();
         _isDiscoveringBaseUrl = false;
         return _baseUrl;
       }
     } catch (_) {}
 
-    debugPrint('[Host Discovery] Probing candidate backend URLs for mobile connectivity...');
+    debugPrint('[Host Discovery] Probing candidate backend URLs concurrently for mobile connectivity...');
 
-    for (final candidate in _candidateUrls) {
+    // Parallel candidate probing to avoid sequential 1.5s x 5 delay
+    final tasks = _candidateUrls.map((candidate) async {
       try {
-        final res = await http.get(Uri.parse('$candidate/health')).timeout(const Duration(milliseconds: 1500));
+        final res = await http.get(
+          Uri.parse('$candidate/health'),
+          headers: {'User-Agent': 'DawaiFlowMobile/1.0'},
+        ).timeout(const Duration(milliseconds: 2500));
         if (res.statusCode == 200) {
-          _baseUrl = candidate;
-          debugPrint('[Host Discovery] SUCCESS! Connected to backend host: $_baseUrl');
-          _isDiscoveringBaseUrl = false;
-          return _baseUrl;
+          return candidate;
         }
-      } catch (_) {
-        continue;
-      }
+      } catch (_) {}
+      return null;
+    }).toList();
+
+    final results = await Future.wait(tasks);
+    final workingHost = results.firstWhere((url) => url != null, orElse: () => null);
+
+    if (workingHost != null) {
+      _baseUrl = workingHost;
+      debugPrint('[Host Discovery] SUCCESS! Connected to backend host: $_baseUrl');
+    } else {
+      debugPrint('[Host Discovery] Fallback to primary base URL: $_baseUrl');
     }
 
+    _lastDiscoveryTime = DateTime.now();
     _isDiscoveringBaseUrl = false;
-    debugPrint('[Host Discovery] Fallback to base URL: $_baseUrl');
     return _baseUrl;
   }
 
@@ -85,9 +107,9 @@ class ApiService {
       return false;
     }
 
-    // In debug mode, allow dev login only if explicitly configured via dart-define
-    const devEmail = String.fromEnvironment('DEV_AUTH_EMAIL', defaultValue: '');
-    const devPass = String.fromEnvironment('DEV_AUTH_PASSWORD', defaultValue: '');
+    // In debug mode, allow dev login with default pilot account or dart-define
+    const devEmail = String.fromEnvironment('DEV_AUTH_EMAIL', defaultValue: 'sharma@example.com');
+    const devPass = String.fromEnvironment('DEV_AUTH_PASSWORD', defaultValue: 'password123');
     if (devEmail.isNotEmpty && devPass.isNotEmpty) {
       debugPrint('[Auth Guard] Debug mode: Attempting auto-login with environment credentials...');
       final success = await login(devEmail, devPass);
@@ -107,6 +129,7 @@ class ApiService {
     final tokenToUse = _token;
     return {
       'Content-Type': 'application/json',
+      'User-Agent': 'DawaiFlowMobile/1.0',
       if (tokenToUse != null && tokenToUse.isNotEmpty)
         'Authorization': 'Bearer $tokenToUse',
     };
@@ -117,12 +140,12 @@ class ApiService {
     debugPrint('[DIAGNOSTIC] Initiating login for email: $email');
 
     final candidateUrls = [
+      'https://api.dawaiflow.com',
       _baseUrl,
       'http://10.0.2.2:8000',
       'http://192.168.29.8:8000',
       'http://127.0.0.1:8000',
       'http://localhost:8000',
-      'https://api.dawaiflow.com',
     ];
 
     for (final base in candidateUrls) {
@@ -161,14 +184,14 @@ class ApiService {
     debugPrint('[DIAGNOSTIC] GET $uri');
     try {
       var response = await http.get(uri, headers: _getHeaders()).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15),
       );
 
       if (response.statusCode == 401) {
         debugPrint('[Auth Guard] 401 received on profile fetch. Re-authenticating...');
         _token = null;
         if (await ensureAuthenticated()) {
-          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 10));
+          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 15));
         }
       }
 
@@ -185,6 +208,43 @@ class ApiService {
     }
   }
 
+  /// Fetch complete Dashboard Summary metrics (Sales, Bills, Inventory counts, Khata Outstanding)
+  static Future<Map<String, dynamic>> fetchDashboardSummary() async {
+    await ensureAuthenticated();
+    final uri = Uri.parse('$_baseUrl/dashboard/summary');
+    debugPrint('[DIAGNOSTIC] REQUEST URL: GET $uri');
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      var response = await http.get(uri, headers: _getHeaders()).timeout(
+        const Duration(seconds: 8),
+      );
+
+      if (response.statusCode == 401) {
+        debugPrint('[Auth Guard] 401 received on dashboard summary request. Re-authenticating...');
+        _token = null;
+        if (await ensureAuthenticated()) {
+          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 8));
+        }
+      }
+
+      stopwatch.stop();
+      debugPrint('[DIAGNOSTIC] HTTP STATUS: ${response.statusCode} (Elapsed: ${stopwatch.elapsedMilliseconds}ms)');
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('[DIAGNOSTIC] DASHBOARD SUMMARY LOADED: $decoded');
+        return decoded;
+      } else {
+        throw Exception('Failed to load dashboard summary (HTTP ${response.statusCode})');
+      }
+    } catch (e) {
+      stopwatch.stop();
+      debugPrint('[DIAGNOSTIC] Dashboard summary exception: $e');
+      rethrow;
+    }
+  }
+
   /// Fetch lightweight SQL-aggregated Inventory Health Dashboard summary metrics
   static Future<Map<String, dynamic>> fetchInventorySummary() async {
     await ensureAuthenticated();
@@ -194,14 +254,14 @@ class ApiService {
 
     try {
       var response = await http.get(uri, headers: _getHeaders()).timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 15),
       );
 
       if (response.statusCode == 401) {
         debugPrint('[Auth Guard] 401 received on summary request. Re-authenticating...');
         _token = null;
         if (await ensureAuthenticated()) {
-          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 5));
+          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 15));
         }
       }
 
@@ -231,14 +291,14 @@ class ApiService {
 
     try {
       var response = await http.get(uri, headers: _getHeaders()).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15),
       );
 
       if (response.statusCode == 401) {
         debugPrint('[Auth Guard] 401 received on intelligence request. Re-authenticating...');
         _token = null;
         if (await ensureAuthenticated()) {
-          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 10));
+          response = await http.get(uri, headers: _getHeaders()).timeout(const Duration(seconds: 15));
         }
       }
 
@@ -591,6 +651,25 @@ class ApiService {
       return jsonDecode(response.body) as List<dynamic>;
     } else {
       throw Exception('Failed to load returns history');
+    }
+  }
+
+  /// Check online for new published mobile app version
+  static Future<Map<String, dynamic>> checkAppVersion() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/app/version');
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'DawaiFlowMobile/1.0',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return {};
+    } catch (e) {
+      debugPrint('[ApiService] Version check error: $e');
+      return {};
     }
   }
 }

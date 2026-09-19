@@ -407,6 +407,10 @@
           <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
           <span class="nav-text">Returns & Refunds</span>
         </a>
+        <a href="gst_filing.html" class="nav-item" data-nav-id="gst-filing">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">GST Filing</span>
+        </a>
         <a href="reports.html" class="nav-item" data-nav-id="reports">
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
           <span class="nav-text">Reports & Analytics</span>
@@ -1245,8 +1249,28 @@
   </div>
 
   <script>
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+    window.escapeHtml = escapeHtml;
+
     let allBills = [];
+    let isBillsLoaded = false;
+    let isBillsLoading = false;
+
     let allDeletedStock = [];
+    let isDeletedStockLoaded = false;
+    let isDeletedStockLoading = false;
+
+    let backupHistoryCache = null;
+    let isBackupHistoryLoading = false;
+
     let selectedDeletedIds = new Set();
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1303,11 +1327,17 @@
       document.querySelectorAll('.settings-nav-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.settings-panel').forEach(panel => panel.classList.remove('active'));
       
-      const activeBtn = Array.from(document.querySelectorAll('.settings-nav-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      const activeBtn = Array.from(document.querySelectorAll('.settings-nav-btn')).find(b => b.getAttribute('onclick')?.includes(tabId));
       if (activeBtn) activeBtn.classList.add('active');
       
       const activePanel = document.getElementById(`panel-${tabId}`);
       if (activePanel) activePanel.classList.add('active');
+
+      try {
+        if (history.replaceState) {
+          history.replaceState(null, null, `#${tabId}`);
+        }
+      } catch (_) {}
 
       if (tabId === 'deleted-stock') {
         loadDeletedStock();
@@ -1322,21 +1352,31 @@
       }
     }
 
-    async function loadBackupHistory() {
+    async function loadBackupHistory(forceRefresh = false) {
+      if (backupHistoryCache && !forceRefresh) {
+        renderBackupHistory(backupHistoryCache);
+        return;
+      }
+      if (isBackupHistoryLoading) return;
+      isBackupHistoryLoading = true;
+
       const tbody = document.getElementById('backup-history-body');
-      if (tbody) {
+      if (tbody && !backupHistoryCache) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading backup history...</td></tr>`;
       }
 
       try {
         const res = await api.getBackupHistory(50);
         const backups = res && res.backups ? res.backups : (Array.isArray(res) ? res : []);
+        backupHistoryCache = backups;
         renderBackupHistory(backups);
       } catch (err) {
         console.error("Failed to load backup history:", err);
-        if (tbody) {
+        if (tbody && !backupHistoryCache) {
           tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--status-danger, #EF4444); padding: 24px;">Failed to load backup history: ${escapeHtml(err.message || 'Access restricted to shop owner')}</td></tr>`;
         }
+      } finally {
+        isBackupHistoryLoading = false;
       }
     }
 
@@ -1482,19 +1522,37 @@
       try {
         await api.deleteBackup(backupId);
         alert("Backup deleted successfully.");
-        await loadBackupHistory();
+        await loadBackupHistory(true);
       } catch (err) {
         console.error("Delete backup error:", err);
         alert("Failed to delete backup: " + (err.message || "Unknown error"));
       }
     }
 
-    async function loadDeletedStock() {
+    async function loadDeletedStock(forceRefresh = false) {
+      if (isDeletedStockLoaded && !forceRefresh) {
+        renderDeletedStock(allDeletedStock);
+        return;
+      }
+      if (isDeletedStockLoading) return;
+      isDeletedStockLoading = true;
+
+      const tbody = document.getElementById('deleted-table-body');
+      if (tbody && !isDeletedStockLoaded) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading recently deleted stock...</td></tr>`;
+      }
+
       try {
         allDeletedStock = await api.getRecentlyDeletedStock();
+        isDeletedStockLoaded = true;
         renderDeletedStock(allDeletedStock);
       } catch (err) {
         console.error("Failed to load deleted stock:", err);
+        if (tbody && !isDeletedStockLoaded) {
+          tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--status-danger, #EF4444); padding: 24px;">Failed to load deleted stock: ${escapeHtml(err.message || 'Error fetching deleted stock')}</td></tr>`;
+        }
+      } finally {
+        isDeletedStockLoading = false;
       }
     }
 
@@ -1608,7 +1666,7 @@
           const res = await api.restoreInventoryStock(ids);
           selectedDeletedIds.clear();
           alert(res.message || `${ids.length} items restored to live inventory.`);
-          loadDeletedStock();
+          loadDeletedStock(true);
         } catch (err) {
           alert(`Failed to restore items: ${err.message}`);
         }
@@ -1634,7 +1692,7 @@
         const res = await api.restoreInventoryStock([id]);
         selectedDeletedIds.delete(id);
         alert(res.message || `Restored ${name} to live inventory.`);
-        loadDeletedStock();
+        loadDeletedStock(true);
       } catch (err) {
         alert(`Failed to restore item: ${err.message}`);
       }
@@ -1651,7 +1709,7 @@
           const res = await api.restoreInventoryStock(ids);
           selectedDeletedIds.clear();
           alert(res.message || `All items restored to live inventory.`);
-          loadDeletedStock();
+          loadDeletedStock(true);
         } catch (err) {
           alert(`Failed to restore all items: ${err.message}`);
         }
@@ -1736,12 +1794,30 @@
       }
     }
 
-    async function loadBills() {
+    async function loadBills(forceRefresh = false) {
+      if (isBillsLoaded && !forceRefresh) {
+        renderBills(allBills);
+        return;
+      }
+      if (isBillsLoading) return;
+      isBillsLoading = true;
+
+      const tbody = document.getElementById('bills-table-body');
+      if (tbody && !isBillsLoaded) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted); padding: 24px;">Loading archived bills...</td></tr>`;
+      }
+
       try {
         allBills = await api.getSales(0, 100);
+        isBillsLoaded = true;
         renderBills(allBills);
       } catch (err) {
         console.error("Failed to load bills:", err);
+        if (tbody && !isBillsLoaded) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--status-danger, #EF4444); padding: 24px;">Failed to load archived bills: ${escapeHtml(err.message || 'Error fetching sales history')}</td></tr>`;
+        }
+      } finally {
+        isBillsLoading = false;
       }
     }
 
@@ -1849,7 +1925,7 @@
         try {
           await api.deleteSale(saleId);
           alert(`Bill ${billNumber} deleted successfully.`);
-          loadBills();
+          loadBills(true);
         } catch (err) {
           alert(`Failed to delete bill: ${err.message}`);
         }

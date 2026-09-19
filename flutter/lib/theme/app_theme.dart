@@ -3,7 +3,7 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 import 'app_spacing.dart';
 
-/// ExpiryGuard Shared ThemeData
+/// DawaiFlow Shared ThemeData
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -29,7 +29,7 @@ class AppTheme {
           bottom: BorderSide(color: AppColors.border, width: 1),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surfaceCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -108,7 +108,7 @@ class AppTheme {
           bottom: BorderSide(color: AppColors.darkBorder, width: 1),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(

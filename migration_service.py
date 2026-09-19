@@ -828,6 +828,13 @@ def process_migration_background(migration_id: int, user_id: int, file_path: str
         valid_bills = [b for b in bills if not b.get("is_duplicate")]
         total_amt = sum(b.get("total_amount", 0.0) for b in valid_bills)
 
+        if imported_cnt == 0 and dup_cnt > 0:
+            status_msg = f"All {dup_cnt} bill(s) in this file were already imported previously and were safely skipped to prevent duplicate bills."
+        elif dup_cnt > 0:
+            status_msg = f"Successfully imported {imported_cnt} bill(s). Skipped {dup_cnt} duplicate bill(s)."
+        else:
+            status_msg = "Historical bills imported successfully."
+
         migration.status = "COMPLETED"
         migration.total_records_detected = total_bills
         migration.total_records_parsed = total_bills
@@ -840,7 +847,7 @@ def process_migration_background(migration_id: int, user_id: int, file_path: str
 
         update_job_status(
             db, migration, "COMPLETED",
-            "Historical bills imported successfully.",
+            status_msg,
             processed=total_bills,
             total=total_bills,
             percentage=100
@@ -948,14 +955,15 @@ def get_migration_history(db: Session, user_id: int) -> List[Dict[str, Any]]:
             "file_format": m.file_format,
             "file_size_bytes": m.file_size_bytes,
             "status": m.status,
-            "total_detected": m.total_records_detected,
-            "total_imported": m.total_records_imported,
-            "total_duplicates": m.total_duplicates_skipped,
-            "total_errors": m.total_errors,
-            "total_amount": m.total_amount_imported,
-            "created_at": m.created_at.strftime("%Y-%m-%d %H:%M") if m.created_at else "",
-            "completed_at": m.completed_at.strftime("%Y-%m-%d %H:%M") if m.completed_at else "",
-            "rolled_back_at": m.rolled_back_at.strftime("%Y-%m-%d %H:%M") if m.rolled_back_at else None,
+            "total_detected": m.total_records_detected or 0,
+            "total_imported": m.total_records_imported or 0,
+            "total_duplicates": m.total_duplicates_skipped or 0,
+            "total_errors": m.total_errors or 0,
+            "total_amount": m.total_amount_imported or 0.0,
+            "current_message": m.current_message or "",
+            "created_at": (m.created_at.isoformat() + "Z") if m.created_at else "",
+            "completed_at": (m.completed_at.isoformat() + "Z") if m.completed_at else "",
+            "rolled_back_at": (m.rolled_back_at.isoformat() + "Z") if m.rolled_back_at else None,
         }
         for m in migrations
     ]

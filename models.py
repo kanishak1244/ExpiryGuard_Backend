@@ -33,6 +33,8 @@ class User(Base):
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     default_gst_percentage = Column(Float, default=12.0, nullable=False)
+    gst_filing_type = Column(String, nullable=True)  # "monthly" | "qrmp"
+    state_category = Column(String, nullable=True)   # "X" | "Y"
     
     # Extended Pharmacy Profile & License Fields
     drug_license_no = Column(String, nullable=True, default="DL-2026-PHARMA-01")
@@ -1034,6 +1036,44 @@ class MigrationError(Base):
 
     migration = relationship("DataMigration", back_populates="errors")
     user = relationship("User")
+
+
+class GstDueDateOverride(Base):
+    """
+    Admin override reference table for official government deadline extensions.
+    """
+    __tablename__ = "gst_due_date_overrides"
+
+    id = Column(Integer, primary_key=True, index=True)
+    period = Column(String(20), nullable=False, index=True)  # e.g., "2026-09" or "2026-Q3"
+    return_type = Column(String(20), nullable=False, index=True)  # GSTR1, GSTR3B, PMT06
+    filing_type = Column(String(20), nullable=True)  # monthly, qrmp, ALL
+    state_category = Column(String(5), nullable=True)  # X, Y, ALL
+    original_due_date = Column(Date, nullable=False)
+    extended_due_date = Column(Date, nullable=False)
+    notification_ref = Column(String(200), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class GstFilingLog(Base):
+    """
+    Pharmacy GST filing completion history records.
+    """
+    __tablename__ = "gst_filing_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    return_type = Column(String(20), nullable=False)  # GSTR1, GSTR3B, PMT06
+    period = Column(String(20), nullable=False)        # e.g., "2026-09" or "2026-Q3"
+    filed_date = Column(Date, nullable=False, default=func.current_date())
+    status = Column(String(20), nullable=False, default="FILED")  # FILED, PENDING
+    acknowledgement_no = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
 
 
 

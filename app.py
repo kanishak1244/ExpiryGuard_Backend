@@ -56,6 +56,7 @@ from ai.invoice_service import scan_invoice
 from crypto_utils import encrypt_staff_password, decrypt_staff_password
 import backup_service
 import migration_service
+from routes import gst_reminder_routes
 
 # ==========================================
 # CONFIGURATION & INITIALIZATION
@@ -311,8 +312,12 @@ def warmup_database():
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_theme VARCHAR DEFAULT 'light';"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gstin VARCHAR DEFAULT '07AABCE1234F1Z5';"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_number VARCHAR DEFAULT '07AABCE1234F1Z5';"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_filing_type VARCHAR;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS state_category VARCHAR DEFAULT 'X';"))
         except Exception as sync_schema_err:
             logger.warning(f"[Startup Schema Notice] {sync_schema_err}")
+
+        app.include_router(gst_reminder_routes.router)
 
         # Offload heavy DB connection, schema creation, & DDL index migrations to background thread so Uvicorn binds port instantly (< 10ms)
         def _background_warmup():

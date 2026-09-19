@@ -86,6 +86,13 @@ window.CANONICAL_NAV_ITEMS = [
     iconSvg: '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>'
   },
   {
+    id: 'gst-filing',
+    href: 'gst_filing.html',
+    label: 'GST Filing',
+    permission: 'REPORT_VIEW',
+    iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>'
+  },
+  {
     id: 'ca-connect',
     href: 'ca_connect.html',
     label: 'CA Connect',
@@ -121,6 +128,7 @@ window.ExpiryNav = {
     if (p.includes('returns')) return 'returns';
     if (p.includes('staff')) return 'staff';
     if (p.includes('branch')) return 'branches';
+    if (p.includes('gst_filing') || p.includes('gst-filing')) return 'gst-filing';
     if (p.includes('ca_connect') || p.includes('ca-connect')) return 'ca-connect';
     if (p.includes('khata')) return 'khata';
     if (p.includes('reports')) return 'reports';
@@ -247,16 +255,16 @@ window.ExpiryNav = {
         ${(() => {
           let userPerms = [];
           let userRole = 'OWNER';
+          let isOwner = true;
           try {
             const cached = localStorage.getItem('expiryguard_cached_user_profile');
             if (cached) {
               const u = JSON.parse(cached);
               userRole = (u.role || 'OWNER').toUpperCase();
               userPerms = u.permissions || [];
+              isOwner = u.is_owner === true || userRole === 'OWNER' || userRole === 'ADMIN' || !u.role;
             }
           } catch (e) {}
-
-          const isOwner = userRole === 'OWNER' || userRole === 'ADMIN';
 
           return window.CANONICAL_NAV_ITEMS.filter(item => {
             if (isOwner || !item.permission) return true;

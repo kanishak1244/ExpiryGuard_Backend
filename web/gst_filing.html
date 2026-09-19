@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GST Filing Due Dates & Compliance Hub | DawaiFlow</title>
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .gst-card {
+      background: var(--color-surface-card, #ffffff);
+      border: 1px solid var(--color-border, #E2E8F0);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .gst-badge {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .badge-green { background: rgba(34, 197, 94, 0.12); color: #16A34A; }
+    .badge-orange { background: rgba(249, 115, 22, 0.12); color: #EA580C; }
+    .badge-red { background: rgba(239, 68, 68, 0.12); color: #DC2626; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar"></aside>
+
+    <main class="main-content">
+      <header class="topbar"></header>
+
+      <div class="content-body" style="padding: 24px;">
+        <!-- Header Config Banner -->
+        <div class="gst-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <h1 style="font-size: 22px; font-weight: 800; margin: 0 0 6px 0;">🏛️ GST Filing Due-Date Hub</h1>
+            <p style="color: var(--color-text-muted, #64748B); margin: 0; font-size: 14px;" id="gst-scheme-desc">
+              Loading GST filing settings...
+            </p>
+          </div>
+          <div>
+            <button class="btn btn-secondary" onclick="openConfigModal()" style="font-weight: 700;">⚙️ Configure Scheme</button>
+            <a href="https://www.gst.gov.in" target="_blank" rel="noopener" class="btn btn-primary" style="font-weight: 700; background: #2E7D32; border-color: #2E7D32;">🔗 Open GST Portal</a>
+          </div>
+        </div>
+
+        <!-- Upcoming Due Dates -->
+        <h3 style="font-size: 15px; font-weight: 700; color: var(--color-text-muted, #64748B); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px;">
+          Upcoming Returns & Deadlines
+        </h3>
+
+        <div id="returns-container">
+          <div class="gst-card" style="text-align: center; padding: 40px; color: var(--color-text-muted);">
+            Loading upcoming return deadlines...
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    async function loadGstStatus() {
+      try {
+        const token = localStorage.getItem('expiryguard_token');
+        const res = await fetch('/api/gst/status', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Failed to load status');
+        const data = await res.json();
+        renderGst(data);
+      } catch (err) {
+        console.warn('API load notice:', err);
+        renderGst({
+          is_configured: false,
+          filing_type: null,
+          returns: []
+        });
+      }
+    }
+
+    function renderGst(data) {
+      const descEl = document.getElementById('gst-scheme-desc');
+      const container = document.getElementById('returns-container');
+
+      if (!data.is_configured) {
+        descEl.innerHTML = `<span style="color: #EA580C; font-weight: 700;">⚠️ Unconfigured</span> — Set turnover & filing frequency (Monthly vs QRMP) to calculate due dates.`;
+        container.innerHTML = `
+          <div class="gst-card" style="border-left: 4px solid #F59E0B; background: #FFFBEB;">
+            <h4 style="margin: 0 0 8px 0; color: #92400E;">Configure GST Filing Reminders</h4>
+            <p style="margin: 0 0 14px 0; color: #78350F; font-size: 14px;">Select whether your pharmacy files GST Monthly (> ₹5 Cr turnover) or under QRMP Scheme (≤ ₹5 Cr turnover).</p>
+            <button class="btn btn-primary" onclick="openConfigModal()" style="background: #D97706; border-color: #D97706;">Set Filing Scheme Now</button>
+          </div>
+        `;
+        return;
+      }
+
+      descEl.textContent = `Scheme: ${data.filing_type.toUpperCase()} | State Category: Category ${data.state_category}`;
+
+      const returns = data.returns || [];
+      if (returns.length === 0) {
+        container.innerHTML = `<div class="gst-card"><p>All returns are up to date! 🎉</p></div>`;
+        return;
+      }
+
+      container.innerHTML = returns.map(ret => {
+        const colorClass = ret.color_code === 'red' ? 'badge-red' : (ret.color_code === 'orange' ? 'badge-orange' : 'badge-green');
+        const isFiled = ret.is_filed;
+
+        return `
+          <div class="gst-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 18px; font-weight: 800;">${ret.return_type}</span>
+                  <span class="gst-badge ${colorClass}">${isFiled ? 'FILED ✓' : ret.badge_label}</span>
+                </div>
+                <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 4px;">
+                  ${ret.description} • Period: ${ret.period_label} (${ret.period})
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 16px; font-weight: 800; color: var(--color-text-primary);">${ret.due_date_formatted}</div>
+                <div style="margin-top: 8px;">
+                  ${!isFiled 
+                    ? `<button class="btn btn-sm btn-primary" onclick="markFiled('${ret.return_type}', '${ret.period}')" style="background: #2E7D32;">Mark as Filed</button>`
+                    : `<span style="color: #16A34A; font-weight: 700; font-size: 13px;">Filed Completed ✓</span>`
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function openConfigModal() {
+      const type = prompt("Select GST Filing Type:\n1. Monthly (Type 'monthly')\n2. QRMP Scheme (Type 'qrmp')", "monthly");
+      if (!type) return;
+      let cat = "X";
+      if (type.toLowerCase() === "qrmp") {
+        cat = prompt("Select State Category for QRMP:\nType 'X' (MH, GJ, KA, TN, KL, AP, TS, GA, MP)\nType 'Y' (DL, HR, PB, UP, RJ, BR, WB, HP, JK)", "X") || "X";
+      }
+
+      try {
+        const token = localStorage.getItem('expiryguard_token');
+        await fetch('/api/gst/settings', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ gst_filing_type: type, state_category: cat })
+        });
+        loadGstStatus();
+      } catch (e) {
+        alert("Failed to update settings: " + e);
+      }
+    }
+
+    async function markFiled(returnType, period) {
+      const ack = prompt(`Enter Acknowledgement No. for ${returnType} (${period}):`, "");
+      try {
+        const token = localStorage.getItem('expiryguard_token');
+        await fetch('/api/gst/mark-filed', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ return_type: returnType, period: period, acknowledgement_no: ack })
+        });
+        loadGstStatus();
+      } catch (e) {
+        alert("Failed to mark filed: " + e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadGstStatus);
+  </script>
+</body>
+</html>

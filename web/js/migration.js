@@ -9,11 +9,15 @@ let currentMigrationId = null;
 let currentJobCode = null;
 let migrationPollTimer = null;
 let migrationWs = null;
+let migrationHistoryCache = null;
+let isMigrationHistoryLoading = false;
 
 function initMigrationModule() {
   initDropzone();
-  loadMigrationHistory();
-  checkActiveMigrationOnLoad();
+  if (window.location.hash === '#migration' || window.location.hash === '#import') {
+    loadMigrationHistory();
+    checkActiveMigrationOnLoad();
+  }
 }
 
 if (document.readyState === 'loading') {
@@ -261,9 +265,9 @@ function showMigrationCompleted(data) {
 
   const summary = data.summary || {};
   const total = data.total || summary.total_processed || 0;
-  const imported = summary.imported || total;
-  const review = summary.needs_review || 0;
-  const dups = summary.duplicates_skipped || 0;
+  const imported = (summary.imported !== undefined && summary.imported !== null) ? summary.imported : (data.total_imported || 0);
+  const review = summary.needs_review !== undefined ? summary.needs_review : (data.total_errors || 0);
+  const dups = summary.duplicates_skipped !== undefined ? summary.duplicates_skipped : (data.total_duplicates || 0);
 
   const totalEl = document.getElementById('m-comp-total');
   if (totalEl) totalEl.textContent = total.toLocaleString();
@@ -327,9 +331,19 @@ async function checkActiveMigrationOnLoad() {
   } catch (e) {}
 }
 
-async function loadMigrationHistory() {
+async function loadMigrationHistory(forceRefresh = false) {
+  if (migrationHistoryCache && !forceRefresh) {
+    renderMigrationHistory(migrationHistoryCache);
+    return;
+  }
+  if (isMigrationHistoryLoading) return;
+  isMigrationHistoryLoading = true;
+
   const tbody = document.getElementById('migration-history-tbody');
-  if (!tbody) return;
+  if (!tbody) {
+    isMigrationHistoryLoading = false;
+    return;
+  }
 
   try {
     const token = localStorage.getItem('token');
@@ -339,39 +353,67 @@ async function loadMigrationHistory() {
     if (!resp.ok) return;
 
     const history = await resp.json();
-    if (!history || !history.length) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">No historical migration batches found.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = history.map(h => {
-      const isRolledBack = h.status === 'ROLLED_BACK';
-      const statusBadge = isRolledBack
-        ? '<span class="status-badge" style="background: #FEE2E2; color: #DC2626;">Rolled Back</span>'
-        : h.status === 'COMPLETED'
-        ? '<span class="status-badge" style="background: #DCFCE7; color: #059669;">Completed</span>'
-        : `<span class="status-badge" style="background: #EFF6FF; color: #2563EB;">${h.status}</span>`;
-
-      const actionBtn = isRolledBack
-        ? '<span style="font-size: 12px; color: #94A3B8;">Rolled back</span>'
-        : `<button type="button" class="btn btn-secondary btn-sm" onclick="rollbackMigrationBatch(${h.id}, '${h.migration_code}')" style="color: #DC2626;">Rollback</button>`;
-
-      return `
-        <tr>
-          <td><strong>${h.migration_code}</strong></td>
-          <td>${h.file_name}</td>
-          <td>${h.created_at || '-'}</td>
-          <td>${(h.total_imported || 0).toLocaleString()} bills</td>
-          <td>₹${(h.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-          <td>${statusBadge}</td>
-          <td>${actionBtn}</td>
-        </tr>
-      `;
-    }).join('');
-
+    migrationHistoryCache = history || [];
+    renderMigrationHistory(migrationHistoryCache);
   } catch (e) {
     console.error('Failed to load migration history', e);
+  } finally {
+    isMigrationHistoryLoading = false;
   }
+}
+
+function renderMigrationHistory(history) {
+  const tbody = document.getElementById('migration-history-tbody');
+  if (!tbody) return;
+
+  if (!history || !history.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 24px;">No historical migration batches found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = history.map(h => {
+    const isRolledBack = h.status === 'ROLLED_BACK';
+    const totalImported = h.total_imported !== undefined ? h.total_imported : 0;
+    const totalDups = h.total_duplicates !== undefined ? h.total_duplicates : 0;
+
+    let statusBadge = `<span class="status-badge" style="background: #EFF6FF; color: #2563EB;">${h.status}</span>`;
+    if (isRolledBack) {
+      statusBadge = '<span class="status-badge" style="background: #FEE2E2; color: #DC2626;">Rolled Back</span>';
+    } else if (h.status === 'COMPLETED') {
+      if (totalImported === 0 && totalDups > 0) {
+        statusBadge = '<span class="status-badge" style="background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;">Skipped (Duplicates)</span>';
+      } else {
+        statusBadge = '<span class="status-badge" style="background: #DCFCE7; color: #059669; border: 1px solid #A7F3D0;">Completed</span>';
+      }
+    }
+
+    const actionBtn = isRolledBack
+      ? '<span style="font-size: 12px; color: #94A3B8;">Rolled back</span>'
+      : `<button type="button" class="btn btn-secondary btn-sm" onclick="rollbackMigrationBatch(${h.id}, '${h.migration_code}')" style="color: #DC2626;">Rollback</button>`;
+
+    let importedDisplay = `<strong>${totalImported.toLocaleString()}</strong> bills`;
+    if (totalDups > 0) {
+      importedDisplay += `<div style="font-size: 11px; color: #D97706; margin-top: 2px;">⚠️ ${totalDups.toLocaleString()} duplicate(s) skipped</div>`;
+    }
+
+    const dateFormatted = h.created_at
+      ? new Date(h.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '-';
+
+    const safeFileName = typeof window.escapeHtml === 'function' ? window.escapeHtml(h.file_name || '') : (h.file_name || '');
+
+    return `
+      <tr>
+        <td><strong>${h.migration_code}</strong></td>
+        <td>${safeFileName}</td>
+        <td>${importedDisplay}</td>
+        <td>₹${(h.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td>${statusBadge}</td>
+        <td class="num-date">${dateFormatted}</td>
+        <td style="text-align: right;">${actionBtn}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function rollbackMigrationBatch(migrationId, code) {
@@ -387,7 +429,7 @@ async function rollbackMigrationBatch(migrationId, code) {
     });
     if (resp.ok) {
       alert(`Batch ${code} successfully rolled back.`);
-      loadMigrationHistory();
+      loadMigrationHistory(true);
     } else {
       const err = await resp.json().catch(() => ({}));
       alert(`Rollback failed: ${err.detail || 'Unknown error'}`);

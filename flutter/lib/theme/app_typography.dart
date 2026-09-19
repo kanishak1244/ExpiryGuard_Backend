@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-/// ExpiryGuard Clinical Pharmacy Design System — Typography & Numeric Scales
+/// DawaiFlow Clinical Pharmacy Design System — Typography & Numeric Scales
 class AppTypography {
   static const String fontUi = 'Inter';
   static const String fontMono = 'JetBrainsMono';
@@ -24,6 +24,10 @@ class AppTypography {
     color: AppColors.textPrimary,
     letterSpacing: -0.3,
   );
+
+  static const TextStyle heading1 = displayLarge;
+  static const TextStyle heading2 = sectionTitle;
+  static const TextStyle heading3 = cardTitle;
 
   static const TextStyle cardTitle = TextStyle(
     fontFamily: fontUi,

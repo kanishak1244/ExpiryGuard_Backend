@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// ExpiryGuard Clinical Pharmacy Design System — Color Tokens (v2.0)
+/// DawaiFlow Clinical Pharmacy Design System — Color Tokens (v2.0)
 class AppColors {
   // Core 6-Token Semantic Palette
   static const Color brandDeep = Color(0xFF0C3B34);      // Clinical Anchor / Primary Actions
@@ -21,6 +21,7 @@ class AppColors {
   static const Color statusWarningText = Color(0xFF92400E);
 
   static const Color statusDanger = Color(0xFFDC2626);   // Expired Drug / Returns
+  static const Color dangerRed = Color(0xFFDC2626);
   static const Color statusDangerBg = Color(0xFFFEF2F2);
   static const Color statusDangerText = Color(0xFF991B1B);
 

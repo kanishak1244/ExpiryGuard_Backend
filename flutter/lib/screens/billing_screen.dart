@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
@@ -22,6 +23,8 @@ class CustomerParty {
     this.gstin = '',
     this.address = '',
   });
+}
+
 typedef ProductBatchOption = Map<String, dynamic>;
 
 /// Retail POS Item Entry Model with FEFO batch selection and live tax calculations
@@ -535,8 +538,8 @@ class _BillingScreenState extends State<BillingScreen> {
         'customer_phone': _selectedCustomer.phone == 'Cash Sale' ? null : _selectedCustomer.phone,
         'notes': 'Mobile Counter Billing - $_invoiceNumber',
         'is_interstate': false,
-        'discount_type': billDiscountPercent > 0 ? 'percent' : null,
-        'discount_value': billDiscountPercent,
+        'discount_type': _billDiscountPercent > 0 ? 'percent' : null,
+        'discount_value': _billDiscountPercent,
       };
 
       final saleRes = await ApiService.createSale(payload);

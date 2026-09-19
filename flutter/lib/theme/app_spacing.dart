@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// ExpiryGuard Clinical Pharmacy Design System — Spacing & Sizing Scale (4px Base)
+/// DawaiFlow Clinical Pharmacy Design System — Spacing & Sizing Scale (4px Base)
 class AppSpacing {
   static const double xxs = 2.0;
   static const double xs = 4.0;

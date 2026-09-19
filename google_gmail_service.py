@@ -100,7 +100,7 @@ def send_ca_report_via_gmail_api(
 
         # 2. Build MIME message
         msg = MIMEMultipart("mixed")
-        msg["Subject"] = f"📑 ExpiryGuard — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})"
+        msg["Subject"] = f"📑 DawaiFlow — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})"
         msg["From"] = f"{owner_name} <{shopkeeper_email}>"
         msg["To"] = ca_email
 
@@ -120,7 +120,7 @@ def send_ca_report_via_gmail_api(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ExpiryGuard - Pharmacy GST & Financial Reports</title>
+  <title>DawaiFlow - Pharmacy GST & Financial Reports</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 30px 15px;">
@@ -132,7 +132,7 @@ def send_ca_report_via_gmail_api(
           <tr>
             <td style="background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); padding: 24px 30px; text-align: left;">
               <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; letter-spacing: -0.5px;">
-                🛡️ Expiry<span style="color: #10B981;">Guard</span> ERP
+                🛡️ Dawai<span style="color: #10B981;">Flow</span> ERP
               </div>
               <p style="margin: 6px 0 0 0; color: #94A3B8; font-size: 13px; font-weight: 500;">CA Connect — Official Financial & GST Data Package</p>
             </td>
@@ -230,7 +230,7 @@ def send_ca_report_via_gmail_api(
           <tr>
             <td style="background-color: #F1F5F9; padding: 20px 30px; text-align: center; border-top: 1px solid #E2E8F0;">
               <p style="margin: 0; color: #94A3B8; font-size: 12px;">
-                Generated securely by <strong>ExpiryGuard AI Pharmacy ERP System</strong>.<br>
+                Generated securely by <strong>DawaiFlow AI Pharmacy ERP System</strong>.<br>
                 Sent via authenticated Gmail account of {owner_name} ({shopkeeper_email}).
               </p>
             </td>
