@@ -4893,7 +4893,25 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
         })
 
     if category and category.lower() != "all":
-        alerts = [a for a in alerts if a["category"].lower() == category.lower() or a["priority"].lower() == category.lower()]
+        cat_lower = category.lower()
+        filtered = []
+        for a in alerts:
+            a_cat = a.get("category", "").lower()
+            a_prio = a.get("priority", "").lower()
+
+            if cat_lower in ("critical",) and a_prio == "critical":
+                filtered.append(a)
+            elif cat_lower in ("expiry", "expired", "expiring", "expiring soon") and ("expir" in a_cat or "expired" in a_cat):
+                filtered.append(a)
+            elif cat_lower in ("stock", "low stock", "lowstock", "out of stock") and ("stock" in a_cat or "reorder" in a_cat):
+                filtered.append(a)
+            elif cat_lower in ("khata", "payment", "payment/khata") and ("khata" in a_cat or "payment" in a_cat or "receivable" in a_cat):
+                filtered.append(a)
+            elif cat_lower in ("dead stock", "deadstock") and "dead" in a_cat:
+                filtered.append(a)
+            elif cat_lower == a_cat or cat_lower == a_prio:
+                filtered.append(a)
+        alerts = filtered
 
     return alerts
 
