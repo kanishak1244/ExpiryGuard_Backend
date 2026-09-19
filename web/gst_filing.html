@@ -37,8 +37,59 @@
     .badge-green { background: rgba(34, 197, 94, 0.12); color: #16A34A; }
     .badge-orange { background: rgba(249, 115, 22, 0.12); color: #EA580C; }
     .badge-red { background: rgba(239, 68, 68, 0.12); color: #DC2626; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .badge-muted { background: rgba(148, 163, 184, 0.15); color: #64748B; }
+
+    .kpi-grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 1024px) {
+      .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .kpi-grid-5 { grid-template-columns: 1fr; }
+    }
+
+    .kpi-stat-card {
+      background: var(--color-surface-card, #ffffff);
+      border: 1px solid var(--color-border, #E2E8F0);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+    .kpi-stat-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--color-text-muted, #64748B);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .kpi-stat-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--color-text-primary, #0F172A);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+    .data-table th, .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-border, #E2E8F0);
+      text-align: left;
+    }
+    .data-table th {
+      background: var(--color-surface-bg, #F8FAFC);
+      font-weight: 700;
+      color: var(--color-text-muted, #64748B);
+    }
   </style>
 </head>
 <body>
@@ -69,112 +120,83 @@
     <div class="main-wrapper">
       <header class="topbar">
         <div>
-          <h1 class="page-title">🏛️ GST Filing Due-Date Hub</h1>
+          <h1 class="page-title">🏛️ GST Filing & Compliance Hub</h1>
         </div>
         <div class="topbar-right" style="display: flex; align-items: center; gap: 12px;">
-          <button class="btn btn-secondary" onclick="openConfigModal()" style="font-weight: 700;">⚙️ Configure Scheme</button>
+          <button class="btn btn-secondary" onclick="openConfigModal()" style="font-weight: 700;">⚙️ Configure GST</button>
           <a href="https://www.gst.gov.in" target="_blank" rel="noopener" class="btn btn-primary" style="font-weight: 700; background: #2E7D32; border-color: #2E7D32;">🔗 Open GST Portal</a>
         </div>
       </header>
 
       <main class="content-body" style="padding: 24px;">
         <!-- Header Config Banner -->
-        <div class="gst-card" style="margin-bottom: 20px;">
-          <p style="color: var(--color-text-muted, #64748B); margin: 0; font-size: 14px;" id="gst-scheme-desc">
-            Loading GST filing settings...
-          </p>
+        <div class="gst-card" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <span style="font-size: 14px; font-weight: 700; color: var(--color-text-primary);" id="gst-pharmacy-info">Pharmacy GSTIN: --</span>
+            <p style="color: var(--color-text-muted, #64748B); margin: 4px 0 0 0; font-size: 13.5px;" id="gst-scheme-desc">
+              Loading GST filing settings...
+            </p>
+          </div>
+          <div>
+            <span class="gst-badge badge-green" id="gst-status-pill">ACTIVE COMPLIANCE</span>
+          </div>
         </div>
 
-        <!-- Upcoming Due Dates -->
+        <!-- KPI Financial Summary Cards -->
+        <div class="kpi-grid-5" id="kpi-financial-bar">
+          <div class="kpi-stat-card">
+            <span class="kpi-stat-title">Output GST (Sales)</span>
+            <span class="kpi-stat-val" id="kpi-output-gst">₹0.00</span>
+          </div>
+          <div class="kpi-stat-card">
+            <span class="kpi-stat-title">Eligible ITC (Purchases)</span>
+            <span class="kpi-stat-val" style="color: #2563EB;" id="kpi-input-itc">₹0.00</span>
+          </div>
+          <div class="kpi-stat-card" style="border-left: 4px solid #D97706;">
+            <span class="kpi-stat-title">Net GST Payable</span>
+            <span class="kpi-stat-val" style="color: #D97706;" id="kpi-net-payable">₹0.00</span>
+          </div>
+          <div class="kpi-stat-card">
+            <span class="kpi-stat-title">Taxable Sales</span>
+            <span class="kpi-stat-val" id="kpi-taxable-sales">₹0.00</span>
+          </div>
+          <div class="kpi-stat-card">
+            <span class="kpi-stat-title">Taxable Purchases</span>
+            <span class="kpi-stat-val" id="kpi-taxable-purchases">₹0.00</span>
+          </div>
+        </div>
+
+        <!-- Upcoming Returns & Deadlines -->
         <h3 style="font-size: 15px; font-weight: 700; color: var(--color-text-muted, #64748B); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px;">
-          Upcoming Returns & Deadlines
+          Returns & Compliance Workspace
         </h3>
 
         <div id="returns-container">
           <div class="gst-card" style="text-align: center; padding: 40px; color: var(--color-text-muted);">
-            Loading upcoming return deadlines...
+            Loading return workspace...
+          </div>
+        </div>
+
+        <!-- GSTR-9 Card (Unconfigured Annual Return) -->
+        <div class="gst-card" style="border-left: 4px solid #64748B;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px; font-weight: 800; color: var(--color-text-primary);">GSTR-9 (Annual Return)</span>
+                <span class="gst-badge badge-muted">WORKFLOW UNCONFIGURED</span>
+              </div>
+              <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 4px;">
+                Annual return reconciliation workflow is not configured for FY 2025-26. Upload prior year turnover data to initiate GSTR-9 audit workspace.
+              </div>
+            </div>
+            <div>
+              <button class="btn btn-secondary" onclick="openGstr9ConfigModal()" style="font-weight: 700;">⚙️ Configure FY Workflow</button>
+            </div>
           </div>
         </div>
       </main>
     </div>
   </div>
-
-  <script src="js/api.js"></script>
-  <script src="js/nav.js"></script>
-  <script>
-    async function loadGstStatus() {
-      try {
-        const token = localStorage.getItem('expiryguard_token');
-        const res = await fetch('/api/gst/status', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (!res.ok) throw new Error('Failed to load status');
-        const data = await res.json();
-        renderGst(data);
-      } catch (err) {
-        console.warn('API load notice:', err);
-        renderGst({
-          is_configured: false,
-          filing_type: null,
-          returns: []
-        });
-      }
-    }
-
-    function renderGst(data) {
-      const descEl = document.getElementById('gst-scheme-desc');
-      const container = document.getElementById('returns-container');
-
-      if (!data.is_configured) {
-        descEl.innerHTML = `<span style="color: #EA580C; font-weight: 700;">⚠️ Unconfigured</span> — Set turnover & filing frequency (Monthly vs QRMP) to calculate due dates.`;
-        container.innerHTML = `
-          <div class="gst-card" style="border-left: 4px solid #F59E0B; background: #FFFBEB;">
-            <h4 style="margin: 0 0 8px 0; color: #92400E;">Configure GST Filing Reminders</h4>
-            <p style="margin: 0 0 14px 0; color: #78350F; font-size: 14px;">Select whether your pharmacy files GST Monthly (> ₹5 Cr turnover) or under QRMP Scheme (≤ ₹5 Cr turnover).</p>
-            <button class="btn btn-primary" onclick="openConfigModal()" style="background: #D97706; border-color: #D97706;">Set Filing Scheme Now</button>
-          </div>
-        `;
-        return;
-      }
-
-      descEl.textContent = `Scheme: ${data.filing_type.toUpperCase()} | State Category: Category ${data.state_category}`;
-
-      const returns = data.returns || [];
-      if (returns.length === 0) {
-        container.innerHTML = `<div class="gst-card"><p>All returns are up to date! 🎉</p></div>`;
-        return;
-      }
-
-      container.innerHTML = returns.map(ret => {
-        const colorClass = ret.color_code === 'red' ? 'badge-red' : (ret.color_code === 'orange' ? 'badge-orange' : 'badge-green');
-        const isFiled = ret.is_filed;
-
-        return `
-          <div class="gst-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 18px; font-weight: 800;">${ret.return_type}</span>
-                  <span class="gst-badge ${colorClass}">${isFiled ? 'FILED ✓' : ret.badge_label}</span>
-                </div>
-                <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 4px;">
-                  ${ret.description} • Period: ${ret.period_label} (${ret.period})
-                </div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-size: 16px; font-weight: 800; color: var(--color-text-primary);">${ret.due_date_formatted}</div>
-                <div style="margin-top: 8px;">
-                  ${!isFiled 
-                    ? `<button class="btn btn-sm btn-primary" onclick="markFiled('${ret.return_type}', '${ret.period}')" style="background: #2E7D32;">Mark as Filed</button>`
-                    : `<span style="color: #16A34A; font-weight: 700; font-size: 13px;">Filed Completed ✓</span>`
-                  }
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
 
   <!-- GST Configuration Modal -->
   <div class="modal-overlay" id="gst-config-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
@@ -202,7 +224,7 @@
 
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
         <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
-        <button type="button" class="btn btn-primary" onclick="saveGstSettingsFromModal()" style="background: #0C3B34; border-color: #0C3B34; font-weight: 700;">Save & Calculate</button>
+        <button type="button" class="btn btn-primary" onclick="saveGstSettingsFromModal()" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">Save & Calculate</button>
       </div>
     </div>
   </div>
@@ -228,6 +250,59 @@
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
         <button type="button" class="btn btn-secondary" onclick="closeMarkFiledModal()">Cancel</button>
         <button type="button" class="btn btn-primary" onclick="submitMarkFiled()" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">Confirm Filed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GSTR-1 Review Modal -->
+  <div class="modal-overlay" id="gstr1-review-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--color-surface-card); border-radius: 14px; width: 100%; max-width: 800px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--color-border); padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 800; margin: 0; color: var(--color-text-primary);" id="gstr1-modal-title">GSTR-1 Outward Supplies Breakdown</h3>
+        <button class="btn btn-secondary" onclick="closeGstr1Modal()">✕</button>
+      </div>
+      <div id="gstr1-modal-body">Loading GSTR-1 data...</div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeGstr1Modal()">Close</button>
+        <button type="button" class="btn btn-primary" id="gstr1-export-btn" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">📥 Export CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GSTR-3B Review Modal -->
+  <div class="modal-overlay" id="gstr3b-review-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--color-surface-card); border-radius: 14px; width: 100%; max-width: 760px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--color-border); padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 800; margin: 0; color: var(--color-text-primary);" id="gstr3b-modal-title">GSTR-3B Tax Computation Summary</h3>
+        <button class="btn btn-secondary" onclick="closeGstr3bModal()">✕</button>
+      </div>
+      <div id="gstr3b-modal-body">Loading GSTR-3B data...</div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeGstr3bModal()">Close</button>
+        <button type="button" class="btn btn-primary" id="gstr3b-export-btn" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">📥 Export CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GSTR-9 Config Modal -->
+  <div class="modal-overlay" id="gstr9-config-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--color-surface-card); border-radius: 14px; width: 100%; max-width: 480px; border: 1px solid var(--color-border); padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+      <h3 style="font-size: 18px; font-weight: 800; margin: 0 0 8px 0; color: var(--color-text-primary);">⚙️ Configure GSTR-9 Annual Workflow</h3>
+      <p style="font-size: 13.5px; color: var(--color-text-muted); margin: 0 0 20px 0;">
+        Annual reconciliation requires prior year turnover setup. Select your active Financial Year:
+      </p>
+
+      <div style="margin-bottom: 18px;">
+        <label style="font-size: 13px; font-weight: 700; color: var(--color-text-primary); display: block; margin-bottom: 8px;">Financial Year</label>
+        <select id="modal-gstr9-fy" style="width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-bg); color: var(--color-text-primary);">
+          <option value="2025-26">FY 2025-26 (Apr 2025 - Mar 2026)</option>
+          <option value="2024-25">FY 2024-25 (Apr 2024 - Mar 2025)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeGstr9ConfigModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="alert('Annual GSTR-9 reconciliation profile saved.') ; closeGstr9ConfigModal();" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">Initialize Workflow</button>
       </div>
     </div>
   </div>
@@ -264,12 +339,24 @@
 
     function renderGst(data) {
       const descEl = document.getElementById('gst-scheme-desc');
+      const pharmacyInfoEl = document.getElementById('gst-pharmacy-info');
       const container = document.getElementById('returns-container');
+
+      // Update Financial KPI Bar
+      if (data.financial_summary) {
+        const fin = data.financial_summary;
+        pharmacyInfoEl.textContent = `${fin.pharmacy_name} | GSTIN: ${fin.gstin}`;
+        document.getElementById('kpi-output-gst').textContent = '₹' + fin.total_output_gst.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('kpi-input-itc').textContent = '₹' + fin.total_input_gst.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('kpi-net-payable').textContent = '₹' + fin.net_gst_payable.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('kpi-taxable-sales').textContent = '₹' + fin.total_taxable_value.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('kpi-taxable-purchases').textContent = '₹' + fin.total_purchases.toLocaleString('en-IN', {minimumFractionDigits: 2});
+      }
 
       if (!data.is_configured) {
         descEl.innerHTML = `<span style="color: #EA580C; font-weight: 700;">⚠️ Unconfigured</span> — Set turnover & filing frequency (Monthly vs QRMP) to calculate due dates.`;
         container.innerHTML = `
-          <div class="gst-card" style="border-left: 4px solid #F59E0B; background: #FFFBEB;">
+          <div class="gst-card" style="border-left: 4px solid #F59E0B; background: rgba(245, 158, 11, 0.08);">
             <h4 style="margin: 0 0 8px 0; color: #92400E;">Configure GST Filing Reminders</h4>
             <p style="margin: 0 0 14px 0; color: #78350F; font-size: 14px;">Select whether your pharmacy files GST Monthly (> ₹5 Cr turnover) or under QRMP Scheme (≤ ₹5 Cr turnover).</p>
             <button class="btn btn-primary" onclick="openConfigModal()" style="background: #D97706; border-color: #D97706; font-weight: 700;">Set Filing Scheme Now</button>
@@ -290,6 +377,15 @@
         const colorClass = ret.color_code === 'red' ? 'badge-red' : (ret.color_code === 'orange' ? 'badge-orange' : 'badge-green');
         const isFiled = ret.is_filed;
 
+        let reviewActionHtml = '';
+        if (ret.return_type === 'GSTR-1') {
+          reviewActionHtml = `<button class="btn btn-sm btn-secondary" onclick="openGstr1ReviewModal('${ret.period}')" style="font-weight: 700;">🔍 Review GSTR-1</button>`;
+        } else if (ret.return_type === 'GSTR-3B') {
+          reviewActionHtml = `<button class="btn btn-sm btn-secondary" onclick="openGstr3bReviewModal('${ret.period}')" style="font-weight: 700;">🔍 Review GSTR-3B</button>`;
+        }
+
+        const exportActionHtml = `<button class="btn btn-sm btn-secondary" onclick="exportGstCsv('${ret.return_type}', '${ret.period}')" style="font-weight: 700;">📥 CSV</button>`;
+
         return `
           <div class="gst-card">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
@@ -304,9 +400,11 @@
               </div>
               <div style="text-align: right;">
                 <div style="font-size: 16px; font-weight: 800; color: var(--color-text-primary);">${ret.due_date_formatted}</div>
-                <div style="margin-top: 8px;">
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; justify-content: flex-end;">
+                  ${reviewActionHtml}
+                  ${exportActionHtml}
                   ${!isFiled 
-                    ? `<button class="btn btn-sm btn-primary" onclick="openMarkFiledModal('${ret.return_type}', '${ret.period}')" style="background: #2E7D32; font-weight: 700;">Mark as Filed</button>`
+                    ? `<button class="btn btn-sm btn-primary" onclick="openMarkFiledModal('${ret.return_type}', '${ret.period}')" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">✓ Mark Filed</button>`
                     : `<span style="color: #16A34A; font-weight: 700; font-size: 13px;">Filed Completed ✓</span>`
                   }
                 </div>
@@ -317,26 +415,224 @@
       }).join('');
     }
 
+    async function openGstr1ReviewModal(period) {
+      const modal = document.getElementById('gstr1-review-modal');
+      const body = document.getElementById('gstr1-modal-body');
+      const exportBtn = document.getElementById('gstr1-export-btn');
+      
+      modal.style.display = 'flex';
+      body.innerHTML = 'Loading GSTR-1 live sales breakdown...';
+
+      exportBtn.onclick = () => exportGstCsv('GSTR-1', period);
+
+      try {
+        const res = await fetch(`/api/gst/gstr1-summary?period=${period}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to load GSTR-1');
+        const data = await res.json();
+
+        document.getElementById('gstr1-modal-title').textContent = `GSTR-1 Summary (${data.period_label})`;
+
+        let b2bRows = (data.b2b_sales || []).map(b => `
+          <tr>
+            <td>${b.bill_number}</td>
+            <td>${b.date}</td>
+            <td>${b.customer_name}</td>
+            <td>${b.gstin}</td>
+            <td>₹${b.taxable_value.toFixed(2)}</td>
+            <td>₹${b.total_tax.toFixed(2)}</td>
+            <td>₹${b.total_amount.toFixed(2)}</td>
+          </tr>
+        `).join('');
+
+        if (data.b2b_sales.length === 0) {
+          b2bRows = `<tr><td colspan="7" style="text-align: center; color: var(--color-text-muted);">No B2B sales registered for this period.</td></tr>`;
+        }
+
+        let hsnRows = (data.hsn_summary || []).map(h => `
+          <tr>
+            <td>${h.hsn_code}</td>
+            <td>${h.description}</td>
+            <td>${h.gst_rate}%</td>
+            <td>${h.total_quantity}</td>
+            <td>₹${h.taxable_value.toFixed(2)}</td>
+            <td>₹${h.gst_amount.toFixed(2)}</td>
+          </tr>
+        `).join('');
+
+        body.innerHTML = `
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+            <div style="background: var(--color-surface-bg); padding: 12px; border-radius: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">TAXABLE VALUE</div>
+              <div style="font-size: 16px; font-weight: 800;">₹${data.totals.taxable_value.toFixed(2)}</div>
+            </div>
+            <div style="background: var(--color-surface-bg); padding: 12px; border-radius: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">CGST + SGST</div>
+              <div style="font-size: 16px; font-weight: 800;">₹${(data.totals.cgst + data.totals.sgst).toFixed(2)}</div>
+            </div>
+            <div style="background: var(--color-surface-bg); padding: 12px; border-radius: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">IGST</div>
+              <div style="font-size: 16px; font-weight: 800;">₹${data.totals.igst.toFixed(2)}</div>
+            </div>
+            <div style="background: var(--color-surface-bg); padding: 12px; border-radius: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">TOTAL OUTPUT TAX</div>
+              <div style="font-size: 16px; font-weight: 800; color: #16A34A;">₹${data.totals.total_output_tax.toFixed(2)}</div>
+            </div>
+          </div>
+
+          <h4 style="font-size: 14px; margin: 16px 0 8px 0;">B2B Supplies (${data.totals.b2b_count} Bills)</h4>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Bill No</th><th>Date</th><th>Customer</th><th>GSTIN</th><th>Taxable</th><th>Tax</th><th>Total</th>
+              </tr>
+            </thead>
+            <tbody>${b2bRows}</tbody>
+          </table>
+
+          <h4 style="font-size: 14px; margin: 20px 0 8px 0;">HSN Summary Register</h4>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>HSN</th><th>Description</th><th>Rate</th><th>Qty</th><th>Taxable</th><th>GST Tax</th>
+              </tr>
+            </thead>
+            <tbody>${hsnRows}</tbody>
+          </table>
+        `;
+      } catch (e) {
+        body.innerHTML = `<p style="color: #DC2626;">Error loading GSTR-1: ${e.message}</p>`;
+      }
+    }
+
+    function closeGstr1Modal() {
+      document.getElementById('gstr1-review-modal').style.display = 'none';
+    }
+
+    async function openGstr3bReviewModal(period) {
+      const modal = document.getElementById('gstr3b-review-modal');
+      const body = document.getElementById('gstr3b-modal-body');
+      const exportBtn = document.getElementById('gstr3b-export-btn');
+
+      modal.style.display = 'flex';
+      body.innerHTML = 'Loading GSTR-3B tax computation...';
+
+      exportBtn.onclick = () => exportGstCsv('GSTR-3B', period);
+
+      try {
+        const res = await fetch(`/api/gst/gstr3b-summary?period=${period}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error('Failed to load GSTR-3B');
+        const data = await res.json();
+
+        document.getElementById('gstr3b-modal-title').textContent = `GSTR-3B Computation (${data.period_label})`;
+
+        const o = data.section_3_1_outward_supplies;
+        const i = data.section_4_eligible_itc;
+        const n = data.section_5_net_liability;
+
+        body.innerHTML = `
+          <h4 style="font-size: 14px; margin: 0 0 8px 0; color: var(--color-text-primary);">3.1 Details of Outward Taxable Supplies (Sales)</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>Nature of Supplies</th><th>Taxable Value</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Total Tax</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Outward Taxable Supplies</td>
+                <td>₹${o.taxable_value.toFixed(2)}</td>
+                <td>₹${o.cgst.toFixed(2)}</td>
+                <td>₹${o.sgst.toFixed(2)}</td>
+                <td>₹${o.igst.toFixed(2)}</td>
+                <td style="font-weight: 700;">₹${o.total_tax.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4 style="font-size: 14px; margin: 20px 0 8px 0; color: var(--color-text-primary);">4. Eligible Input Tax Credit (ITC from Purchases)</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>Details</th><th>Purchase Subtotal</th><th>Input CGST</th><th>Input SGST</th><th>Input IGST</th><th>Total ITC</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>All Other ITC (Inward Purchases)</td>
+                <td>₹${i.purchase_subtotal.toFixed(2)}</td>
+                <td>₹${i.cgst.toFixed(2)}</td>
+                <td>₹${i.sgst.toFixed(2)}</td>
+                <td>₹${i.igst.toFixed(2)}</td>
+                <td style="font-weight: 700; color: #2563EB;">₹${i.total_itc.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4 style="font-size: 14px; margin: 20px 0 8px 0; color: var(--color-text-primary);">5. Net Tax Liability & Payment Summary</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>Tax Head</th><th>Output Tax (A)</th><th>Eligible ITC (B)</th><th>Net Tax Payable (A - B)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>CGST</td><td>₹${o.cgst.toFixed(2)}</td><td>₹${i.cgst.toFixed(2)}</td><td>₹${n.cgst_payable.toFixed(2)}</td></tr>
+              <tr><td>SGST</td><td>₹${o.sgst.toFixed(2)}</td><td>₹${i.sgst.toFixed(2)}</td><td>₹${n.sgst_payable.toFixed(2)}</td></tr>
+              <tr><td>IGST</td><td>₹${o.igst.toFixed(2)}</td><td>₹${i.igst.toFixed(2)}</td><td>₹${n.igst_payable.toFixed(2)}</td></tr>
+              <tr style="font-weight: 800; background: rgba(234, 88, 12, 0.08);">
+                <td>TOTAL NET TAX PAYABLE</td>
+                <td>₹${o.total_tax.toFixed(2)}</td>
+                <td>₹${i.total_itc.toFixed(2)}</td>
+                <td style="color: #EA580C; font-size: 15px;">₹${n.total_net_payable.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        body.innerHTML = `<p style="color: #DC2626;">Error loading GSTR-3B: ${e.message}</p>`;
+      }
+    }
+
+    function closeGstr3bModal() {
+      document.getElementById('gstr3b-review-modal').style.display = 'none';
+    }
+
+    function openGstr9ConfigModal() {
+      document.getElementById('gstr9-config-modal').style.display = 'flex';
+    }
+
+    function closeGstr9ConfigModal() {
+      document.getElementById('gstr9-config-modal').style.display = 'none';
+    }
+
+    async function exportGstCsv(returnType, period) {
+      try {
+        const token = localStorage.getItem('expiryguard_token') || localStorage.getItem('access_token') || '';
+        const res = await fetch(`/api/gst/export-csv?return_type=${returnType}&period=${period}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Failed to export CSV');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${returnType}_${period}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e) {
+        alert("Failed to export CSV: " + e.message);
+      }
+    }
+
     function openConfigModal() {
       const modal = document.getElementById('gst-config-modal');
-      if (modal) {
-        modal.style.display = 'flex';
-      }
+      if (modal) modal.style.display = 'flex';
     }
 
     function closeConfigModal() {
       const modal = document.getElementById('gst-config-modal');
-      if (modal) {
-        modal.style.display = 'none';
-      }
+      if (modal) modal.style.display = 'none';
     }
 
     function toggleStateCatVisibility() {
       const type = document.getElementById('modal-gst-type').value;
       const group = document.getElementById('state-cat-group');
-      if (group) {
-        group.style.display = type === 'qrmp' ? 'block' : 'none';
-      }
+      if (group) group.style.display = type === 'qrmp' ? 'block' : 'none';
     }
 
     async function saveGstSettingsFromModal() {

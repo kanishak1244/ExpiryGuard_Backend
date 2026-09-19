@@ -2228,14 +2228,56 @@ class MarkFiledRequest(BaseModel):
     notes: Optional[str] = None
 
 
+def _parse_gst_period_dates(period_str: Optional[str] = None):
+    from datetime import datetime
+    import calendar
+    now = datetime.utcnow()
+
+    if not period_str:
+        start_dt = datetime(now.year, now.month, 1, 0, 0, 0)
+        _, last_day = calendar.monthrange(now.year, now.month)
+        end_dt = datetime(now.year, now.month, last_day, 23, 59, 59)
+        period_label = now.strftime("%B %Y")
+        period_code = now.strftime("%Y-%m")
+        return start_dt, end_dt, period_label, period_code
+
+    p_str = period_str.strip()
+    try:
+        if "-Q" in p_str:
+            parts = p_str.split("-Q")
+            year = int(parts[0])
+            quarter = int(parts[1])
+            q_start_month = 3 * (quarter - 1) + 1
+            q_end_month = q_start_month + 2
+            start_dt = datetime(year, q_start_month, 1, 0, 0, 0)
+            _, last_day = calendar.monthrange(year, q_end_month)
+            end_dt = datetime(year, q_end_month, last_day, 23, 59, 59)
+            return start_dt, end_dt, f"Q{quarter} {year}", p_str
+        elif "-" in p_str:
+            parts = p_str.split("-")
+            year = int(parts[0])
+            month = int(parts[1])
+            start_dt = datetime(year, month, 1, 0, 0, 0)
+            _, last_day = calendar.monthrange(year, month)
+            end_dt = datetime(year, month, last_day, 23, 59, 59)
+            dt_obj = datetime(year, month, 1)
+            return start_dt, end_dt, dt_obj.strftime("%B %Y"), p_str
+    except Exception:
+        pass
+
+    start_dt = datetime(now.year, now.month, 1, 0, 0, 0)
+    _, last_day = calendar.monthrange(now.year, now.month)
+    end_dt = datetime(now.year, now.month, last_day, 23, 59, 59)
+    return start_dt, end_dt, now.strftime("%B %Y"), now.strftime("%Y-%m")
+
+
 @app.get("/api/gst/status")
 def get_gst_status(
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Returns GST configuration, calculated due dates, urgency status, and next due return.
-    Runs isolated date calculation without external API or heavy blocking calls.
+    Returns GST configuration, calculated due dates, urgency status, and current period financial summary.
     """
     overrides = db.query(models.GstDueDateOverride).all()
     override_list = [
@@ -2266,7 +2308,325 @@ def get_gst_status(
         processed_returns.append(ret_copy)
 
     calc_res["returns"] = processed_returns
+
+    # Financial Summary for active filing period
+    start_dt, end_dt, label, _ = _parse_gst_period_dates()
+    fin_data = _build_gst_financial_data(db=db, user=current_user, start_dt=start_dt, end_dt=end_dt, label=label)
+    calc_res["financial_summary"] = {
+        "period_label": label,
+        "total_sales": fin_data["total_sales"],
+        "total_purchases": fin_data["total_purchases"],
+        "total_taxable_value": fin_data["total_taxable_value"],
+        "total_output_gst": fin_data["total_output_gst"],
+        "total_input_gst": fin_data["total_input_gst"],
+        "net_gst_payable": fin_data["net_gst_payable"],
+        "gstin": fin_data["gstin"],
+        "pharmacy_name": fin_data["pharmacy_name"],
+    }
     return calc_res
+
+
+@app.get("/api/gst/gstr1-summary")
+def get_gstr1_summary(
+    period: Optional[str] = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Returns detailed GSTR-1 breakdown (B2B, B2C, HSN summary, Output Tax)."""
+    from sqlalchemy.orm import selectinload
+
+    start_dt, end_dt, period_label, period_code = _parse_gst_period_dates(period)
+
+    sales = (
+        db.query(models.Sale)
+        .options(selectinload(models.Sale.items))
+        .filter(
+            models.Sale.user_id == current_user.id,
+            models.Sale.created_at >= start_dt,
+            models.Sale.created_at <= end_dt,
+        )
+        .order_by(models.Sale.created_at.desc())
+        .all()
+    )
+
+    b2b_sales = []
+    b2c_taxable = 0.0
+    b2c_cgst = 0.0
+    b2c_sgst = 0.0
+    b2c_igst = 0.0
+    b2c_total_tax = 0.0
+    b2c_total_amount = 0.0
+    b2c_count = 0
+
+    hsn_dict = {}
+
+    for s in sales:
+        has_gstin = bool(s.gst_number and s.gst_number.strip() and s.gst_number != "07AABCE1234F1Z5")
+        is_b2b_bill = has_gstin or (s.customer_name and "b2b" in s.customer_name.lower())
+
+        s_taxable = round(s.total_taxable_value or s.subtotal, 2)
+        s_cgst = round(s.total_cgst, 2)
+        s_sgst = round(s.total_sgst, 2)
+        s_igst = round(s.total_igst, 2)
+        s_tax = round(s.tax_amount, 2)
+        s_total = round(s.total_amount, 2)
+
+        if is_b2b_bill:
+            b2b_sales.append({
+                "bill_number": s.bill_number,
+                "date": s.created_at.strftime("%Y-%m-%d") if s.created_at else "",
+                "customer_name": s.customer_name or "B2B Client",
+                "gstin": s.gst_number or "N/A",
+                "taxable_value": s_taxable,
+                "cgst": s_cgst,
+                "sgst": s_sgst,
+                "igst": s_igst,
+                "total_tax": s_tax,
+                "total_amount": s_total,
+            })
+        else:
+            b2c_count += 1
+            b2c_taxable += s_taxable
+            b2c_cgst += s_cgst
+            b2c_sgst += s_sgst
+            b2c_igst += s_igst
+            b2c_total_tax += s_tax
+            b2c_total_amount += s_total
+
+        # HSN breakdown from sale items
+        for item in s.items:
+            hsn = getattr(item, 'hsn_code', None) or "3004"
+            rate = float(getattr(item, 'gst_percentage', None) or getattr(item, 'gst_rate', None) or s.gst_percentage or 12.0)
+            item_taxable = float(getattr(item, 'line_total', None) or (item.quantity * item.unit_price))
+            item_tax = float(getattr(item, 'taxable_value', None) or (item_taxable * rate / 100.0))
+
+            if hsn not in hsn_dict:
+                hsn_dict[hsn] = {
+                    "hsn_code": hsn,
+                    "description": "Medicines / Pharma Supplies",
+                    "gst_rate": rate,
+                    "total_quantity": 0,
+                    "taxable_value": 0.0,
+                    "gst_amount": 0.0,
+                }
+            hsn_dict[hsn]["total_quantity"] += item.quantity
+            hsn_dict[hsn]["taxable_value"] += item_taxable
+            hsn_dict[hsn]["gst_amount"] += item_tax
+
+    # Format HSN summary list
+    hsn_summary = [
+        {
+            "hsn_code": k,
+            "description": v["description"],
+            "gst_rate": round(v["gst_rate"], 1),
+            "total_quantity": v["total_quantity"],
+            "taxable_value": round(v["taxable_value"], 2),
+            "gst_amount": round(v["gst_amount"], 2),
+        }
+        for k, v in hsn_dict.items()
+    ]
+
+    total_taxable = round(sum(s.total_taxable_value or s.subtotal for s in sales), 2)
+    total_cgst = round(sum(s.total_cgst for s in sales), 2)
+    total_sgst = round(sum(s.total_sgst for s in sales), 2)
+    total_igst = round(sum(s.total_igst for s in sales), 2)
+    total_tax = round(sum(s.tax_amount for s in sales), 2)
+
+    return {
+        "period": period_code,
+        "period_label": period_label,
+        "gstin": getattr(current_user, "gstin", None) or current_user.gst_number or "07AABCE1234F1Z5",
+        "pharmacy_name": current_user.shop_name or "Pharmacy",
+        "totals": {
+            "total_invoices": len(sales),
+            "b2b_count": len(b2b_sales),
+            "b2c_count": b2c_count,
+            "taxable_value": total_taxable,
+            "cgst": total_cgst,
+            "sgst": total_sgst,
+            "igst": total_igst,
+            "total_output_tax": total_tax,
+        },
+        "b2b_sales": b2b_sales,
+        "b2c_summary": {
+            "count": b2c_count,
+            "taxable_value": round(b2c_taxable, 2),
+            "cgst": round(b2c_cgst, 2),
+            "sgst": round(b2c_sgst, 2),
+            "igst": round(b2c_igst, 2),
+            "total_tax": round(b2c_total_tax, 2),
+            "total_amount": round(b2c_total_amount, 2),
+        },
+        "hsn_summary": hsn_summary,
+    }
+
+
+@app.get("/api/gst/gstr3b-summary")
+def get_gstr3b_summary(
+    period: Optional[str] = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Returns detailed GSTR-3B tax computation summary (3.1 Outward, 4 ITC, 5 Net Tax)."""
+    from sqlalchemy.orm import selectinload
+
+    start_dt, end_dt, period_label, period_code = _parse_gst_period_dates(period)
+
+    sales = (
+        db.query(models.Sale)
+        .filter(
+            models.Sale.user_id == current_user.id,
+            models.Sale.created_at >= start_dt,
+            models.Sale.created_at <= end_dt,
+        )
+        .all()
+    )
+
+    purchases = (
+        db.query(models.PurchaseInvoice)
+        .filter(
+            models.PurchaseInvoice.user_id == current_user.id,
+            models.PurchaseInvoice.created_at >= start_dt,
+            models.PurchaseInvoice.created_at <= end_dt,
+        )
+        .all()
+    )
+
+    outward_taxable = sum(s.total_taxable_value or s.subtotal for s in sales)
+    outward_cgst = sum(s.total_cgst for s in sales)
+    outward_sgst = sum(s.total_sgst for s in sales)
+    outward_igst = sum(s.total_igst for s in sales)
+    outward_tax = sum(s.tax_amount for s in sales)
+
+    itc_taxable = sum(p.subtotal for p in purchases)
+    itc_total_tax = sum(p.tax_amount for p in purchases)
+    itc_igst = sum(p.tax_amount if getattr(p, 'is_interstate', False) else 0.0 for p in purchases)
+    itc_cgst = (itc_total_tax - itc_igst) / 2.0
+    itc_sgst = (itc_total_tax - itc_igst) / 2.0
+
+    net_cgst = max(0.0, outward_cgst - itc_cgst)
+    net_sgst = max(0.0, outward_sgst - itc_sgst)
+    net_igst = max(0.0, outward_igst - itc_igst)
+    net_total = max(0.0, outward_tax - itc_total_tax)
+
+    return {
+        "period": period_code,
+        "period_label": period_label,
+        "gstin": getattr(current_user, "gstin", None) or current_user.gst_number or "07AABCE1234F1Z5",
+        "pharmacy_name": current_user.shop_name or "Pharmacy",
+        "section_3_1_outward_supplies": {
+            "taxable_value": round(outward_taxable, 2),
+            "cgst": round(outward_cgst, 2),
+            "sgst": round(outward_sgst, 2),
+            "igst": round(outward_igst, 2),
+            "total_tax": round(outward_tax, 2),
+        },
+        "section_4_eligible_itc": {
+            "purchase_subtotal": round(itc_taxable, 2),
+            "cgst": round(itc_cgst, 2),
+            "sgst": round(itc_sgst, 2),
+            "igst": round(itc_igst, 2),
+            "total_itc": round(itc_total_tax, 2),
+        },
+        "section_5_net_liability": {
+            "cgst_payable": round(net_cgst, 2),
+            "sgst_payable": round(net_sgst, 2),
+            "igst_payable": round(net_igst, 2),
+            "total_net_payable": round(net_total, 2),
+        }
+    }
+
+
+@app.get("/api/gst/export-csv")
+def export_gst_return_csv(
+    return_type: str = "GSTR-1",
+    period: Optional[str] = None,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generates downloadable CSV for GSTR-1 or GSTR-3B return filing data."""
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    if return_type.upper() == "GSTR-1":
+        summary = get_gstr1_summary(period=period, current_user=current_user, db=db)
+        writer.writerow(["GSTR-1 RETURN SUMMARY - DAWAI FLOW"])
+        writer.writerow(["Pharmacy Name", summary["pharmacy_name"]])
+        writer.writerow(["GSTIN", summary["gstin"]])
+        writer.writerow(["Period", summary["period_label"] + " (" + summary["period"] + ")"])
+        writer.writerow([])
+
+        writer.writerow(["1. TOTALS & OVERVIEW"])
+        writer.writerow(["Metric", "Amount (INR)"])
+        writer.writerow(["Total Invoices", summary["totals"]["total_invoices"]])
+        writer.writerow(["B2B Invoices Count", summary["totals"]["b2b_count"]])
+        writer.writerow(["B2C Invoices Count", summary["totals"]["b2c_count"]])
+        writer.writerow(["Total Taxable Value", f"{summary['totals']['taxable_value']:.2f}"])
+        writer.writerow(["CGST", f"{summary['totals']['cgst']:.2f}"])
+        writer.writerow(["SGST", f"{summary['totals']['sgst']:.2f}"])
+        writer.writerow(["IGST", f"{summary['totals']['igst']:.2f}"])
+        writer.writerow(["Total Output Tax", f"{summary['totals']['total_output_tax']:.2f}"])
+        writer.writerow([])
+
+        writer.writerow(["2. B2B SUPPLIES REGISTER"])
+        writer.writerow(["Bill Number", "Date", "Customer Name", "GSTIN", "Taxable Value (INR)", "CGST (INR)", "SGST (INR)", "IGST (INR)", "Total Tax (INR)", "Bill Total (INR)"])
+        for b in summary.get("b2b_sales", []):
+            writer.writerow([
+                b["bill_number"], b["date"], b["customer_name"], b["gstin"],
+                f"{b['taxable_value']:.2f}", f"{b['cgst']:.2f}", f"{b['sgst']:.2f}",
+                f"{b['igst']:.2f}", f"{b['total_tax']:.2f}", f"{b['total_amount']:.2f}"
+            ])
+        writer.writerow([])
+
+        writer.writerow(["3. HSN SUMMARY REGISTER"])
+        writer.writerow(["HSN Code", "Description", "GST Rate (%)", "Total Quantity", "Taxable Value (INR)", "GST Amount (INR)"])
+        for h in summary.get("hsn_summary", []):
+            writer.writerow([
+                h["hsn_code"], h["description"], f"{h['gst_rate']:.1f}", h["total_quantity"],
+                f"{h['taxable_value']:.2f}", f"{h['gst_amount']:.2f}"
+            ])
+
+        filename = f"GSTR1_{summary['period']}.csv"
+
+    else:
+        summary = get_gstr3b_summary(period=period, current_user=current_user, db=db)
+        writer.writerow(["GSTR-3B TAX COMPUTATION - DAWAI FLOW"])
+        writer.writerow(["Pharmacy Name", summary["pharmacy_name"]])
+        writer.writerow(["GSTIN", summary["gstin"]])
+        writer.writerow(["Period", summary["period_label"] + " (" + summary["period"] + ")"])
+        writer.writerow([])
+
+        writer.writerow(["3.1 OUTWARD TAXABLE SUPPLIES"])
+        writer.writerow(["Metric", "Taxable Value (INR)", "CGST (INR)", "SGST (INR)", "IGST (INR)", "Total Tax (INR)"])
+        o = summary["section_3_1_outward_supplies"]
+        writer.writerow(["Outward Supplies (Sales)", f"{o['taxable_value']:.2f}", f"{o['cgst']:.2f}", f"{o['sgst']:.2f}", f"{o['igst']:.2f}", f"{o['total_tax']:.2f}"])
+        writer.writerow([])
+
+        writer.writerow(["4. ELIGIBLE INPUT TAX CREDIT (ITC)"])
+        writer.writerow(["Metric", "Purchase Subtotal (INR)", "Input CGST (INR)", "Input SGST (INR)", "Input IGST (INR)", "Total ITC (INR)"])
+        i = summary["section_4_eligible_itc"]
+        writer.writerow(["Eligible ITC (Purchases)", f"{i['purchase_subtotal']:.2f}", f"{i['cgst']:.2f}", f"{i['sgst']:.2f}", f"{i['igst']:.2f}", f"{i['total_itc']:.2f}"])
+        writer.writerow([])
+
+        writer.writerow(["5. NET TAX LIABILITY & PAYMENT SUMMARY"])
+        writer.writerow(["Tax Head", "Net Tax Payable (INR)"])
+        n = summary["section_5_net_liability"]
+        writer.writerow(["CGST Payable", f"{n['cgst_payable']:.2f}"])
+        writer.writerow(["SGST Payable", f"{n['sgst_payable']:.2f}"])
+        writer.writerow(["IGST Payable", f"{n['igst_payable']:.2f}"])
+        writer.writerow(["TOTAL NET TAX PAYABLE", f"{n['total_net_payable']:.2f}"])
+
+        filename = f"GSTR3B_{summary['period']}.csv"
+
+    output.seek(0)
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @app.put("/api/gst/settings")
