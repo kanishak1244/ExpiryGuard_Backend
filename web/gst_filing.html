@@ -176,45 +176,224 @@
       }).join('');
     }
 
-    async function openConfigModal() {
-      const type = prompt("Select GST Filing Type:\n1. Monthly (Type 'monthly')\n2. QRMP Scheme (Type 'qrmp')", "monthly");
-      if (!type) return;
-      let cat = "X";
-      if (type.toLowerCase() === "qrmp") {
-        cat = prompt("Select State Category for QRMP:\nType 'X' (MH, GJ, KA, TN, KL, AP, TS, GA, MP)\nType 'Y' (DL, HR, PB, UP, RJ, BR, WB, HP, JK)", "X") || "X";
-      }
+  <!-- GST Configuration Modal -->
+  <div class="modal-overlay" id="gst-config-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--color-surface-card); border-radius: 14px; width: 100%; max-width: 480px; border: 1px solid var(--color-border); padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+      <h3 style="font-size: 18px; font-weight: 800; margin: 0 0 8px 0; color: var(--color-text-primary);">⚙️ Configure GST Filing Scheme</h3>
+      <p style="font-size: 13.5px; color: var(--color-text-muted); margin: 0 0 20px 0;">
+        Select your pharmacy's turnover category & state location to calculate exact filing deadlines.
+      </p>
+      
+      <div style="margin-bottom: 18px;">
+        <label style="font-size: 13px; font-weight: 700; color: var(--color-text-primary); display: block; margin-bottom: 8px;">1. Filing Frequency & Scheme</label>
+        <select id="modal-gst-type" onchange="toggleStateCatVisibility()" style="width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-bg); color: var(--color-text-primary);">
+          <option value="monthly">Monthly Filing (> ₹5 Cr turnover)</option>
+          <option value="qrmp">QRMP Scheme (≤ ₹5 Cr turnover - Quarterly filing, Monthly tax)</option>
+        </select>
+      </div>
 
+      <div id="state-cat-group" style="margin-bottom: 22px;">
+        <label style="font-size: 13px; font-weight: 700; color: var(--color-text-primary); display: block; margin-bottom: 8px;">2. State Category (for QRMP GSTR-3B Due Dates)</label>
+        <select id="modal-state-cat" style="width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-bg); color: var(--color-text-primary);">
+          <option value="X">Category X (MH, GJ, KA, TN, KL, AP, TS, GA, MP, CG — Due 22nd)</option>
+          <option value="Y">Category Y (DL, HR, PB, UP, RJ, BR, WB, HP, JK, UT, NE — Due 24th)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveGstSettingsFromModal()" style="background: #0C3B34; border-color: #0C3B34; font-weight: 700;">Save & Calculate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mark Filed Modal -->
+  <div class="modal-overlay" id="gst-filed-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+    <div class="modal-content" style="background: var(--color-surface-card); border-radius: 14px; width: 100%; max-width: 440px; border: 1px solid var(--color-border); padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);">
+      <h3 style="font-size: 18px; font-weight: 800; margin: 0 0 8px 0; color: var(--color-text-primary);" id="filed-modal-title">Record Return Filing</h3>
+      <p style="font-size: 13.5px; color: var(--color-text-muted); margin: 0 0 20px 0;" id="filed-modal-desc">
+        Log completion for GSTR return.
+      </p>
+
+      <div style="margin-bottom: 16px;">
+        <label style="font-size: 13px; font-weight: 700; color: var(--color-text-primary); display: block; margin-bottom: 6px;">Acknowledgement No. (ARN / Reference)</label>
+        <input type="text" id="modal-ack-no" placeholder="e.g. AA270826123456V" style="width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-bg); color: var(--color-text-primary);" />
+      </div>
+
+      <div style="margin-bottom: 22px;">
+        <label style="font-size: 13px; font-weight: 700; color: var(--color-text-primary); display: block; margin-bottom: 6px;">Notes / Remarks (Optional)</label>
+        <input type="text" id="modal-filing-notes" placeholder="e.g. Paid via netbanking" style="width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-bg); color: var(--color-text-primary);" />
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="closeMarkFiledModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitMarkFiled()" style="background: #2E7D32; border-color: #2E7D32; font-weight: 700;">Confirm Filed</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    let activeFilingTarget = null;
+
+    function getAuthHeaders() {
+      const token = localStorage.getItem('expiryguard_token') || localStorage.getItem('access_token') || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return headers;
+    }
+
+    async function loadGstStatus() {
       try {
-        const token = localStorage.getItem('expiryguard_token');
-        await fetch('/api/gst/settings', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify({ gst_filing_type: type, state_category: cat })
+        const res = await fetch('/api/gst/status', {
+          headers: getAuthHeaders()
         });
-        loadGstStatus();
-      } catch (e) {
-        alert("Failed to update settings: " + e);
+        if (!res.ok) throw new Error('Failed to load status');
+        const data = await res.json();
+        renderGst(data);
+      } catch (err) {
+        console.warn('API load notice:', err);
+        renderGst({
+          is_configured: false,
+          filing_type: null,
+          returns: []
+        });
       }
     }
 
-    async function markFiled(returnType, period) {
-      const ack = prompt(`Enter Acknowledgement No. for ${returnType} (${period}):`, "");
+    function renderGst(data) {
+      const descEl = document.getElementById('gst-scheme-desc');
+      const container = document.getElementById('returns-container');
+
+      if (!data.is_configured) {
+        descEl.innerHTML = `<span style="color: #EA580C; font-weight: 700;">⚠️ Unconfigured</span> — Set turnover & filing frequency (Monthly vs QRMP) to calculate due dates.`;
+        container.innerHTML = `
+          <div class="gst-card" style="border-left: 4px solid #F59E0B; background: #FFFBEB;">
+            <h4 style="margin: 0 0 8px 0; color: #92400E;">Configure GST Filing Reminders</h4>
+            <p style="margin: 0 0 14px 0; color: #78350F; font-size: 14px;">Select whether your pharmacy files GST Monthly (> ₹5 Cr turnover) or under QRMP Scheme (≤ ₹5 Cr turnover).</p>
+            <button class="btn btn-primary" onclick="openConfigModal()" style="background: #D97706; border-color: #D97706; font-weight: 700;">Set Filing Scheme Now</button>
+          </div>
+        `;
+        return;
+      }
+
+      descEl.textContent = `Scheme: ${data.filing_type.toUpperCase()} | State Category: Category ${data.state_category}`;
+
+      const returns = data.returns || [];
+      if (returns.length === 0) {
+        container.innerHTML = `<div class="gst-card"><p>All returns are up to date! 🎉</p></div>`;
+        return;
+      }
+
+      container.innerHTML = returns.map(ret => {
+        const colorClass = ret.color_code === 'red' ? 'badge-red' : (ret.color_code === 'orange' ? 'badge-orange' : 'badge-green');
+        const isFiled = ret.is_filed;
+
+        return `
+          <div class="gst-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 18px; font-weight: 800; color: var(--color-text-primary);">${ret.return_type}</span>
+                  <span class="gst-badge ${colorClass}">${isFiled ? 'FILED ✓' : ret.badge_label}</span>
+                </div>
+                <div style="font-size: 13px; color: var(--color-text-muted); margin-top: 4px;">
+                  ${ret.description} • Period: ${ret.period_label} (${ret.period})
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 16px; font-weight: 800; color: var(--color-text-primary);">${ret.due_date_formatted}</div>
+                <div style="margin-top: 8px;">
+                  ${!isFiled 
+                    ? `<button class="btn btn-sm btn-primary" onclick="openMarkFiledModal('${ret.return_type}', '${ret.period}')" style="background: #2E7D32; font-weight: 700;">Mark as Filed</button>`
+                    : `<span style="color: #16A34A; font-weight: 700; font-size: 13px;">Filed Completed ✓</span>`
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openConfigModal() {
+      const modal = document.getElementById('gst-config-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeConfigModal() {
+      const modal = document.getElementById('gst-config-modal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    function toggleStateCatVisibility() {
+      const type = document.getElementById('modal-gst-type').value;
+      const group = document.getElementById('state-cat-group');
+      if (group) {
+        group.style.display = type === 'qrmp' ? 'block' : 'none';
+      }
+    }
+
+    async function saveGstSettingsFromModal() {
+      const type = document.getElementById('modal-gst-type').value;
+      const cat = document.getElementById('modal-state-cat').value;
+
       try {
-        const token = localStorage.getItem('expiryguard_token');
-        await fetch('/api/gst/mark-filed', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify({ return_type: returnType, period: period, acknowledgement_no: ack })
+        const res = await fetch('/api/gst/settings', {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ gst_filing_type: type, state_category: cat })
         });
+        if (!res.ok) throw new Error('Failed to update settings');
+        closeConfigModal();
         loadGstStatus();
       } catch (e) {
-        alert("Failed to mark filed: " + e);
+        alert("Failed to update GST settings: " + e.message);
+      }
+    }
+
+    function openMarkFiledModal(returnType, period) {
+      activeFilingTarget = { returnType, period };
+      document.getElementById('filed-modal-title').textContent = `Mark ${returnType} as Filed`;
+      document.getElementById('filed-modal-desc').textContent = `Log completion for period ${period}.`;
+      document.getElementById('modal-ack-no').value = '';
+      document.getElementById('modal-filing-notes').value = '';
+      const modal = document.getElementById('gst-filed-modal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeMarkFiledModal() {
+      activeFilingTarget = null;
+      const modal = document.getElementById('gst-filed-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    async function submitMarkFiled() {
+      if (!activeFilingTarget) return;
+      const ack = document.getElementById('modal-ack-no').value;
+      const notes = document.getElementById('modal-filing-notes').value;
+
+      try {
+        const res = await fetch('/api/gst/mark-filed', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ 
+            return_type: activeFilingTarget.returnType, 
+            period: activeFilingTarget.period, 
+            acknowledgement_no: ack,
+            notes: notes 
+          })
+        });
+        if (!res.ok) throw new Error('Failed to record filing');
+        closeMarkFiledModal();
+        loadGstStatus();
+      } catch (e) {
+        alert("Failed to mark filed: " + e.message);
       }
     }
 
