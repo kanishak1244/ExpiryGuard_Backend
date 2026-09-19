@@ -64,6 +64,14 @@ SessionLocal = sessionmaker(
 
 Base = declarative_base()
 
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 def ensure_return_columns():
     """
     Idempotent schema migration ensuring sales and sale_items relations have return tracking columns.
