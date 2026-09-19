@@ -330,6 +330,12 @@ function initDashboard() {
       const revEl = document.getElementById('kpi-revenue');
       if (revEl) revEl.textContent = `₹${(summary.today_revenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+      const profitEl = document.getElementById('kpi-profit-today');
+      if (profitEl) {
+        const profitVal = summary.today_profit !== undefined ? summary.today_profit : (summary.profit_today || 0);
+        profitEl.textContent = `₹${Number(profitVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+
       const expEl = document.getElementById('kpi-expiring');
       if (expEl) expEl.textContent = Number(summary.expiring_soon_count || 0).toLocaleString('en-IN');
 

@@ -5803,26 +5803,34 @@ def get_dashboard_summary(
     if yesterday_revenue > 0:
         growth_pct = round(((today_sales - yesterday_revenue) / yesterday_revenue) * 100, 1)
 
-    # Today's Profit (Revenue - COGS)
-    if bills_count > 0:
-        today_cogs = db.query(
-            func.sum(
-                models.SaleItem.quantity * func.coalesce(
-                    models.Product.purchase_price,
-                    models.SaleItem.unit_price * 0.7
-                )
-            )
-        ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).outerjoin(
-            models.Product, models.SaleItem.product_id == models.Product.id
-        ).filter(
-            models.Sale.user_id == user_id, 
-            models.Sale.created_at >= today_start_utc,
-            models.Sale.created_at <= today_end_utc
-        ).scalar() or 0.0
-    else:
-        today_cogs = 0.0
+    # Today's Profit (Sale price minus cost price for tracked items sold today)
+    from services.profit_calculator import calculate_today_profit
+    today_items_rows = db.query(
+        models.SaleItem.unit_price,
+        models.SaleItem.quantity,
+        models.SaleItem.returned_quantity,
+        models.SaleItem.total_price,
+        models.Product.purchase_price.label("cost_price")
+    ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).outerjoin(
+        models.Product, models.SaleItem.product_id == models.Product.id
+    ).filter(
+        models.Sale.user_id == user_id, 
+        models.Sale.created_at >= today_start_utc,
+        models.Sale.created_at <= today_end_utc
+    ).all()
 
-    today_profit = max(0.0, round(today_sales - float(today_cogs), 2))
+    today_item_dicts = [
+        {
+            "unit_price": row.unit_price,
+            "quantity": row.quantity,
+            "returned_quantity": row.returned_quantity,
+            "total_price": row.total_price,
+            "cost_price": row.cost_price
+        }
+        for row in today_items_rows
+    ]
+    today_profit = calculate_today_profit(today_item_dicts)
+    today_cogs = round(today_sales - today_profit, 2)
 
     # Today's Returns
     today_returns_val = db.query(func.sum(models.SaleReturn.return_amount)).filter(
@@ -5980,6 +5988,7 @@ def get_dashboard_summary(
         "total_products": total_products if can_view_inventory else 0,
         "today_sales_count": bills_count if (can_view_financials or can_view_bills) else 0,
         "today_revenue": round(today_sales, 2) if can_view_financials else 0.0,
+        "today_profit": round(today_profit, 2) if can_view_financials else 0.0,
         "expiring_soon_count": expiring_soon_count if can_view_inventory else 0,
         "expired_count": expired_count if can_view_inventory else 0,
         "low_stock_count": low_stock_count if can_view_inventory else 0,
