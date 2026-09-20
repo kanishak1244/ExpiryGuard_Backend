@@ -6397,6 +6397,29 @@ def get_dashboard_summary(
     can_view_bills = current_user.is_owner or current_user.has_permission(permissions.PERM_BILL_VIEW)
 
     dead_stock_val = 0
+    priority_sale_val = 0
+    marked_return_val = 0
+    if can_view_inventory:
+        try:
+            priority_sale_val = db.query(func.count(models.PrioritySale.id)).filter(models.PrioritySale.user_id == user_id).scalar() or 0
+        except Exception:
+            db.rollback()
+            crud.ensure_marked_return_and_priority_tables()
+            try:
+                priority_sale_val = db.query(func.count(models.PrioritySale.id)).filter(models.PrioritySale.user_id == user_id).scalar() or 0
+            except Exception:
+                db.rollback()
+
+        try:
+            marked_return_val = db.query(func.count(models.MarkedForReturn.id)).filter(models.MarkedForReturn.user_id == user_id).scalar() or 0
+        except Exception:
+            db.rollback()
+            crud.ensure_marked_return_and_priority_tables()
+            try:
+                marked_return_val = db.query(func.count(models.MarkedForReturn.id)).filter(models.MarkedForReturn.user_id == user_id).scalar() or 0
+            except Exception:
+                db.rollback()
+
     if can_view_inventory:
         try:
             dead_stock_val = crud.get_inventory_summary(db=db, user_id=user_id).get("dead_stock", 0)
@@ -6413,7 +6436,7 @@ def get_dashboard_summary(
         "is_owner": current_user.is_owner,
         "permissions": list(current_user.permissions),
         
-        # Root-level metrics mapped to web frontend expectations
+        # Root-level metrics mapped to web & mobile expectations
         "total_products": total_products if can_view_inventory else 0,
         "today_sales_count": bills_count if (can_view_financials or can_view_bills) else 0,
         "today_revenue": round(today_sales, 2) if can_view_financials else 0.0,
@@ -6422,6 +6445,8 @@ def get_dashboard_summary(
         "expired_count": expired_count if can_view_inventory else 0,
         "low_stock_count": low_stock_count if can_view_inventory else 0,
         "dead_stock_count": dead_stock_val,
+        "priority_sale": priority_sale_val,
+        "marked_for_return": marked_return_val,
         "today_returns_amount": round(today_returns_amount, 2) if can_view_financials else 0.0,
         
         # Payment breakdown summary
@@ -6460,7 +6485,9 @@ def get_dashboard_summary(
             "healthy_count": healthy_count if can_view_inventory else 0,
             "expiring_count": expiring_soon_count if can_view_inventory else 0,
             "expired_count": expired_count if can_view_inventory else 0,
-            "low_stock_count": low_stock_count if can_view_inventory else 0
+            "low_stock_count": low_stock_count if can_view_inventory else 0,
+            "priority_sale_count": priority_sale_val,
+            "marked_for_return_count": marked_return_val
         },
         "top_selling": top_selling if can_view_financials else [],
         "intelligence": {
@@ -8561,7 +8588,11 @@ def api_get_marked_for_return(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Fetch all batches currently marked for return for the logged in tenant."""
-    return crud.get_marked_for_return_items(db, current_user.id)
+    try:
+        return crud.get_marked_for_return_items(db, current_user.id)
+    except Exception as e:
+        logger.error(f"[Marked Returns GET Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve marked for return items")
 
 
 @app.post("/returns/marked")
@@ -8571,15 +8602,22 @@ def api_mark_item_for_return(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Mark a specific product/batch for supplier return without stock deduction."""
-    item = crud.mark_item_for_return(
-        db=db,
-        user_id=current_user.id,
-        product_id=data.product_id,
-        batch_number=data.batch_number,
-        return_qty=data.return_qty,
-        notes=data.notes,
-    )
-    return {"message": "Item marked for return successfully", "id": item.id}
+    try:
+        item = crud.mark_item_for_return(
+            db=db,
+            user_id=current_user.id,
+            product_id=data.product_id,
+            batch_number=data.batch_number,
+            return_qty=data.return_qty,
+            notes=data.notes,
+        )
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return {"message": "Item marked for return successfully", "id": item.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Marked Return POST Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to mark item for return")
 
 
 @app.put("/returns/marked/{item_id}")
@@ -8590,15 +8628,22 @@ def api_update_marked_for_return(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Update quantity, notes, or status of a marked return item."""
-    item = crud.update_marked_for_return_item(
-        db=db,
-        user_id=current_user.id,
-        item_id=item_id,
-        return_qty=data.return_qty,
-        notes=data.notes,
-        status=data.status,
-    )
-    return {"message": "Marked return updated successfully", "id": item.id}
+    try:
+        item = crud.update_marked_for_return_item(
+            db=db,
+            user_id=current_user.id,
+            item_id=item_id,
+            return_qty=data.return_qty,
+            notes=data.notes,
+            status=data.status,
+        )
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return {"message": "Marked return updated successfully", "id": item.id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Marked Return PUT Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to update marked return")
 
 
 @app.delete("/returns/marked/{item_id}")
@@ -8608,8 +8653,15 @@ def api_delete_marked_for_return(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Remove item from marked for return list."""
-    crud.delete_marked_for_return_item(db, current_user.id, item_id)
-    return {"message": "Item removed from marked for return"}
+    try:
+        crud.delete_marked_for_return_item(db, current_user.id, item_id)
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return {"message": "Item removed from marked for return"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Marked Return DELETE Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove marked return item")
 
 
 @app.delete("/returns/marked/product/{product_id}")
@@ -8619,8 +8671,15 @@ def api_delete_marked_for_return_by_product(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Remove product from marked for return list."""
-    crud.delete_marked_for_return_by_product(db, current_user.id, product_id)
-    return {"message": "Product removed from marked for return"}
+    try:
+        crud.delete_marked_for_return_by_product(db, current_user.id, product_id)
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return {"message": "Product removed from marked for return"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Marked Return DELETE Product Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove product from marked returns")
 
 
 @app.get("/priority-sales")
@@ -8629,7 +8688,11 @@ def api_get_priority_sales(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Fetch all medicines/batches flagged for priority sale."""
-    return crud.get_priority_sales_items(db, current_user.id)
+    try:
+        return crud.get_priority_sales_items(db, current_user.id)
+    except Exception as e:
+        logger.error(f"[Priority Sales GET Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve priority sales items")
 
 
 @app.post("/priority-sales")
@@ -8639,14 +8702,21 @@ def api_toggle_priority_sale(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Toggle priority sale flag for a medicine/batch."""
-    result = crud.toggle_priority_sale(
-        db=db,
-        user_id=current_user.id,
-        product_id=data.product_id,
-        batch_number=data.batch_number,
-        notes=data.notes,
-    )
-    return result
+    try:
+        result = crud.toggle_priority_sale(
+            db=db,
+            user_id=current_user.id,
+            product_id=data.product_id,
+            batch_number=data.batch_number,
+            notes=data.notes,
+        )
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Priority Sale POST Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to toggle priority sale")
 
 
 @app.delete("/priority-sales/{product_id}")
@@ -8656,12 +8726,20 @@ def api_remove_priority_sale(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Remove product from priority sale list."""
-    result = crud.toggle_priority_sale(
-        db=db,
-        user_id=current_user.id,
-        product_id=product_id,
-    )
-    return result
+    try:
+        result = crud.remove_priority_sale(
+            db=db,
+            user_id=current_user.id,
+            product_id=product_id,
+        )
+        fast_cache.invalidate_tag(current_user.id, "dashboard")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Priority Sale DELETE Error] {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove priority sale")
+
 
 
 

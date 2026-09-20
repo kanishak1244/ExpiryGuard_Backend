@@ -6210,14 +6210,60 @@ def get_returns_history(
 # MARKED FOR RETURN & PRIORITY SALE CRUD
 # ==========================================
 
+def ensure_marked_return_and_priority_tables():
+    """Idempotently ensures marked_for_return and priority_sales tables exist on database."""
+    try:
+        from database import engine
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS marked_for_return (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    product_id INTEGER NOT NULL,
+                    batch_number VARCHAR,
+                    return_qty INTEGER NOT NULL DEFAULT 1,
+                    notes TEXT,
+                    status VARCHAR NOT NULL DEFAULT 'Marked for Return',
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc'),
+                    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc')
+                );
+                CREATE INDEX IF NOT EXISTS idx_marked_return_user_prod ON marked_for_return (user_id, product_id);
+
+                CREATE TABLE IF NOT EXISTS priority_sales (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    product_id INTEGER NOT NULL,
+                    batch_number VARCHAR,
+                    notes TEXT,
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc')
+                );
+                CREATE INDEX IF NOT EXISTS idx_priority_sales_user_prod ON priority_sales (user_id, product_id);
+            """))
+    except Exception as e:
+        logger.warning(f"[Schema Notice] Could not verify/create marked return or priority sale tables: {e}")
+
+
 def get_marked_for_return_items(db: Session, user_id: int) -> List[dict]:
-    items = (
-        db.query(models.MarkedForReturn)
-        .options(joinedload(models.MarkedForReturn.product).joinedload(models.Product.supplier))
-        .filter(models.MarkedForReturn.user_id == user_id)
-        .order_by(models.MarkedForReturn.created_at.desc())
-        .all()
-    )
+    try:
+        items = (
+            db.query(models.MarkedForReturn)
+            .options(joinedload(models.MarkedForReturn.product).joinedload(models.Product.supplier))
+            .filter(models.MarkedForReturn.user_id == user_id)
+            .order_by(models.MarkedForReturn.created_at.desc())
+            .all()
+        )
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        items = (
+            db.query(models.MarkedForReturn)
+            .options(joinedload(models.MarkedForReturn.product).joinedload(models.Product.supplier))
+            .filter(models.MarkedForReturn.user_id == user_id)
+            .order_by(models.MarkedForReturn.created_at.desc())
+            .all()
+        )
+
     result = []
     for item in items:
         prod = item.product
@@ -6252,14 +6298,27 @@ def mark_item_for_return(
     return_qty: int = 1,
     notes: Optional[str] = None,
 ) -> models.MarkedForReturn:
-    existing = (
-        db.query(models.MarkedForReturn)
-        .filter(
-            models.MarkedForReturn.user_id == user_id,
-            models.MarkedForReturn.product_id == product_id,
+    try:
+        existing = (
+            db.query(models.MarkedForReturn)
+            .filter(
+                models.MarkedForReturn.user_id == user_id,
+                models.MarkedForReturn.product_id == product_id,
+            )
+            .first()
         )
-        .first()
-    )
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        existing = (
+            db.query(models.MarkedForReturn)
+            .filter(
+                models.MarkedForReturn.user_id == user_id,
+                models.MarkedForReturn.product_id == product_id,
+            )
+            .first()
+        )
+
     if existing:
         existing.return_qty = return_qty
         if batch_number:
@@ -6337,29 +6396,55 @@ def delete_marked_for_return_item(db: Session, user_id: int, item_id: int) -> bo
 
 
 def delete_marked_for_return_by_product(db: Session, user_id: int, product_id: int) -> bool:
-    item = (
-        db.query(models.MarkedForReturn)
-        .filter(
-            models.MarkedForReturn.product_id == product_id,
-            models.MarkedForReturn.user_id == user_id,
+    try:
+        items = (
+            db.query(models.MarkedForReturn)
+            .filter(
+                models.MarkedForReturn.product_id == product_id,
+                models.MarkedForReturn.user_id == user_id,
+            )
+            .all()
         )
-        .first()
-    )
-    if item:
-        db.delete(item)
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        items = (
+            db.query(models.MarkedForReturn)
+            .filter(
+                models.MarkedForReturn.product_id == product_id,
+                models.MarkedForReturn.user_id == user_id,
+            )
+            .all()
+        )
+
+    if items:
+        for item in items:
+            db.delete(item)
         db.commit()
         return True
     return False
 
 
 def get_priority_sales_items(db: Session, user_id: int) -> List[dict]:
-    items = (
-        db.query(models.PrioritySale)
-        .options(joinedload(models.PrioritySale.product))
-        .filter(models.PrioritySale.user_id == user_id)
-        .order_by(models.PrioritySale.created_at.desc())
-        .all()
-    )
+    try:
+        items = (
+            db.query(models.PrioritySale)
+            .options(joinedload(models.PrioritySale.product))
+            .filter(models.PrioritySale.user_id == user_id)
+            .order_by(models.PrioritySale.created_at.desc())
+            .all()
+        )
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        items = (
+            db.query(models.PrioritySale)
+            .options(joinedload(models.PrioritySale.product))
+            .filter(models.PrioritySale.user_id == user_id)
+            .order_by(models.PrioritySale.created_at.desc())
+            .all()
+        )
+
     result = []
     for item in items:
         prod = item.product
@@ -6388,14 +6473,27 @@ def toggle_priority_sale(
     batch_number: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> dict:
-    existing = (
-        db.query(models.PrioritySale)
-        .filter(
-            models.PrioritySale.user_id == user_id,
-            models.PrioritySale.product_id == product_id,
+    try:
+        existing = (
+            db.query(models.PrioritySale)
+            .filter(
+                models.PrioritySale.user_id == user_id,
+                models.PrioritySale.product_id == product_id,
+            )
+            .first()
         )
-        .first()
-    )
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        existing = (
+            db.query(models.PrioritySale)
+            .filter(
+                models.PrioritySale.user_id == user_id,
+                models.PrioritySale.product_id == product_id,
+            )
+            .first()
+        )
+
     if existing:
         db.delete(existing)
         db.commit()
@@ -6413,6 +6511,40 @@ def toggle_priority_sale(
         db.add(new_item)
         db.commit()
         return {"is_priority_sale": True, "message": "Added to Priority Sale", "product_id": product_id}
+
+
+def remove_priority_sale(
+    db: Session,
+    user_id: int,
+    product_id: int,
+) -> dict:
+    try:
+        items = (
+            db.query(models.PrioritySale)
+            .filter(
+                models.PrioritySale.user_id == user_id,
+                models.PrioritySale.product_id == product_id,
+            )
+            .all()
+        )
+    except Exception:
+        db.rollback()
+        ensure_marked_return_and_priority_tables()
+        items = (
+            db.query(models.PrioritySale)
+            .filter(
+                models.PrioritySale.user_id == user_id,
+                models.PrioritySale.product_id == product_id,
+            )
+            .all()
+        )
+
+    if items:
+        for item in items:
+            db.delete(item)
+        db.commit()
+    return {"is_priority_sale": False, "message": "Removed from Priority Sale", "product_id": product_id}
+
 
 
 
