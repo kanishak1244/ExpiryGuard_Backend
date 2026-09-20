@@ -5840,28 +5840,35 @@ async def preview_inventory_import(
 
     try:
         df = import_service.read_file_to_dataframe(content, file.filename)
+        if df.empty:
+            raise HTTPException(status_code=400, detail="File contains no rows.")
+
+        file_headers = [str(c).strip() for c in df.columns if str(c).strip()]
+        if not file_headers:
+            raise HTTPException(status_code=400, detail="File has no valid column headers.")
+
+        detected_mapping, unmapped = import_service.auto_detect_mapping(file_headers)
+        preview_id = import_service.save_temp_dataframe(df)
+
+        preview_slice_json = df.head(10).fillna("").to_json(orient="records", date_format="iso")
+        preview_slice = json.loads(preview_slice_json)
+
+        return schemas.ImportPreviewResponse(
+            preview_id=preview_id,
+            filename=file.filename or "uploaded_spreadsheet",
+            total_rows=len(df),
+            file_headers=file_headers,
+            detected_mapping=detected_mapping,
+            unmapped_columns=unmapped,
+            preview_data=preview_slice,
+        )
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Import preview parse error: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Failed to parse file. Please verify file format and integrity.")
-
-    if df.empty:
-        raise HTTPException(status_code=400, detail="File contains no rows.")
-
-    file_headers = list(df.columns)
-    detected_mapping, unmapped = import_service.auto_detect_mapping(file_headers)
-    preview_id = import_service.save_temp_dataframe(df)
-
-    preview_slice = df.head(10).fillna("").to_dict(orient="records")
-
-    return schemas.ImportPreviewResponse(
-        preview_id=preview_id,
-        filename=file.filename,
-        total_rows=len(df),
-        file_headers=file_headers,
-        detected_mapping=detected_mapping,
-        unmapped_columns=unmapped,
-        preview_data=preview_slice,
-    )
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
 
 
 @app.post("/import/inventory/confirm", response_model=schemas.ImportSummaryResponse)

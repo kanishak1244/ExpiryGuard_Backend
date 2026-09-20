@@ -58,6 +58,10 @@ HEADER_ALIASES: Dict[str, List[str]] = {
     ]
 }
 
+import tempfile
+
+# Directory for storing temporary import JSON caches
+TEMP_CACHE_DIR = os.path.join(tempfile.gettempdir(), "dawaiflow_temp_import_cache")
 try:
     os.makedirs(TEMP_CACHE_DIR, exist_ok=True)
 except Exception:
@@ -119,7 +123,13 @@ def read_file_to_dataframe(file_bytes: bytes, filename: str) -> pd.DataFrame:
     """Reads uploaded bytes into a pandas DataFrame supporting .csv, .tsv, .xlsx, .xls."""
     ext = os.path.splitext(filename.lower())[1]
     if ext in ['.xlsx', '.xls']:
-        df = pd.read_excel(BytesIO(file_bytes))
+        try:
+            df = pd.read_excel(BytesIO(file_bytes), engine='openpyxl')
+        except Exception:
+            try:
+                df = pd.read_excel(BytesIO(file_bytes))
+            except Exception as e:
+                raise ValueError(f"Could not parse Excel spreadsheet: {str(e)}")
     elif ext in ['.tsv']:
         df = pd.read_csv(BytesIO(file_bytes), sep='\t')
     else:
@@ -127,12 +137,21 @@ def read_file_to_dataframe(file_bytes: bytes, filename: str) -> pd.DataFrame:
         try:
             df = pd.read_csv(BytesIO(file_bytes), encoding='utf-8')
         except UnicodeDecodeError:
-            df = pd.read_csv(BytesIO(file_bytes), encoding='latin-1')
+            try:
+                df = pd.read_csv(BytesIO(file_bytes), encoding='latin-1')
+            except UnicodeDecodeError:
+                df = pd.read_csv(BytesIO(file_bytes), encoding='cp1252')
 
     # Drop completely empty rows
     df = df.dropna(how='all')
-    # Strip string column names
-    df.columns = [str(col).strip() for col in df.columns]
+    # Strip string column names and clean unnamed/empty column headers
+    cleaned_cols = []
+    for idx, col in enumerate(df.columns):
+        c_str = str(col).strip() if col is not None else ""
+        if not c_str or c_str.lower().startswith("unnamed:"):
+            c_str = f"Column_{idx+1}"
+        cleaned_cols.append(c_str)
+    df.columns = cleaned_cols
     return df
 
 def parse_date_flexible(val: Any) -> Tuple[Optional[date], Optional[str]]:
@@ -324,6 +343,14 @@ def validate_and_normalize_row(
         bc_str = str(row[barcode_col]).strip()
         if bc_str and bc_str.lower() != 'nan':
             barcode = bc_str
+
+    # 13. Category / Group (OPTIONAL, default "General")
+    category_col = mapping.get("category")
+    category = "General"
+    if category_col and category_col in row and not pd.isna(row[category_col]):
+        cat_str = str(row[category_col]).strip()
+        if cat_str and cat_str.lower() != 'nan':
+            category = cat_str
 
     cleaned_data = {
         "product_name": product_name,
