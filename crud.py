@@ -299,6 +299,20 @@ def get_products(
                 models.Product.quantity > 0,
                 ~models.Product.id.in_(sold_product_ids_subquery)
             )
+        elif fk in ["priority_sale", "priority_sales"]:
+            p_subquery = (
+                select(models.PrioritySale.product_id)
+                .filter(models.PrioritySale.user_id == user_id)
+                .scalar_subquery()
+            )
+            base_query = base_query.filter(models.Product.id.in_(p_subquery))
+        elif fk in ["marked_for_return", "marked_return", "marked_for_returns"]:
+            r_subquery = (
+                select(models.MarkedForReturn.product_id)
+                .filter(models.MarkedForReturn.user_id == user_id)
+                .scalar_subquery()
+            )
+            base_query = base_query.filter(models.Product.id.in_(r_subquery))
 
     if search and search.strip():
         s_clean = search.strip().lower()
@@ -4456,6 +4470,14 @@ def get_inventory_summary(db: Session, user_id: int):
         ~models.Product.id.in_(sold_product_ids_subquery)
     ).count()
 
+    priority_sale = db.query(models.PrioritySale).filter(
+        models.PrioritySale.user_id == user_id
+    ).count()
+
+    marked_for_return = db.query(models.MarkedForReturn).filter(
+        models.MarkedForReturn.user_id == user_id
+    ).count()
+
     return {
         "total_products": total_products,
         "total_stock_value": round(total_stock_value, 2),
@@ -4464,6 +4486,8 @@ def get_inventory_summary(db: Session, user_id: int):
         "low_stock": low_stock,
         "out_of_stock": out_of_stock,
         "dead_stock": dead_stock,
+        "priority_sale": priority_sale,
+        "marked_for_return": marked_for_return,
     }
 
 
