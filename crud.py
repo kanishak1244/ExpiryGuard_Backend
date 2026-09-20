@@ -4470,13 +4470,21 @@ def get_inventory_summary(db: Session, user_id: int):
         ~models.Product.id.in_(sold_product_ids_subquery)
     ).count()
 
-    priority_sale = db.query(models.PrioritySale).filter(
-        models.PrioritySale.user_id == user_id
-    ).count()
+    priority_sale = 0
+    try:
+        priority_sale = db.query(models.PrioritySale).filter(
+            models.PrioritySale.user_id == user_id
+        ).count()
+    except Exception as e:
+        db.rollback()
 
-    marked_for_return = db.query(models.MarkedForReturn).filter(
-        models.MarkedForReturn.user_id == user_id
-    ).count()
+    marked_for_return = 0
+    try:
+        marked_for_return = db.query(models.MarkedForReturn).filter(
+            models.MarkedForReturn.user_id == user_id
+        ).count()
+    except Exception as e:
+        db.rollback()
 
     return {
         "total_products": total_products,

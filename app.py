@@ -314,6 +314,8 @@ def warmup_database():
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_number VARCHAR DEFAULT '07AABCE1234F1Z5';"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_filing_type VARCHAR;"))
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS state_category VARCHAR DEFAULT 'X';"))
+                conn.execute(text("ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS returned_quantity INTEGER DEFAULT 0;"))
+                conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status VARCHAR DEFAULT 'COMPLETED';"))
         except Exception as sync_schema_err:
             logger.warning(f"[Startup Schema Notice] {sync_schema_err}")
 
@@ -353,6 +355,35 @@ def warmup_database():
                         bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_purchases_user_created ON purchase_invoices (user_id, created_at DESC);"))
                         bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_sale_returns_user_created ON sale_returns (user_id, created_at DESC);"))
                         bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_supplier_payments_user ON supplier_payments (user_id);"))
+
+                        # Table DDL for Marked for Return and Priority Sales
+                        bg_db.execute(text("""
+                            CREATE TABLE IF NOT EXISTS marked_for_return (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                product_id INTEGER NOT NULL,
+                                batch_number VARCHAR,
+                                return_qty INTEGER NOT NULL DEFAULT 1,
+                                notes TEXT,
+                                status VARCHAR NOT NULL DEFAULT 'Marked for Return',
+                                created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc'),
+                                updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc')
+                            );
+                        """))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_marked_return_user_prod ON marked_for_return (user_id, product_id);"))
+
+                        bg_db.execute(text("""
+                            CREATE TABLE IF NOT EXISTS priority_sales (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                product_id INTEGER NOT NULL,
+                                batch_number VARCHAR,
+                                notes TEXT,
+                                created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (now() at time zone 'utc')
+                            );
+                        """))
+                        bg_db.execute(text("CREATE INDEX IF NOT EXISTS idx_priority_sales_user_prod ON priority_sales (user_id, product_id);"))
+                        bg_db.commit()
 
                         # Split payments migration
                         bg_db.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_split_payment BOOLEAN DEFAULT FALSE;"))
@@ -6160,41 +6191,51 @@ def get_dashboard_summary(
         growth_pct = round(((today_sales - yesterday_revenue) / yesterday_revenue) * 100, 1)
 
     # Today's Profit (Sale price minus cost price for tracked items sold today)
-    from services.profit_calculator import calculate_today_profit
-    today_items_rows = db.query(
-        models.SaleItem.unit_price,
-        models.SaleItem.quantity,
-        models.SaleItem.returned_quantity,
-        models.SaleItem.total_price,
-        models.Product.purchase_price.label("cost_price")
-    ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).outerjoin(
-        models.Product, models.SaleItem.product_id == models.Product.id
-    ).filter(
-        models.Sale.user_id == user_id, 
-        models.Sale.created_at >= today_start_utc,
-        models.Sale.created_at <= today_end_utc
-    ).all()
+    today_profit = 0.0
+    today_cogs = 0.0
+    try:
+        from services.profit_calculator import calculate_today_profit
+        today_items_rows = db.query(
+            models.SaleItem.unit_price,
+            models.SaleItem.quantity,
+            models.SaleItem.total_price,
+            models.Product.purchase_price.label("cost_price")
+        ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).outerjoin(
+            models.Product, models.SaleItem.product_id == models.Product.id
+        ).filter(
+            models.Sale.user_id == user_id, 
+            models.Sale.created_at >= today_start_utc,
+            models.Sale.created_at <= today_end_utc
+        ).all()
 
-    today_item_dicts = [
-        {
-            "unit_price": row.unit_price,
-            "quantity": row.quantity,
-            "returned_quantity": row.returned_quantity,
-            "total_price": row.total_price,
-            "cost_price": row.cost_price
-        }
-        for row in today_items_rows
-    ]
-    today_profit = calculate_today_profit(today_item_dicts)
-    today_cogs = round(today_sales - today_profit, 2)
+        today_item_dicts = [
+            {
+                "unit_price": row.unit_price,
+                "quantity": row.quantity,
+                "returned_quantity": 0,
+                "total_price": row.total_price,
+                "cost_price": row.cost_price
+            }
+            for row in today_items_rows
+        ]
+        today_profit = calculate_today_profit(today_item_dicts)
+        today_cogs = round(today_sales - today_profit, 2)
+    except Exception as profit_err:
+        logger.warning(f"[Dashboard Summary] Profit calculation notice: {profit_err}")
+        db.rollback()
 
     # Today's Returns
-    today_returns_val = db.query(func.sum(models.SaleReturn.return_amount)).filter(
-        models.SaleReturn.user_id == user_id,
-        models.SaleReturn.created_at >= today_start_utc,
-        models.SaleReturn.created_at <= today_end_utc
-    ).scalar() or 0.0
-    today_returns_amount = float(today_returns_val)
+    today_returns_amount = 0.0
+    try:
+        today_returns_val = db.query(func.sum(models.SaleReturn.return_amount)).filter(
+            models.SaleReturn.user_id == user_id,
+            models.SaleReturn.created_at >= today_start_utc,
+            models.SaleReturn.created_at <= today_end_utc
+        ).scalar() or 0.0
+        today_returns_amount = float(today_returns_val)
+    except Exception as returns_err:
+        logger.warning(f"[Dashboard Summary] Returns calculation notice: {returns_err}")
+        db.rollback()
 
     # 2. Consolidated Product & Inventory Health Aggregation in 1 query
     prod_agg = db.query(
@@ -6215,25 +6256,37 @@ def get_dashboard_summary(
     total_stock_value = round(float(prod_agg.stock_val or 0.0), 2) if prod_agg else 0.0
     healthy_count = max(0, total_products - (expiring_soon_count + expired_count + low_stock_count))
 
-    customer_outstanding = float(db.query(func.sum(models.Customer.pending_amount)).filter(
-        models.Customer.user_id == user_id
-    ).scalar() or 0.0)
+    customer_outstanding = 0.0
+    try:
+        customer_outstanding = float(db.query(func.sum(models.Customer.pending_amount)).filter(
+            models.Customer.user_id == user_id
+        ).scalar() or 0.0)
+    except Exception as e:
+        db.rollback()
 
-    total_purchases = float(db.query(func.sum(models.PurchaseInvoice.total_amount)).filter(
-        models.PurchaseInvoice.user_id == user_id
-    ).scalar() or 0.0)
-    total_supplier_paid = float(db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
-        models.SupplierPayment.user_id == user_id
-    ).scalar() or 0.0)
-    supplier_payable = max(0.0, total_purchases - total_supplier_paid)
+    supplier_payable = 0.0
+    try:
+        total_purchases = float(db.query(func.sum(models.PurchaseInvoice.total_amount)).filter(
+            models.PurchaseInvoice.user_id == user_id
+        ).scalar() or 0.0)
+        total_supplier_paid = float(db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
+            models.SupplierPayment.user_id == user_id
+        ).scalar() or 0.0)
+        supplier_payable = max(0.0, total_purchases - total_supplier_paid)
+    except Exception as e:
+        db.rollback()
 
     # 4. Top Selling Medicines (Real SQL aggregation)
-    top_items_rows = db.query(
-        models.SaleItem.product_name,
-        func.sum(models.SaleItem.quantity).label("total_units")
-    ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).filter(
-        models.Sale.user_id == user_id
-    ).group_by(models.SaleItem.product_name).order_by(text("total_units DESC")).limit(4).all()
+    top_items_rows = []
+    try:
+        top_items_rows = db.query(
+            models.SaleItem.product_name,
+            func.sum(models.SaleItem.quantity).label("total_units")
+        ).join(models.Sale, models.SaleItem.sale_id == models.Sale.id).filter(
+            models.Sale.user_id == user_id
+        ).group_by(models.SaleItem.product_name).order_by(text("total_units DESC")).limit(4).all()
+    except Exception as e:
+        db.rollback()
 
     top_selling = [
         {"name": row[0] or "Medicine", "units": int(row[1] or 0)}
@@ -6241,13 +6294,17 @@ def get_dashboard_summary(
     ]
 
     # 5. Sales Overview Trends (Today, 7D, 30D) - Grouped timezone-correctly in Python
-    trend_sales = db.query(
-        models.Sale.created_at,
-        models.Sale.total_amount
-    ).filter(
-        models.Sale.user_id == user_id,
-        models.Sale.created_at >= seven_days_ago_utc
-    ).all()
+    trend_sales = []
+    try:
+        trend_sales = db.query(
+            models.Sale.created_at,
+            models.Sale.total_amount
+        ).filter(
+            models.Sale.user_id == user_id,
+            models.Sale.created_at >= seven_days_ago_utc
+        ).all()
+    except Exception as e:
+        db.rollback()
 
     sales_by_date = {}
     for i in range(7):
@@ -6280,10 +6337,14 @@ def get_dashboard_summary(
         target_module = "Sales History"
 
     # 7. Recent Products List (10 most recent non-deleted products)
-    recent_products_rows = db.query(models.Product).filter(
-        models.Product.user_id == user_id,
-        models.Product.is_deleted == False
-    ).order_by(models.Product.id.desc()).limit(10).all()
+    recent_products_rows = []
+    try:
+        recent_products_rows = db.query(models.Product).filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False
+        ).order_by(models.Product.id.desc()).limit(10).all()
+    except Exception as e:
+        db.rollback()
 
     recent_products_list = []
     for p in recent_products_rows:
@@ -6307,10 +6368,14 @@ def get_dashboard_summary(
         })
 
     # 8. Pending Payments Ledger List
-    pending_sales = db.query(models.Sale).filter(
-        models.Sale.user_id == user_id,
-        models.Sale.payment_status == "PENDING"
-    ).order_by(models.Sale.created_at.desc()).all()
+    pending_sales = []
+    try:
+        pending_sales = db.query(models.Sale).filter(
+            models.Sale.user_id == user_id,
+            models.Sale.payment_status == "PENDING"
+        ).order_by(models.Sale.created_at.desc()).all()
+    except Exception as e:
+        db.rollback()
     
     pending_payments_list = []
     pending_payments_total = 0.0
@@ -6331,6 +6396,14 @@ def get_dashboard_summary(
     can_view_inventory = current_user.is_owner or current_user.has_permission(permissions.PERM_INVENTORY_VIEW)
     can_view_bills = current_user.is_owner or current_user.has_permission(permissions.PERM_BILL_VIEW)
 
+    dead_stock_val = 0
+    if can_view_inventory:
+        try:
+            dead_stock_val = crud.get_inventory_summary(db=db, user_id=user_id).get("dead_stock", 0)
+        except Exception as dead_stock_err:
+            logger.warning(f"[Dashboard Summary] Dead stock notice: {dead_stock_err}")
+            db.rollback()
+
     summary_result = {
         "shop_name": current_user.shop_name or "Shree Balaji Medical Store",
         "owner_name": current_user.owner_name or "Kanishak Vashist",
@@ -6348,7 +6421,7 @@ def get_dashboard_summary(
         "expiring_soon_count": expiring_soon_count if can_view_inventory else 0,
         "expired_count": expired_count if can_view_inventory else 0,
         "low_stock_count": low_stock_count if can_view_inventory else 0,
-        "dead_stock_count": crud.get_inventory_summary(db=db, user_id=user_id).get("dead_stock", 0) if can_view_inventory else 0,
+        "dead_stock_count": dead_stock_val,
         "today_returns_amount": round(today_returns_amount, 2) if can_view_financials else 0.0,
         
         # Payment breakdown summary
