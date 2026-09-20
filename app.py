@@ -3429,18 +3429,39 @@ def connect_gmail_oauth(
     }
 
 
-@app.delete("/ca-connect/gmail/disconnect")
-def disconnect_gmail_oauth(
+@app.get("/ca-connect/email-health")
+def get_ca_email_health(
+    probe: bool = False,
     db: Session = Depends(get_db),
-    current_user: AuthenticatedUser = Depends(require_owner),
+    current_user: AuthenticatedUser = Depends(require_permission([permissions.PERM_REPORT_VIEW, permissions.PERM_GST_VIEW, permissions.PERM_ACCOUNTING_VIEW])),
 ):
-    """Disconnects and removes stored Google OAuth credentials for the shop (Owner only)."""
-    existing = db.query(models.UserGoogleOAuth).filter(models.UserGoogleOAuth.user_id == current_user.shop_id).first()
-    if existing:
-        db.delete(existing)
-        db.commit()
-        return {"success": True, "connected": False, "message": "Gmail account disconnected successfully."}
-    return {"success": True, "connected": False, "message": "Gmail was not connected."}
+    """Inspects email service configuration and production network connectivity status."""
+    import os
+    from email_service import check_smtp_health
+
+    oauth_rec = db.query(models.UserGoogleOAuth).filter(models.UserGoogleOAuth.user_id == current_user.shop_id).first()
+    
+    health = check_smtp_health(probe_network=probe)
+    health["gmail_oauth_connected"] = bool(oauth_rec)
+    health["gmail_oauth_email"] = oauth_rec.google_email if oauth_rec else None
+    
+    has_resend = bool(os.getenv("RESEND_API_KEY"))
+    has_brevo = bool(os.getenv("BREVO_API_KEY") or os.getenv("SENDINBLUE_API_KEY"))
+    has_sendgrid = bool(os.getenv("SENDGRID_API_KEY"))
+    has_gmail_oauth = bool(oauth_rec)
+    
+    health["https_providers_configured"] = {
+        "resend": has_resend,
+        "brevo": has_brevo,
+        "sendgrid": has_sendgrid,
+        "gmail_oauth": has_gmail_oauth,
+    }
+    
+    health["ready_for_production"] = has_resend or has_brevo or has_sendgrid or has_gmail_oauth
+    if not health["ready_for_production"]:
+        health["warning"] = "Outbound raw SMTP port 587/465 is blocked by Railway cloud network. Please add RESEND_API_KEY (or BREVO_API_KEY / SENDGRID_API_KEY) in Railway Environment Variables or connect Gmail account via OAuth."
+    
+    return health
 
 
 @app.post("/ca-connect/share")
