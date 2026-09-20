@@ -3255,18 +3255,21 @@ def delete_ca_profile(
 
 @app.get("/ca-connect/history", response_model=List[schemas.CaShareLogResponse])
 def get_ca_share_history(
+    status_filter: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(require_permission([permissions.PERM_REPORT_VIEW, permissions.PERM_GST_VIEW, permissions.PERM_ACCOUNTING_VIEW])),
 ):
-    """Fetches history logs of all reports shared with the CA."""
+    """Fetches history logs of all reports shared with the CA with optional status filtering."""
     import json
-    logs = (
-        db.query(models.CaShareLog)
-        .filter(models.CaShareLog.user_id == current_user.shop_id)
-        .order_by(models.CaShareLog.sent_at.desc())
-        .limit(100)
-        .all()
-    )
+    query = db.query(models.CaShareLog).filter(models.CaShareLog.user_id == current_user.shop_id)
+    if status_filter:
+        sf = status_filter.lower().strip()
+        if sf in ("successful", "success", "sent"):
+            query = query.filter(models.CaShareLog.status == "SENT")
+        elif sf in ("failed", "failure", "error"):
+            query = query.filter(models.CaShareLog.status == "FAILED")
+
+    logs = query.order_by(models.CaShareLog.sent_at.desc()).limit(100).all()
     
     out = []
     for log in logs:
