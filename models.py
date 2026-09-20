@@ -1075,5 +1075,41 @@ class GstFilingLog(Base):
     user = relationship("User")
 
 
+class MarkedForReturn(Base):
+    __tablename__ = "marked_for_return"
+    __table_args__ = (
+        Index("idx_marked_return_user_prod", "user_id", "product_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    batch_number = Column(String, nullable=True)
+    return_qty = Column(Integer, nullable=False, default=1)
+    notes = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="Marked for Return")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    product = relationship("Product")
+
+
+class PrioritySale(Base):
+    __tablename__ = "priority_sales"
+    __table_args__ = (
+        Index("idx_priority_sales_user_prod", "user_id", "product_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    batch_number = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    product = relationship("Product")
+
+
+
 
 

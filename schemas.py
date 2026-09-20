@@ -1733,5 +1733,71 @@ class TodayReturnsSummaryResponse(BaseModel):
     returns: List[TodayReturnItemRecord]
 
 
+# ---------------- MARKED FOR RETURN SCHEMAS ---------------- #
+
+class MarkedForReturnCreate(BaseModel):
+    product_id: int
+    batch_number: Optional[str] = None
+    return_qty: int = Field(gt=0, default=1)
+    notes: Optional[str] = None
+
+
+class MarkedForReturnUpdate(BaseModel):
+    return_qty: Optional[int] = Field(default=None, gt=0)
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+class MarkedForReturnResponse(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    batch_number: Optional[str] = None
+    return_qty: int
+    notes: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    product_name: Optional[str] = None
+    brand: Optional[str] = None
+    expiry_date: Optional[str] = None
+    days_remaining: Optional[int] = None
+    supplier_name: Optional[str] = None
+    unit_price: Optional[float] = 0.0
+    purchase_price: Optional[float] = 0.0
+    current_stock: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+# ---------------- PRIORITY SALE SCHEMAS ---------------- #
+
+class PrioritySaleCreate(BaseModel):
+    product_id: int
+    batch_number: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PrioritySaleResponse(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    batch_number: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    product_name: Optional[str] = None
+    brand: Optional[str] = None
+    expiry_date: Optional[str] = None
+    days_remaining: Optional[int] = None
+    unit_price: Optional[float] = 0.0
+    purchase_price: Optional[float] = 0.0
+    current_stock: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+
 
 

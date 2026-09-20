@@ -6174,6 +6174,216 @@ def get_returns_history(
     return records
 
 
+# ==========================================
+# MARKED FOR RETURN & PRIORITY SALE CRUD
+# ==========================================
+
+def get_marked_for_return_items(db: Session, user_id: int) -> List[dict]:
+    items = (
+        db.query(models.MarkedForReturn)
+        .options(joinedload(models.MarkedForReturn.product).joinedload(models.Product.supplier))
+        .filter(models.MarkedForReturn.user_id == user_id)
+        .order_by(models.MarkedForReturn.created_at.desc())
+        .all()
+    )
+    result = []
+    for item in items:
+        prod = item.product
+        supplier_name = prod.supplier.name if (prod and prod.supplier) else "Not available"
+        result.append({
+            "id": item.id,
+            "user_id": item.user_id,
+            "product_id": item.product_id,
+            "batch_number": item.batch_number or (prod.batch_number if prod else None),
+            "return_qty": item.return_qty,
+            "notes": item.notes,
+            "status": item.status,
+            "created_at": item.created_at,
+            "updated_at": item.updated_at,
+            "product_name": prod.product_name if prod else "Unknown Medicine",
+            "brand": prod.brand if prod else None,
+            "expiry_date": safe_date_format(prod.expiry_date) if prod else None,
+            "days_remaining": prod.days_remaining if prod else 0,
+            "supplier_name": supplier_name,
+            "unit_price": float(prod.unit_price or 0.0) if prod else 0.0,
+            "purchase_price": float(prod.purchase_price or 0.0) if prod else 0.0,
+            "current_stock": prod.quantity if prod else 0,
+        })
+    return result
+
+
+def mark_item_for_return(
+    db: Session,
+    user_id: int,
+    product_id: int,
+    batch_number: Optional[str] = None,
+    return_qty: int = 1,
+    notes: Optional[str] = None,
+) -> models.MarkedForReturn:
+    existing = (
+        db.query(models.MarkedForReturn)
+        .filter(
+            models.MarkedForReturn.user_id == user_id,
+            models.MarkedForReturn.product_id == product_id,
+        )
+        .first()
+    )
+    if existing:
+        existing.return_qty = return_qty
+        if batch_number:
+            existing.batch_number = batch_number
+        if notes:
+            existing.notes = notes
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    prod = db.query(models.Product).filter(models.Product.id == product_id, models.Product.user_id == user_id).first()
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    new_item = models.MarkedForReturn(
+        user_id=user_id,
+        product_id=product_id,
+        batch_number=batch_number or prod.batch_number,
+        return_qty=return_qty,
+        notes=notes,
+        status="Marked for Return",
+    )
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    return new_item
+
+
+def update_marked_for_return_item(
+    db: Session,
+    user_id: int,
+    item_id: int,
+    return_qty: Optional[int] = None,
+    notes: Optional[str] = None,
+    status: Optional[str] = None,
+) -> models.MarkedForReturn:
+    item = (
+        db.query(models.MarkedForReturn)
+        .filter(
+            models.MarkedForReturn.id == item_id,
+            models.MarkedForReturn.user_id == user_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Marked for return item not found")
+
+    if return_qty is not None:
+        item.return_qty = return_qty
+    if notes is not None:
+        item.notes = notes
+    if status is not None:
+        item.status = status
+    item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_marked_for_return_item(db: Session, user_id: int, item_id: int) -> bool:
+    item = (
+        db.query(models.MarkedForReturn)
+        .filter(
+            models.MarkedForReturn.id == item_id,
+            models.MarkedForReturn.user_id == user_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)
+    db.commit()
+    return True
+
+
+def delete_marked_for_return_by_product(db: Session, user_id: int, product_id: int) -> bool:
+    item = (
+        db.query(models.MarkedForReturn)
+        .filter(
+            models.MarkedForReturn.product_id == product_id,
+            models.MarkedForReturn.user_id == user_id,
+        )
+        .first()
+    )
+    if item:
+        db.delete(item)
+        db.commit()
+        return True
+    return False
+
+
+def get_priority_sales_items(db: Session, user_id: int) -> List[dict]:
+    items = (
+        db.query(models.PrioritySale)
+        .options(joinedload(models.PrioritySale.product))
+        .filter(models.PrioritySale.user_id == user_id)
+        .order_by(models.PrioritySale.created_at.desc())
+        .all()
+    )
+    result = []
+    for item in items:
+        prod = item.product
+        result.append({
+            "id": item.id,
+            "user_id": item.user_id,
+            "product_id": item.product_id,
+            "batch_number": item.batch_number or (prod.batch_number if prod else None),
+            "notes": item.notes,
+            "created_at": item.created_at,
+            "product_name": prod.product_name if prod else "Unknown Medicine",
+            "brand": prod.brand if prod else None,
+            "expiry_date": safe_date_format(prod.expiry_date) if prod else None,
+            "days_remaining": prod.days_remaining if prod else 0,
+            "unit_price": float(prod.unit_price or 0.0) if prod else 0.0,
+            "purchase_price": float(prod.purchase_price or 0.0) if prod else 0.0,
+            "current_stock": prod.quantity if prod else 0,
+        })
+    return result
+
+
+def toggle_priority_sale(
+    db: Session,
+    user_id: int,
+    product_id: int,
+    batch_number: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> dict:
+    existing = (
+        db.query(models.PrioritySale)
+        .filter(
+            models.PrioritySale.user_id == user_id,
+            models.PrioritySale.product_id == product_id,
+        )
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"is_priority_sale": False, "message": "Removed from Priority Sale", "product_id": product_id}
+    else:
+        prod = db.query(models.Product).filter(models.Product.id == product_id, models.Product.user_id == user_id).first()
+        if not prod:
+            raise HTTPException(status_code=404, detail="Product not found")
+        new_item = models.PrioritySale(
+            user_id=user_id,
+            product_id=product_id,
+            batch_number=batch_number or prod.batch_number,
+            notes=notes,
+        )
+        db.add(new_item)
+        db.commit()
+        return {"is_priority_sale": True, "message": "Added to Priority Sale", "product_id": product_id}
+
+
+
 
 
 

@@ -8478,6 +8478,120 @@ def api_export_migration_errors(
     )
 
 
+# ==========================================
+# MARKED FOR RETURN & PRIORITY SALE ENDPOINTS
+# ==========================================
+
+@app.get("/returns/marked")
+def api_get_marked_for_return(
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Fetch all batches currently marked for return for the logged in tenant."""
+    return crud.get_marked_for_return_items(db, current_user.id)
+
+
+@app.post("/returns/marked")
+def api_mark_item_for_return(
+    data: schemas.MarkedForReturnCreate,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Mark a specific product/batch for supplier return without stock deduction."""
+    item = crud.mark_item_for_return(
+        db=db,
+        user_id=current_user.id,
+        product_id=data.product_id,
+        batch_number=data.batch_number,
+        return_qty=data.return_qty,
+        notes=data.notes,
+    )
+    return {"message": "Item marked for return successfully", "id": item.id}
+
+
+@app.put("/returns/marked/{item_id}")
+def api_update_marked_for_return(
+    item_id: int,
+    data: schemas.MarkedForReturnUpdate,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Update quantity, notes, or status of a marked return item."""
+    item = crud.update_marked_for_return_item(
+        db=db,
+        user_id=current_user.id,
+        item_id=item_id,
+        return_qty=data.return_qty,
+        notes=data.notes,
+        status=data.status,
+    )
+    return {"message": "Marked return updated successfully", "id": item.id}
+
+
+@app.delete("/returns/marked/{item_id}")
+def api_delete_marked_for_return(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Remove item from marked for return list."""
+    crud.delete_marked_for_return_item(db, current_user.id, item_id)
+    return {"message": "Item removed from marked for return"}
+
+
+@app.delete("/returns/marked/product/{product_id}")
+def api_delete_marked_for_return_by_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Remove product from marked for return list."""
+    crud.delete_marked_for_return_by_product(db, current_user.id, product_id)
+    return {"message": "Product removed from marked for return"}
+
+
+@app.get("/priority-sales")
+def api_get_priority_sales(
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Fetch all medicines/batches flagged for priority sale."""
+    return crud.get_priority_sales_items(db, current_user.id)
+
+
+@app.post("/priority-sales")
+def api_toggle_priority_sale(
+    data: schemas.PrioritySaleCreate,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Toggle priority sale flag for a medicine/batch."""
+    result = crud.toggle_priority_sale(
+        db=db,
+        user_id=current_user.id,
+        product_id=data.product_id,
+        batch_number=data.batch_number,
+        notes=data.notes,
+    )
+    return result
+
+
+@app.delete("/priority-sales/{product_id}")
+def api_remove_priority_sale(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Remove product from priority sale list."""
+    result = crud.toggle_priority_sale(
+        db=db,
+        user_id=current_user.id,
+        product_id=product_id,
+    )
+    return result
+
+
+
 
 
 # ==========================================
