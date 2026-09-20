@@ -279,6 +279,7 @@ def send_email_via_resend(
     plain_text: str,
     from_name: str = "DawaiFlow Pilot Alerts",
     reply_to: Optional[str] = None,
+    csv_attachments: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str, str]:
     """
     Sends email via Resend HTTPS REST API (port 443).
@@ -290,6 +291,7 @@ def send_email_via_resend(
 
     import urllib.request
     import json
+    import base64
 
     from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
     payload: Dict[str, Any] = {
@@ -301,6 +303,16 @@ def send_email_via_resend(
     }
     if reply_to:
         payload["reply_to"] = reply_to
+
+    if csv_attachments:
+        resend_atts = []
+        for fname, fcontent in csv_attachments.items():
+            if isinstance(fcontent, str):
+                b64_str = base64.b64encode(fcontent.encode("utf-8")).decode("utf-8")
+            else:
+                b64_str = base64.b64encode(fcontent).decode("utf-8")
+            resend_atts.append({"filename": fname, "content": b64_str})
+        payload["attachments"] = resend_atts
 
     try:
         req = urllib.request.Request(
@@ -332,6 +344,7 @@ def send_email_via_brevo(
     plain_text: str,
     from_name: str = "DawaiFlow Pilot Alerts",
     reply_to: Optional[str] = None,
+    csv_attachments: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str, str]:
     """
     Sends email via Brevo (Sendinblue) HTTPS REST API (port 443).
@@ -343,6 +356,7 @@ def send_email_via_brevo(
 
     import urllib.request
     import json
+    import base64
 
     sender_email = (
         os.getenv("BREVO_SENDER_EMAIL")
@@ -358,6 +372,16 @@ def send_email_via_brevo(
     }
     if reply_to:
         payload["replyTo"] = {"email": reply_to}
+
+    if csv_attachments:
+        brevo_atts = []
+        for fname, fcontent in csv_attachments.items():
+            if isinstance(fcontent, str):
+                b64_str = base64.b64encode(fcontent.encode("utf-8")).decode("utf-8")
+            else:
+                b64_str = base64.b64encode(fcontent).decode("utf-8")
+            brevo_atts.append({"name": fname, "content": b64_str})
+        payload["attachment"] = brevo_atts
 
     try:
         req = urllib.request.Request(
@@ -387,6 +411,7 @@ def send_email_via_sendgrid(
     plain_text: str,
     from_name: str = "DawaiFlow Pilot Alerts",
     reply_to: Optional[str] = None,
+    csv_attachments: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str, str]:
     """
     Sends email via SendGrid HTTPS REST API (port 443).
@@ -398,6 +423,7 @@ def send_email_via_sendgrid(
 
     import urllib.request
     import json
+    import base64
 
     sender_email = (
         os.getenv("SENDGRID_SENDER_EMAIL")
@@ -415,6 +441,16 @@ def send_email_via_sendgrid(
     }
     if reply_to:
         payload["reply_to"] = {"email": reply_to}
+
+    if csv_attachments:
+        sg_atts = []
+        for fname, fcontent in csv_attachments.items():
+            if isinstance(fcontent, str):
+                b64_str = base64.b64encode(fcontent.encode("utf-8")).decode("utf-8")
+            else:
+                b64_str = base64.b64encode(fcontent).decode("utf-8")
+            sg_atts.append({"content": b64_str, "filename": fname, "type": "text/csv"})
+        payload["attachments"] = sg_atts
 
     try:
         req = urllib.request.Request(
@@ -443,6 +479,7 @@ def send_email_with_fallback(
     subject: Optional[str] = None,
     html_content: Optional[str] = None,
     plain_text: Optional[str] = None,
+    csv_attachments: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str, str]:
     """
     Sends email with multi-layer resilience:
@@ -465,6 +502,7 @@ def send_email_with_fallback(
             plain_text=plain_text,
             from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
             reply_to=cfg.get("user") or None,
+            csv_attachments=csv_attachments,
         )
         if ok:
             return True, prov, ""
@@ -477,6 +515,7 @@ def send_email_with_fallback(
             plain_text=plain_text,
             from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
             reply_to=cfg.get("user") or None,
+            csv_attachments=csv_attachments,
         )
         if ok:
             return True, prov, ""
@@ -489,6 +528,7 @@ def send_email_with_fallback(
             plain_text=plain_text,
             from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
             reply_to=cfg.get("user") or None,
+            csv_attachments=csv_attachments,
         )
         if ok:
             return True, prov, ""
@@ -537,6 +577,7 @@ def send_email_with_fallback(
                     break
         if any("Errno 101" in e or "Network is unreachable" in e for e in errors):
             break
+
     if html_content and plain_text:
         if os.getenv("RESEND_API_KEY"):
             ok, prov, err = send_email_via_resend(
@@ -546,6 +587,7 @@ def send_email_with_fallback(
                 plain_text=plain_text,
                 from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
                 reply_to=cfg.get("user") or None,
+                csv_attachments=csv_attachments,
             )
             if ok:
                 return True, prov, ""
@@ -559,6 +601,7 @@ def send_email_with_fallback(
                 plain_text=plain_text,
                 from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
                 reply_to=cfg.get("user") or None,
+                csv_attachments=csv_attachments,
             )
             if ok:
                 return True, prov, ""
@@ -572,6 +615,7 @@ def send_email_with_fallback(
                 plain_text=plain_text,
                 from_name=cfg.get("from_name", "DawaiFlow Pilot Alerts"),
                 reply_to=cfg.get("user") or None,
+                csv_attachments=csv_attachments,
             )
             if ok:
                 return True, prov, ""
@@ -1060,7 +1104,14 @@ def send_ca_report_email(
                 attachment.add_header("Content-Disposition", f'attachment; filename="{filename}"')
                 msg.attach(attachment)
 
-        success, provider, err_details = send_email_with_fallback(msg, cfg)
+        success, provider, err_details = send_email_with_fallback(
+            msg=msg,
+            cfg=cfg,
+            subject=f"📑 DawaiFlow — Pharmacy Financial & GST Reports ({pharmacy_name} - {date_range_label})",
+            html_content=html_content,
+            plain_text=f"Pharmacy GST & Financial Reports shared by {pharmacy_name} ({date_range_label}).",
+            csv_attachments=csv_attachments,
+        )
         if success:
             return {
                 "success": True,

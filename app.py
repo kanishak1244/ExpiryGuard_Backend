@@ -3563,9 +3563,13 @@ def share_reports_with_ca(
     db.commit()
 
     if not email_res.get("success"):
+        # Technical error details are preserved in server logs & DB log.notes
+        user_err = "Unable to share reports right now. Please try again."
+        if email_res.get("auth_error"):
+            user_err = email_res.get("error") or user_err
         raise HTTPException(
             status_code=500,
-            detail=error_note or "Failed to send reports email to CA."
+            detail=user_err
         )
 
     return {
