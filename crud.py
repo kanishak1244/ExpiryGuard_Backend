@@ -4914,19 +4914,19 @@ def get_inventory_intelligence(
 
 def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
     intel = get_inventory_intelligence(db, user_id)
-    summary = intel["summary"]
+    summary = intel.get("summary", {})
     
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    expiry_enabled = getattr(user, 'expiry_alerts_enabled', True)
-    low_stock_enabled = getattr(user, 'low_stock_alerts_enabled', True)
+    expiry_enabled = getattr(user, 'expiry_alerts_enabled', True) if user else True
+    low_stock_enabled = getattr(user, 'low_stock_alerts_enabled', True) if user else True
 
     alerts = []
 
-    if expiry_enabled and (summary["expired_count"] > 0 or summary["expiring_soon_count"] > 0):
-        exp_count = summary["expired_count"]
-        exp_soon = summary["expiring_soon_count"]
-        exp_val = intel["expiry_risk"]["expiring_30d_value"] + intel["expiry_risk"]["expired_value"]
+    exp_count = summary.get("expired_count", 0)
+    exp_soon = summary.get("expiring_soon_count", 0)
+    exp_val = intel.get("expiring_30d_value", 0.0) + intel.get("expired_value", 0.0)
 
+    if expiry_enabled and (exp_count > 0 or exp_soon > 0):
         alerts.append({
             "id": f"expiry_summary_{user_id}",
             "category": "Expired" if exp_count > 0 else "Expiring Soon",
@@ -4936,16 +4936,16 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
             "what": f"{exp_count} expired, {exp_soon} expiring soon",
             "why": f"₹{exp_val:.2f} capital at risk of loss",
             "action_type": "inventory_filter",
-            "action_target": "expiring",
+            "action_target": "expired" if exp_count > 0 else "expiring",
             "action_label": "View Expiry Risk",
             "created_at": datetime.utcnow().isoformat(),
             "is_read": False
         })
 
-    if low_stock_enabled and summary["low_stock_count"] > 0:
-        low_count = summary["low_stock_count"]
-        out_count = summary["out_of_stock_count"]
-        
+    low_count = summary.get("low_stock_count", 0)
+    out_count = summary.get("out_of_stock_count", 0)
+
+    if low_stock_enabled and (low_count > 0 or out_count > 0):
         alerts.append({
             "id": f"low_stock_summary_{user_id}",
             "category": "Out of Stock" if out_count > 0 else "Low Stock",
@@ -4984,9 +4984,10 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
             "is_read": False
         })
 
-    if summary["dead_stock_count"] > 0:
-        dead_count = summary["dead_stock_count"]
-        dead_val = summary["dead_stock_value"]
+    dead_count = summary.get("dead_stock_count", 0)
+    dead_val = summary.get("dead_stock_value", 0.0)
+
+    if dead_count > 0:
         alerts.append({
             "id": f"dead_stock_summary_{user_id}",
             "category": "Dead Stock",
@@ -5002,6 +5003,47 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
             "is_read": False
         })
 
+    # Include item-level actionable recommendations
+    recommendations = intel.get("recommendations", [])
+    for rec in recommendations:
+        priority_lvl = rec.get("priority_level", "")
+        prod_name = rec.get("product_name", "Item")
+        prod_id = rec.get("product_id")
+        batch_no = rec.get("batch_number", "N/A")
+        
+        if priority_lvl == "CRITICAL_RESTOCK":
+            is_out = rec.get("current_stock", 0) <= 0
+            alerts.append({
+                "id": f"rec_restock_{prod_id}_{batch_no}",
+                "category": "Out of Stock" if is_out else "Low Stock",
+                "priority": "CRITICAL" if is_out else "HIGH",
+                "title": f"Critical Restock: {prod_name}",
+                "message": rec.get("reason", f"Stockout risk for {prod_name}"),
+                "what": f"Current stock: {rec.get('current_stock', 0)} (Reorder point: {rec.get('reorder_point', 10)})",
+                "why": "Prevent stock-outs and customer loss",
+                "action_type": "inventory_filter",
+                "action_target": "lowstock",
+                "action_label": "Restock Item",
+                "created_at": datetime.utcnow().isoformat(),
+                "is_read": False
+            })
+        elif priority_lvl == "EXPIRY_RISK":
+            days_exp = rec.get("days_to_expiry", 0)
+            alerts.append({
+                "id": f"rec_expiry_{prod_id}_{batch_no}",
+                "category": "Expired" if days_exp < 0 else "Expiring Soon",
+                "priority": "CRITICAL" if days_exp <= 0 else "HIGH",
+                "title": f"Expiry Risk: {prod_name} (Batch {batch_no})",
+                "message": rec.get("reason", f"Batch {batch_no} is near expiry."),
+                "what": f"Expired {abs(days_exp)} days ago" if days_exp < 0 else f"Expires in {days_exp} days",
+                "why": f"₹{rec.get('at_risk_value', 0.0):.2f} capital at risk",
+                "action_type": "inventory_filter",
+                "action_target": "expired" if days_exp < 0 else "expiring",
+                "action_label": "View Batch",
+                "created_at": datetime.utcnow().isoformat(),
+                "is_read": False
+            })
+
     if category and category.lower() != "all":
         cat_lower = category.lower()
         filtered = []
@@ -5009,11 +5051,11 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
             a_cat = a.get("category", "").lower()
             a_prio = a.get("priority", "").lower()
 
-            if cat_lower in ("critical",) and a_prio == "critical":
+            if cat_lower == "critical" and a_prio == "critical":
                 filtered.append(a)
             elif cat_lower in ("expiry", "expired", "expiring", "expiring soon") and ("expir" in a_cat or "expired" in a_cat):
                 filtered.append(a)
-            elif cat_lower in ("stock", "low stock", "lowstock", "out of stock") and ("stock" in a_cat or "reorder" in a_cat):
+            elif cat_lower in ("stock", "low stock", "lowstock", "out of stock") and ("stock" in a_cat or "reorder" in a_cat or "out" in a_cat):
                 filtered.append(a)
             elif cat_lower in ("khata", "payment", "payment/khata") and ("khata" in a_cat or "payment" in a_cat or "receivable" in a_cat):
                 filtered.append(a)
@@ -5028,7 +5070,7 @@ def get_smart_alerts(db: Session, user_id: int, category: Optional[str] = None):
 def get_alert_summary(db: Session, user_id: int):
     alerts = get_smart_alerts(db, user_id)
     unread_count = len(alerts)
-    critical_count = sum(1 for a in alerts if a["priority"] == "CRITICAL")
+    critical_count = sum(1 for a in alerts if a.get("priority") == "CRITICAL")
     return {
         "unread_count": unread_count,
         "critical_count": critical_count,
