@@ -3540,7 +3540,7 @@ def share_reports_with_ca(
             custom_message=req.custom_message,
         )
 
-    status_str = "SENT" if email_res.get("success") else "COMPOSED"
+    status_str = "SENT" if email_res.get("success") else "FAILED"
     error_note = email_res.get("error")
 
     log = models.CaShareLog(
@@ -3553,16 +3553,27 @@ def share_reports_with_ca(
         date_range_end=end_dt,
         status=status_str,
         sent_at=datetime.utcnow(),
-        notes=error_note or f"Prepared {len(shared_labels)} CA report files for compose & sharing.",
+        notes=error_note or (
+            f"Successfully emailed {len(shared_labels)} CA report files to {target_ca_email}."
+            if status_str == "SENT"
+            else "Email dispatch failed."
+        ),
     )
     db.add(log)
     db.commit()
 
+    if not email_res.get("success"):
+        raise HTTPException(
+            status_code=500,
+            detail=error_note or "Failed to send reports email to CA."
+        )
+
     return {
         "success": True,
+        "status": "SENT",
         "sender_email": shopkeeper_email,
         "ca_email": target_ca_email,
-        "message": f"Report generated successfully for {target_ca_email}.",
+        "message": f"Reports successfully emailed to {target_ca_email}.",
         "date_range_label": label,
         "reports_shared": shared_labels,
         "sent_at": log.sent_at.isoformat(),
