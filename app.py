@@ -5731,6 +5731,87 @@ def scan_multi_item_endpoint(
         raise HTTPException(status_code=500, detail="Internal scanning failure.")
 
 
+@app.post("/scan-invoice")
+@limiter.limit("30/hour")
+def scan_invoice_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Scans a purchase bill invoice document (PDF/JPEG/PNG) using Gemini Vision Purchase Invoice OCR.
+    Handles invoices with 1, 5, 10, 14, 20, 50, 100+ line items with full fidelity.
+    Extracts PTR, MRP, GST%, Discount%, Batch, Expiry, Supplier info, and Invoice Number.
+    """
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in ALLOWED_DOC_EXTENSIONS:
+        extension = ".jpg"
+
+    check_file_size(file, MAX_FILE_SIZE_10MB)
+    file_bytes = file.file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded invoice file is empty.")
+
+    validate_file_content_and_magic(file_bytes, extension)
+
+    temp_dir = BASE_DIR / "temp_uploads"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_file_path = temp_dir / f"invoice_{uuid.uuid4().hex}{extension}"
+
+    try:
+        with open(temp_file_path, "wb") as f:
+            f.write(file_bytes)
+
+        scan_res = scan_invoice(str(temp_file_path))
+        if not scan_res.get("success"):
+            raise HTTPException(
+                status_code=502,
+                detail=scan_res.get("error") or "Failed to scan purchase invoice."
+            )
+
+        invoice_data = scan_res.get("data", {})
+        
+        supplier_match = None
+        s_name = (invoice_data.get("supplier_name") or "").strip()
+        if s_name:
+            supplier_match = crud.find_matching_suppliers(
+                db=db,
+                user_id=current_user.id,
+                extracted_name=s_name,
+                extracted_gstin=invoice_data.get("supplier_gstin")
+            )
+
+        items = invoice_data.get("items", [])
+        has_review = any(it.get("needs_review") for it in items)
+
+        return {
+            "success": True,
+            "invoice_number": invoice_data.get("invoice_number"),
+            "invoice_date": invoice_data.get("invoice_date"),
+            "supplier_name": invoice_data.get("supplier_name"),
+            "supplier_gstin": invoice_data.get("supplier_gstin"),
+            "supplier_phone": invoice_data.get("supplier_phone"),
+            "supplier_address": invoice_data.get("supplier_address"),
+            "supplier_match": supplier_match,
+            "total_amount": invoice_data.get("total_amount"),
+            "subtotal": invoice_data.get("subtotal"),
+            "tax_amount": invoice_data.get("tax_amount"),
+            "discount_amount": invoice_data.get("discount_amount"),
+            "items": items,
+            "items_count": len(items),
+            "needs_review": has_review,
+            "error": None
+        }
+    finally:
+        if temp_file_path.exists():
+            try:
+                os.remove(temp_file_path)
+            except Exception:
+                pass
+
+
+
 
 # ==========================================
 # NOTIFICATIONS & DEVICE TOKENS

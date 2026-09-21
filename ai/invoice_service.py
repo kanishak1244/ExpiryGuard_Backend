@@ -26,24 +26,34 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 
-def _safe_float(value, default: float = 0.0) -> float:
+def _safe_float_nullable(value) -> Optional[float]:
+    if value in ("", None):
+        return None
     try:
-        if value in ("", None):
-            return default
         clean_val = re.sub(r"[^\d.-]", "", str(value))
-        return float(clean_val) if clean_val else default
+        return float(clean_val) if clean_val else None
     except Exception:
-        return default
+        return None
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    val = _safe_float_nullable(value)
+    return val if val is not None else default
+
+
+def _safe_int_nullable(value) -> Optional[int]:
+    if value in ("", None):
+        return None
+    try:
+        clean_val = re.sub(r"[^\d.-]", "", str(value))
+        return int(float(clean_val)) if clean_val else None
+    except Exception:
+        return None
 
 
 def _safe_int(value, default: int = 1) -> int:
-    try:
-        if value in ("", None):
-            return default
-        clean_val = re.sub(r"[^\d.-]", "", str(value))
-        return int(float(clean_val)) if clean_val else default
-    except Exception:
-        return default
+    val = _safe_int_nullable(value)
+    return val if val is not None else default
 
 
 def _normalize_date(date_str: str) -> str:
@@ -78,33 +88,89 @@ def _normalize_date(date_str: str) -> str:
 
 def _normalize_item(item: dict) -> dict:
     """
-    Ensures every product has all required fields with proper types.
+    Ensures every product has proper typed fields without silent fake defaults.
+    Flags items needing user review if critical values are missing.
     """
-    qty = _safe_int(item.get("quantity"), default=1)
-    u_price = _safe_float(item.get("unit_price"), default=0.0)
-    t_price = _safe_float(item.get("total_price"), default=0.0)
+    review_reasons = []
     
-    if t_price == 0.0 and u_price > 0:
-        t_price = round(u_price * qty, 2)
-    elif u_price == 0.0 and t_price > 0 and qty > 0:
-        u_price = round(t_price / qty, 2)
+    product_name = str(item.get("product_name") or item.get("name") or "").strip()
+    if not product_name:
+        review_reasons.append("Medicine name missing")
+        
+    qty = _safe_int_nullable(item.get("quantity"))
+    free_qty = _safe_int(item.get("free_qty") or item.get("scheme_qty"), default=0)
+    
+    if qty is None or qty <= 0:
+        review_reasons.append("Quantity missing or unreadable")
+        qty_val = None
+    else:
+        qty_val = qty
+
+    # PTR / Purchase Rate extraction
+    raw_ptr = item.get("ptr") or item.get("unit_price") or item.get("purchase_price")
+    ptr_val = _safe_float_nullable(raw_ptr)
+    
+    t_price = _safe_float_nullable(item.get("total_price"))
+    mrp_val = _safe_float_nullable(item.get("mrp"))
+    disc_val = _safe_float(item.get("discount_percent") or item.get("dis_percent"), default=0.0)
+
+    # Compute PTR if missing but Total Price & Qty exist
+    if ptr_val is None and t_price is not None and qty_val is not None and qty_val > 0:
+        ptr_val = round(t_price / qty_val, 2)
+    elif ptr_val is None and mrp_val is not None and disc_val > 0:
+        ptr_val = round(mrp_val * (1.0 - (disc_val / 100.0)), 2)
+
+    if ptr_val is None or ptr_val <= 0:
+        review_reasons.append("Purchase price (PTR) missing")
+
+    # Compute Total Price if missing
+    if t_price is None and ptr_val is not None and qty_val is not None:
+        t_price = round(ptr_val * qty_val, 2)
+
+    # Batch and Expiry
+    batch_no = str(item.get("batch_number") or item.get("batch") or "").strip()
+    if not batch_no:
+        review_reasons.append("Batch number missing")
+        
+    raw_exp = str(item.get("expiry_date") or item.get("expiry") or "")
+    exp_date = _normalize_date(raw_exp)
+    if not exp_date:
+        review_reasons.append("Expiry date missing or unreadable")
+
+    # GST Rate (DO NOT default to 12.0)
+    raw_gst = item.get("gst_rate") or item.get("gst_percent")
+    gst_val = _safe_float_nullable(raw_gst)
+    if gst_val is None:
+        review_reasons.append("GST rate missing")
+
+    hsn = str(item.get("hsn_code") or "").strip()
+    brand = str(item.get("brand") or "").strip()
+    unit = str(item.get("unit") or "strip").strip()
+    confidence = _safe_float(item.get("confidence"), default=1.0)
+    
+    needs_review = len(review_reasons) > 0
 
     return {
-        "product_name": str(item.get("product_name") or "").strip(),
-        "brand": str(item.get("brand") or "").strip(),
+        "product_name": product_name,
+        "brand": brand,
         "category": str(item.get("category") or "allopathy").strip(),
-        "quantity": max(1, qty),
-        "unit": str(item.get("unit") or "strip").strip(),
-        "unit_price": u_price,
-        "purchase_price": u_price,
+        "quantity": qty_val,
+        "free_qty": free_qty,
+        "unit": unit,
+        "unit_price": ptr_val,
+        "ptr": ptr_val,
+        "purchase_price": ptr_val,
         "total_price": t_price,
-        "mrp": _safe_float(item.get("mrp") or u_price),
-        "batch_number": str(item.get("batch_number") or "").strip(),
+        "mrp": mrp_val,
+        "discount_percent": disc_val,
+        "batch_number": batch_no,
         "manufacturing_date": _normalize_date(str(item.get("manufacturing_date") or "")),
-        "expiry_date": _normalize_date(str(item.get("expiry_date") or "")),
-        "hsn_code": str(item.get("hsn_code") or "3004").strip(),
-        "gst_rate": _safe_float(item.get("gst_rate"), default=12.0),
-        "confidence": _safe_float(item.get("confidence"), default=1.0),
+        "expiry_date": exp_date,
+        "hsn_code": hsn,
+        "gst_rate": gst_val,
+        "confidence": confidence,
+        "needs_review": needs_review,
+        "review_reasons": review_reasons,
         "notes": str(item.get("notes") or "").strip()
     }
 
