@@ -232,118 +232,118 @@ def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/j
     logger.info(f"[OCR:START] Scanning invoice document: {doc_label} ({len(image_bytes)} bytes, mime: {mime_type})")
 
     last_error = None
-    candidate_models = [GEMINI_PRIMARY_MODEL, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash-lite"]
-    models_to_try = []
-    for m in candidate_models:
-        if m and m not in models_to_try:
-            models_to_try.append(m)
+    candidate_models = [
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.5-flash",
+        "gemini-1.5-flash",
+    ]
+    if GEMINI_PRIMARY_MODEL and GEMINI_PRIMARY_MODEL not in candidate_models:
+        candidate_models.insert(0, GEMINI_PRIMARY_MODEL)
 
-    for target_model in models_to_try:
-        for attempt in range(2):
-            try:
-                logger.info(f"[OCR:TRY] Attempting invoice OCR with model: {target_model} (attempt {attempt+1})")
-                response = client.models.generate_content(
-                    model=target_model,
-                    contents=[
-                        INVOICE_PROMPT,
-                        types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                    ],
-                    config=types.GenerateContentConfig(
-                        temperature=0.0,
-                        response_mime_type="application/json",
-                    ),
-                )
+    for target_model in candidate_models:
+        try:
+            logger.info(f"[OCR:TRY] Attempting invoice OCR with model: {target_model}")
+            response = client.models.generate_content(
+                model=target_model,
+                contents=[
+                    INVOICE_PROMPT,
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                ],
+                config=types.GenerateContentConfig(
+                    temperature=0.0,
+                    response_mime_type="application/json",
+                ),
+            )
 
-                raw_text = response.text or "{}"
-                logger.info(f"[OCR:RAW_RESPONSE]\n{raw_text}")
+            raw_text = response.text or "{}"
+            logger.info(f"[OCR:RAW_RESPONSE]\n{raw_text}")
 
-                cleaned_text = raw_text.strip()
-                if cleaned_text.startswith("```"):
-                    cleaned_text = re.sub(r"^```(?:json)?\s*", "", cleaned_text, flags=re.IGNORECASE)
-                    cleaned_text = re.sub(r"\s*```$", "", cleaned_text)
+            cleaned_text = raw_text.strip()
+            if cleaned_text.startswith("```"):
+                cleaned_text = re.sub(r"^```(?:json)?\s*", "", cleaned_text, flags=re.IGNORECASE)
+                cleaned_text = re.sub(r"\s*```$", "", cleaned_text)
 
-                result = json.loads(cleaned_text)
+            result = json.loads(cleaned_text)
 
-                # Validate invoice structure
-                if not validate_invoice_data(result):
-                    raise ValueError("Extracted invoice JSON failed schema validation (no items found).")
+            # Validate invoice structure
+            if not validate_invoice_data(result):
+                raise ValueError("Extracted invoice JSON failed schema validation (no items found).")
 
-                # Extract header metadata & financial totals
-                raw_inv_date = result.get("invoice_date", "")
-                norm_inv_date = _normalize_date(str(raw_inv_date))
-                
-                raw_subtotal = _safe_float(result.get("subtotal"))
-                raw_disc = _safe_float(result.get("discount_amount") or result.get("cd_amount"))
-                raw_taxable = _safe_float(result.get("taxable_amount"))
-                raw_cgst = _safe_float(result.get("cgst_amount"))
-                raw_sgst = _safe_float(result.get("sgst_amount"))
-                raw_igst = _safe_float(result.get("igst_amount"))
-                raw_tax = _safe_float(result.get("tax_amount"))
-                raw_other = _safe_float(result.get("other_amount") or result.get("roundoff_amount"))
-                raw_total = _safe_float(result.get("total_amount") or result.get("grand_total") or result.get("net_amount"))
+            # Extract header metadata & financial totals
+            raw_inv_date = result.get("invoice_date", "")
+            norm_inv_date = _normalize_date(str(raw_inv_date))
+            
+            raw_subtotal = _safe_float(result.get("subtotal"))
+            raw_disc = _safe_float(result.get("discount_amount") or result.get("cd_amount"))
+            raw_taxable = _safe_float(result.get("taxable_amount"))
+            raw_cgst = _safe_float(result.get("cgst_amount"))
+            raw_sgst = _safe_float(result.get("sgst_amount"))
+            raw_igst = _safe_float(result.get("igst_amount"))
+            raw_tax = _safe_float(result.get("tax_amount"))
+            raw_other = _safe_float(result.get("other_amount") or result.get("roundoff_amount"))
+            raw_total = _safe_float(result.get("total_amount") or result.get("grand_total") or result.get("net_amount"))
 
-                raw_items = result.get("items", [])
-                normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
+            raw_items = result.get("items", [])
+            normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
 
-                # Reconcile calculations dynamically
-                if raw_subtotal == 0.0 and normalized_items:
-                    raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in normalized_items), 2)
+            # Reconcile calculations dynamically
+            if raw_subtotal == 0.0 and normalized_items:
+                raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in normalized_items), 2)
 
-                if raw_taxable == 0.0 and raw_subtotal > 0:
-                    raw_taxable = round(max(0.0, raw_subtotal - raw_disc), 2)
+            if raw_taxable == 0.0 and raw_subtotal > 0:
+                raw_taxable = round(max(0.0, raw_subtotal - raw_disc), 2)
 
-                if raw_tax == 0.0 and (raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0):
-                    raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
+            if raw_tax == 0.0 and (raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0):
+                raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
 
-                if raw_total == 0.0 and raw_taxable > 0:
-                    raw_total = round(raw_taxable + raw_tax + raw_other, 2)
+            if raw_total == 0.0 and raw_taxable > 0:
+                raw_total = round(raw_taxable + raw_tax + raw_other, 2)
 
-                invoice = {
-                    "supplier_name": str(result.get("supplier_name") or "").strip(),
-                    "supplier_gstin": str(result.get("supplier_gstin") or "").strip(),
-                    "supplier_phone": str(result.get("supplier_phone") or "").strip(),
-                    "supplier_email": str(result.get("supplier_email") or "").strip(),
-                    "supplier_address": str(result.get("supplier_address") or "").strip(),
-                    "invoice_number": str(result.get("invoice_number") or "").strip(),
-                    "invoice_date": norm_inv_date,
-                    "subtotal": raw_subtotal,
-                    "discount_amount": raw_disc,
-                    "cd_amount": raw_disc,
-                    "taxable_amount": raw_taxable,
-                    "cgst_amount": raw_cgst,
-                    "sgst_amount": raw_sgst,
-                    "igst_amount": raw_igst,
-                    "tax_amount": raw_tax,
-                    "other_amount": raw_other,
-                    "total_amount": raw_total,
-                    "items": normalized_items
-                }
+            invoice = {
+                "supplier_name": str(result.get("supplier_name") or "").strip(),
+                "supplier_gstin": str(result.get("supplier_gstin") or "").strip(),
+                "supplier_phone": str(result.get("supplier_phone") or "").strip(),
+                "supplier_email": str(result.get("supplier_email") or "").strip(),
+                "supplier_address": str(result.get("supplier_address") or "").strip(),
+                "invoice_number": str(result.get("invoice_number") or "").strip(),
+                "invoice_date": norm_inv_date,
+                "subtotal": raw_subtotal,
+                "discount_amount": raw_disc,
+                "cd_amount": raw_disc,
+                "taxable_amount": raw_taxable,
+                "cgst_amount": raw_cgst,
+                "sgst_amount": raw_sgst,
+                "igst_amount": raw_igst,
+                "tax_amount": raw_tax,
+                "other_amount": raw_other,
+                "total_amount": raw_total,
+                "items": normalized_items
+            }
 
-                logger.info(
-                    f"[OCR:SUCCESS] Invoice #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
-                    f"Subtotal: ₹{invoice['subtotal']} | CD Amt: -₹{invoice['discount_amount']} | Taxable: ₹{invoice['taxable_amount']} | "
-                    f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(normalized_items)}"
-                )
+            logger.info(
+                f"[OCR:SUCCESS] Invoice #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
+                f"Subtotal: ₹{invoice['subtotal']} | CD Amt: -₹{invoice['discount_amount']} | Taxable: ₹{invoice['taxable_amount']} | "
+                f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(normalized_items)}"
+            )
 
-                latency = time.time() - start_time
-                in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
-                out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
-                
-                log_ai_metrics("/documents/{id}/ocr", "invoice", target_model, True, False, latency, in_tokens, out_tokens)
+            latency = time.time() - start_time
+            in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+            out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+            
+            log_ai_metrics("/documents/{id}/ocr", "invoice", target_model, True, False, latency, in_tokens, out_tokens)
 
-                return {
-                    "success": True,
-                    "data": invoice,
-                    "error": None
-                }
-            except Exception as e:
-                last_error = str(e)
-                logger.warning(f"[OCR_WARNING] Model {target_model} attempt {attempt+1} failed: {e}")
-                
-                is_transient = any(code in last_error for code in ("429", "503", "500", "UNAVAILABLE"))
-                if not is_transient:
-                    break
-                time.sleep(0.5 * (2 ** attempt))
+            return {
+                "success": True,
+                "data": invoice,
+                "error": None
+            }
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"[OCR_WARNING] Model {target_model} failed: {e}")
+            continue
 
     # All attempts failed
     latency = time.time() - start_time
