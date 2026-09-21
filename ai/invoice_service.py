@@ -30,9 +30,14 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 def _safe_float_nullable(value) -> Optional[float]:
     if value in ("", None):
         return None
+    val_str = str(value).strip()
+    is_negative = "-" in val_str or "(-)" in val_str or "minus" in val_str.lower()
     try:
-        clean_val = re.sub(r"[^\d.-]", "", str(value))
-        return float(clean_val) if clean_val else None
+        clean_val = re.sub(r"[^\d.]", "", val_str)
+        if not clean_val:
+            return None
+        res = float(clean_val)
+        return -res if is_negative else res
     except Exception:
         return None
 

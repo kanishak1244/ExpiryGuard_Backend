@@ -104,18 +104,23 @@ def serialize_product(p):
 # DATE PARSER
 # ===========================
 
+import calendar
+
 def parse_date(date_value):
     if not date_value:
         return None
 
     # Product dates read from PostgreSQL may already be date objects.
-    if hasattr(date_value, "year") and hasattr(date_value, "month"):
-        return date_value
+    if hasattr(date_value, "year") and hasattr(date_value, "month") and hasattr(date_value, "day"):
+        return date_value if isinstance(date_value, date) else date_value.date()
 
     date_str = str(date_value).strip()
 
     formats = [
         "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%Y-%m",
+        "%Y/%m",
         "%d/%m/%Y",
         "%d-%m-%Y",
         "%m/%Y",
@@ -127,6 +132,7 @@ def parse_date(date_value):
         "%d.%m.%Y",
         "%d/%m/%y",
         "%m/%y",
+        "%m-%y",
     ]
 
     for fmt in formats:
@@ -134,13 +140,18 @@ def parse_date(date_value):
             parsed_date = datetime.strptime(date_str, fmt)
 
             if fmt in [
+                "%Y-%m",
+                "%Y/%m",
                 "%m/%Y",
                 "%m-%Y",
                 "%b %Y",
                 "%B %Y",
                 "%m/%y",
+                "%m-%y",
             ]:
-                parsed_date = parsed_date.replace(day=1)
+                # Expiry dates specified by month/year expire on the last day of that month
+                last_day = calendar.monthrange(parsed_date.year, parsed_date.month)[1]
+                parsed_date = parsed_date.replace(day=last_day)
 
             return parsed_date.date()
 
@@ -158,13 +169,23 @@ def parse_date(date_value):
         .strip()
     )
 
-    for fmt in ["%m/%Y", "%m-%Y", "%b %Y", "%B %Y"]:
+    for fmt in ["%Y-%m", "%Y/%m", "%m/%Y", "%m-%Y", "%b %Y", "%B %Y"]:
         try:
-            return datetime.strptime(cleaned, fmt).replace(day=1).date()
+            p_dt = datetime.strptime(cleaned, fmt)
+            last_day = calendar.monthrange(p_dt.year, p_dt.month)[1]
+            return p_dt.replace(day=last_day).date()
         except ValueError:
             continue
 
-    raise ValueError(f"Unsupported date format: {date_str}")
+    try:
+        if "T" in cleaned:
+            cleaned_iso = cleaned.split("T")[0]
+            return datetime.strptime(cleaned_iso, "%Y-%m-%d").date()
+    except Exception:
+        pass
+
+    logger.warning(f"Could not parse date string: {date_value}. Defaulting to +2 years.")
+    return (datetime.today() + timedelta(days=730)).date()
 
 
 # ===========================
@@ -599,17 +620,52 @@ def create_product(
 
     days_remaining, product_status = calculate_product_status(expiry)
 
-    effective_price = product.price if (product.price is not None and product.price > 0) else product.unit_price
+    selling_pr = getattr(product, 'selling_price', None)
+    effective_price = product.price if (product.price is not None and product.price > 0) else (selling_pr if (selling_pr is not None and selling_pr > 0) else product.unit_price)
     calc_total_price = product.total_price if product.total_price > 0 else (product.quantity * effective_price)
+
+    clean_name = product.product_name.strip()
+    existing = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            func.lower(models.Product.product_name) == clean_name.lower(),
+        )
+        .first()
+    )
+
+    if existing:
+        if product.quantity > 0:
+            existing.quantity = (existing.quantity or 0) + product.quantity
+        if effective_price > 0:
+            existing.unit_price = effective_price
+        if getattr(product, 'batch_number', None):
+            existing.batch_number = product.batch_number
+        if getattr(product, 'tablets_per_strip', None):
+            existing.tablets_per_strip = product.tablets_per_strip
+        if getattr(product, 'loose_tablet_price', None):
+            existing.loose_tablet_price = product.loose_tablet_price
+        if getattr(product, 'composition', None):
+            existing.composition = product.composition
+
+        existing.expiry_date = expiry
+        existing.days_remaining = days_remaining
+        existing.status = product_status
+        db.commit()
+        db.refresh(existing)
+        invalidate_products_cache(user_id)
+        return existing
 
     db_product = models.Product(
         user_id=user_id,
-        product_name=product.product_name,
+        product_name=clean_name,
         brand=product.brand,
-        category=product.category,
+        category=product.category or "General",
         batch_number=product.batch_number,
         quantity=product.quantity,
         unit_price=effective_price,
+        purchase_price=getattr(product, 'purchase_price', 0.0) or 0.0,
         total_price=calc_total_price,
         manufacturing_date=manufacturing,
         expiry_date=expiry,
@@ -617,6 +673,12 @@ def create_product(
         status=product_status,
         image_path=product.image_path,
         ocr_text=product.ocr_text,
+        composition=getattr(product, 'composition', None),
+        hsn_code=getattr(product, 'hsn_code', '3004') or '3004',
+        gst_rate=getattr(product, 'gst_rate', 12.0) or 12.0,
+        tablets_per_strip=getattr(product, 'tablets_per_strip', None) or getattr(product, 'units_per_pack', None),
+        units_per_pack=getattr(product, 'units_per_pack', None) or getattr(product, 'tablets_per_strip', None),
+        loose_tablet_price=getattr(product, 'loose_tablet_price', None),
     )
 
     db.add(db_product)

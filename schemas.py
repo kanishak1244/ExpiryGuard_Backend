@@ -107,7 +107,7 @@ class Token(BaseModel):
 class ProductBase(BaseModel):
     product_name: str
     brand: Optional[str] = None
-    category: str
+    category: Optional[str] = "General"
 
     hsn_code: Optional[str] = "3004"
     gst_rate: Optional[float] = 12.0
@@ -118,6 +118,7 @@ class ProductBase(BaseModel):
     # Retail selling price (support both unit_price and price aliases)
     unit_price: float = Field(default=0, ge=0)
     price: Optional[float] = Field(default=None, ge=0)
+    selling_price: Optional[float] = Field(default=None, ge=0)
 
     # Supplier purchase price.
     purchase_price: float = Field(default=0, ge=0)
@@ -139,6 +140,8 @@ class ProductBase(BaseModel):
     price_last_updated: Optional[datetime] = None
 
     units_per_pack: Optional[int] = None
+    tablets_per_strip: Optional[int] = None
+    loose_tablet_price: Optional[float] = None
     price_per_unit: Optional[float] = None
     is_countable: bool = True
     needs_review: bool = False
