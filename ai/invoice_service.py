@@ -6,6 +6,7 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List, Dict, Any
 
 from dotenv import load_dotenv
 from google.genai import types
