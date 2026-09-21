@@ -249,20 +249,35 @@ def scan_invoice(image_path: str) -> dict:
             if not validate_invoice_data(result):
                 raise ValueError("Extracted invoice JSON failed schema validation (no items found).")
 
-            # Extract header metadata
+            # Extract header metadata & financial totals
             raw_inv_date = result.get("invoice_date", "")
             norm_inv_date = _normalize_date(str(raw_inv_date))
             
-            raw_total = _safe_float(result.get("total_amount") or result.get("grand_total") or result.get("net_amount"))
             raw_subtotal = _safe_float(result.get("subtotal"))
+            raw_disc = _safe_float(result.get("discount_amount") or result.get("cd_amount"))
+            raw_taxable = _safe_float(result.get("taxable_amount"))
+            raw_cgst = _safe_float(result.get("cgst_amount"))
+            raw_sgst = _safe_float(result.get("sgst_amount"))
+            raw_igst = _safe_float(result.get("igst_amount"))
             raw_tax = _safe_float(result.get("tax_amount"))
+            raw_other = _safe_float(result.get("other_amount") or result.get("roundoff_amount"))
+            raw_total = _safe_float(result.get("total_amount") or result.get("grand_total") or result.get("net_amount"))
 
             raw_items = result.get("items", [])
             normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
 
-            # Compute total if missing
-            if raw_total == 0.0 and normalized_items:
-                raw_total = round(sum(it["total_price"] for it in normalized_items), 2)
+            # Reconcile calculations dynamically
+            if raw_subtotal == 0.0 and normalized_items:
+                raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in normalized_items), 2)
+
+            if raw_taxable == 0.0 and raw_subtotal > 0:
+                raw_taxable = round(max(0.0, raw_subtotal - raw_disc), 2)
+
+            if raw_tax == 0.0 and (raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0):
+                raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
+
+            if raw_total == 0.0 and raw_taxable > 0:
+                raw_total = round(raw_taxable + raw_tax + raw_other, 2)
 
             invoice = {
                 "supplier_name": str(result.get("supplier_name") or "").strip(),
@@ -272,15 +287,23 @@ def scan_invoice(image_path: str) -> dict:
                 "supplier_address": str(result.get("supplier_address") or "").strip(),
                 "invoice_number": str(result.get("invoice_number") or "").strip(),
                 "invoice_date": norm_inv_date,
-                "total_amount": raw_total,
                 "subtotal": raw_subtotal,
+                "discount_amount": raw_disc,
+                "cd_amount": raw_disc,
+                "taxable_amount": raw_taxable,
+                "cgst_amount": raw_cgst,
+                "sgst_amount": raw_sgst,
+                "igst_amount": raw_igst,
                 "tax_amount": raw_tax,
+                "other_amount": raw_other,
+                "total_amount": raw_total,
                 "items": normalized_items
             }
 
             logger.info(
-                f"[OCR:SUCCESS] Extracted Invoice: #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
-                f"Supplier: '{invoice['supplier_name']}' | Total: ₹{invoice['total_amount']} | Line Items: {len(normalized_items)}"
+                f"[OCR:SUCCESS] Invoice #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
+                f"Subtotal: ₹{invoice['subtotal']} | CD Amt: -₹{invoice['discount_amount']} | Taxable: ₹{invoice['taxable_amount']} | "
+                f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(normalized_items)}"
             )
 
             latency = time.time() - start_time
