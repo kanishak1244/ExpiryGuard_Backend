@@ -41,7 +41,7 @@ class _LazyGeminiClientProxy:
         return getattr(self._get_client(), name)
 
 client = _LazyGeminiClientProxy()
-GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.1-flash-lite")
+GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-2.5-flash-lite")
 
 # Centralized Barcode/QR Code Map (Cost-Saving Interceptor)
 BARCODE_MAP = {
