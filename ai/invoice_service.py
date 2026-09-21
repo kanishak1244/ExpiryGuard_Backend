@@ -6,7 +6,7 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 
 from dotenv import load_dotenv
 from google.genai import types
@@ -192,31 +192,44 @@ def validate_invoice_data(data: dict) -> bool:
     return True
 
 
-def scan_invoice(image_path: str) -> dict:
+def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/jpeg") -> dict:
     """
     Scan supplier invoice using Gemini Vision.
     Features image optimization, schema validation, and retry logic.
     """
     start_time = time.time()
-    
-    # 1. Optimize Image (Resize & Compress)
-    optimize_image(image_path)
 
-    image_file = Path(image_path)
-    if not image_file.exists():
-        logger.error(f"[OCR] File not found: {image_path}")
+    if isinstance(image_input, (str, Path)):
+        image_path = str(image_input)
+        optimize_image(image_path)
+        image_file = Path(image_path)
+        if not image_file.exists():
+            logger.error(f"[OCR] File not found: {image_path}")
+            return {
+                "success": False,
+                "data": None,
+                "error": "Image file not found."
+            }
+
+        guessed_mime, _ = mimetypes.guess_type(image_file)
+        if guessed_mime is not None:
+            mime_type = guessed_mime
+        else:
+            mime_type = "application/pdf" if image_file.suffix.lower() == ".pdf" else "image/jpeg"
+
+        image_bytes = image_file.read_bytes()
+        doc_label = image_path
+    elif isinstance(image_input, bytes):
+        image_bytes = image_input
+        doc_label = "raw_bytes"
+    else:
         return {
             "success": False,
             "data": None,
-            "error": "Image file not found."
+            "error": "Invalid image input format."
         }
 
-    mime_type, _ = mimetypes.guess_type(image_file)
-    if mime_type is None:
-        mime_type = "application/pdf" if image_file.suffix.lower() == ".pdf" else "image/jpeg"
-
-    image_bytes = image_file.read_bytes()
-    logger.info(f"[OCR:START] Scanning invoice document: {image_path} ({len(image_bytes)} bytes, mime: {mime_type})")
+    logger.info(f"[OCR:START] Scanning invoice document: {doc_label} ({len(image_bytes)} bytes, mime: {mime_type})")
 
     last_error = None
     target_model = GEMINI_PRIMARY_MODEL
