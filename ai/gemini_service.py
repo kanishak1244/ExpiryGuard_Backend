@@ -99,14 +99,14 @@ Output format:
 }
 """
 
-def optimize_image_bytes(image_bytes: bytes, max_size=(1024, 1024), quality=70) -> bytes:
+def optimize_image_bytes(image_bytes: bytes, max_size=(2560, 2560), quality=90) -> bytes:
     """
     Resizes and compresses raw image bytes in-memory using PIL / BytesIO.
-    Avoids disk read/write overhead for maximum pipeline speed.
+    Preserves high resolution for multi-item billing & purchase invoice OCR.
     """
     try:
         import io
-        if len(image_bytes) < 150 * 1024:  # If less than 150KB, skip to save CPU
+        if len(image_bytes) < 800 * 1024:  # If less than 800KB, skip to preserve raw clarity
             return image_bytes
 
         with Image.open(io.BytesIO(image_bytes)) as img:
@@ -124,17 +124,17 @@ def optimize_image_bytes(image_bytes: bytes, max_size=(1024, 1024), quality=70) 
         logger.warning(f"[IN-MEMORY OPTIMIZATION FAILED] {e}")
         return image_bytes
 
-def optimize_image(file_path: str, max_size=(1600, 1600), quality=80) -> str:
+def optimize_image(file_path: str, max_size=(2560, 2560), quality=90) -> str:
     """
     Resizes image if dimensions exceed max_size, and compresses it.
-    Modifies the file in-place to reduce upload payload and token footprint.
+    Modifies the file in-place to reduce upload payload while keeping full OCR text readability.
     """
     try:
         if not os.path.exists(file_path) or file_path.lower().endswith(".pdf"):
             return file_path
         
         file_size = os.path.getsize(file_path)
-        if file_size < 300 * 1024:  # If less than 300KB, skip to avoid over-compression
+        if file_size < 800 * 1024:  # If less than 800KB, skip to preserve crisp OCR detail
             return file_path
 
         with Image.open(file_path) as img:
