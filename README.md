@@ -99,43 +99,9 @@ flowchart LR
 
 ---
 
-## Quick Setup & Local Running
-
-### Backend
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env     # Configure database & API keys
-uvicorn app:app --reload --port 8000
-```
-
-### Web Dashboard (`public_site`)
-```bash
-cd public_site
-npm install
-npm run dev
-```
-
-### Mobile App (`flutter`)
-```bash
-cd flutter
-flutter pub get
-flutter run
-```
-
----
-
 ## Real-World Pilot & Impact
 
 DawaiFlow is being tested through real-world pharmacy workflows to validate medicine identification, purchase OCR, FEFO billing, and Khata tracking under live operational conditions.
-
-### Pilot Results
-- **Location / Pilot Site:** [ADD PILOT PHARMACY / LOCATION IF PUBLIC]
-- **Bills Processed:** [ADD NUMBER OF BILLS PROCESSED]
-- **Medicines / Transactions Tested:** [ADD NUMBER TESTED]
-- **Time Saved:** [ADD TIME SAVED, IF MEASURED]
-- **Accuracy Rate:** [ADD ACCURACY RESULT, IF MEASURED]
 
 ---
 
@@ -143,8 +109,5 @@ DawaiFlow is being tested through real-world pharmacy workflows to validate medi
 
 ### Team
 - **Institution:** Bharatiya Vidyapeeth College of Engineering, New Delhi
-- **Team Name:** [TEAM NAME]
-- **Members:** [MEMBER 1] | [MEMBER 2] | [MEMBER 3] | [MEMBER 4]
-
-### License
-[ADD LICENSE HERE]
+- **Team Name:** DAWAIFLOW
+- **Members:** Kanishak vashist | Jiya rawat 
