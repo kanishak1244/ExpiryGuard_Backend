@@ -266,155 +266,6 @@ ExpiryGuard_Backend/
 
 ---
 
-## Setup & Installation
-
-### A. Prerequisites
-Ensure you have the following installed on your local development system:
-- **Python**: Version 3.11 or higher
-- **Node.js**: Version 18.0 or higher (with `npm`)
-- **Flutter SDK**: Version 3.0 or higher (for mobile app testing)
-- **PostgreSQL**: Version 14 or higher (or cloud PostgreSQL instance like Supabase/Neon)
-- **Git**
-
-### B. Backend Setup
-1. Clone the repository and navigate to the project directory:
-   ```bash
-   git clone https://github.com/your-username/dawaiflow.git
-   cd dawaiflow
-   ```
-
-2. Create and activate a Python virtual environment:
-   ```bash
-   # On macOS/Linux:
-   python3 -m venv venv
-   source venv/bin/activate
-
-   # On Windows (PowerShell):
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-
-3. Install backend dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Configure environment variables (see [Environment Variables](#environment-variables) section below).
-
-5. Start the FastAPI server:
-   ```bash
-   uvicorn app:app --reload --host 0.0.0.0 --port 8000
-   ```
-   *Alternative:* You can also launch using `python start_server.py`.
-   The API interactive documentation will be available at `http://localhost:8000/docs`.
-
-### C. PostgreSQL Database Setup
-Ensure PostgreSQL is running locally or accessible via a remote URI. Set your `DATABASE_URL` in `.env`. FastAPI will automatically initialize the required database tables on startup via SQLAlchemy ORM.
-
-### D. Web Dashboard Setup
-1. Navigate to the `public_site` directory:
-   ```bash
-   cd public_site
-   ```
-
-2. Install Node dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-   The web dashboard will open at `http://localhost:3000` (or `http://localhost:5173`).
-
-### E. Flutter Mobile Setup
-1. Navigate to the `flutter` directory:
-   ```bash
-   cd flutter
-   ```
-
-2. Fetch Flutter package dependencies:
-   ```bash
-   flutter pub get
-   ```
-
-3. Ensure a device or emulator is connected:
-   ```bash
-   flutter devices
-   ```
-
-4. Run the application:
-   ```bash
-   flutter run
-   ```
-   *Note: Ensure the mobile app API configuration points to your local backend server IP address (e.g., `http://192.168.x.x:8000`) rather than `localhost` when testing on physical mobile devices.*
-
-### F. Running the Complete System
-To run the complete system locally:
-1. Start the PostgreSQL service.
-2. Launch the FastAPI backend server (`port 8000`).
-3. Launch the React web dashboard (`port 3000` / `5173`).
-4. Launch the Flutter mobile app on an Android/iOS emulator or connected test device.
-
----
-
-## Environment Variables
-
-Create a `.env` file in the root directory by copying the provided `.env.example` file:
-
-```bash
-cp .env.example .env
-```
-
-Fill in the environment variables with your local configuration (placeholders shown below):
-
-```env
-# Runtime Environment
-ENVIRONMENT=development
-PORT=8000
-
-# Database Connection (PostgreSQL)
-DATABASE_URL=postgresql://username:password@localhost:5432/dawaiflow
-
-# Cryptographic Security (JWT Signing)
-SECRET_KEY=your_secure_random_64_character_hex_key_here
-
-# CORS Allowed Origins
-ALLOWED_ORIGINS=http://localhost:8000,http://localhost:3000,http://localhost:5173
-
-# Google Gemini AI Configuration
-GEMINI_API_KEY=your_google_ai_studio_gemini_api_key_here
-GEMINI_PRIMARY_MODEL=gemini-3.1-flash-lite
-
-# Firebase Cloud Messaging (Push Notifications)
-FIREBASE_CREDENTIALS_PATH=credentials/firebase_key.json
-
-# SMTP Email Notifications
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_16_character_app_password
-MY_EMAIL=your_personal_receiving_email@gmail.com
-SMTP_FROM_NAME="DawaiFlow Alerts"
-
-# Web Dashboard (public_site/.env)
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-> ⚠️ **SECURITY WARNING:** Never commit real API keys, database passwords, JWT secret keys, Firebase service account credentials, or `.env` files to GitHub or any public source repository. Production AI credentials and service keys must always be secured server-side.
-
----
-
-## Demo
-
-### Video Demo
-[Video Demo Link]
-
-### Live Demo
-[Live Demo Link]
-
----
 
 ## Real-World Impact
 
@@ -428,22 +279,6 @@ Pilot testing focuses on validating key core workflows in live environments:
 - Expiry risk tracking and inventory value-at-risk monitoring
 - Customer Khata balance tracking and WhatsApp payment reminders
 - Supplier return and credit ledger management
-
-### Pilot Results
-
-[ADD PILOT PHARMACY / LOCATION IF PUBLIC]
-
-[ADD NUMBER OF BILLS PROCESSED]
-
-[ADD NUMBER OF MEDICINES / TRANSACTIONS TESTED]
-
-[ADD TIME SAVED, IF MEASURED]
-
-[ADD ERROR-REDUCTION / ACCURACY RESULT, IF MEASURED]
-
-[ADD OTHER VERIFIED PILOT METRICS]
-
----
 
 ## Feasibility & Scalability
 
@@ -491,21 +326,14 @@ DawaiFlow was built for the **Innovate Without Borders** hackathon under the **H
 ---
 
 ## Team
-
-### Team Name
-[TEAM NAME]
+DAWAIFLOW
+[
 
 ### Members
-- [MEMBER 1 — NAME] — [ROLE]
-- [MEMBER 2 — NAME] — [ROLE]
-- [MEMBER 3 — NAME] — [ROLE]
-- [MEMBER 4 — NAME] — [ROLE]
+Kanishak vashist
+Jiya rawat
 
 **Institution:**  
 Bharatiya Vidyapeeth College of Engineering, New Delhi
 
 ---
-
-## License
-
-[ADD LICENSE HERE]
