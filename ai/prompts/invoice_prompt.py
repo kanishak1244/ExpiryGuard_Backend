@@ -8,7 +8,10 @@ header-level financial summaries, and all line items from Indian pharmacy suppli
 INVOICE_PROMPT = """
 You are an expert AI Indian pharmaceutical invoice & receipt reader for pharmacy inventory management.
 
-Analyze this supplier purchase invoice document / image carefully. Extract ALL visible header metadata, summary financial totals (Subtotal, CD Amt / Discount, Taxable Base, CGST, SGST, Total Tax, Other Adjustments, Grand Total), and EVERY SINGLE line item from the invoice table.
+Analyze the provided supplier purchase invoice photo(s) / document page(s) carefully.
+The image(s) represent 1 or consecutive pages/photos of ONE SINGLE pharmacy purchase invoice.
+
+Extract ALL visible header metadata, summary financial totals (Subtotal, CD Amt / Discount, Taxable Base, CGST, SGST, Total Tax, Other Adjustments, Grand Total), and EVERY SINGLE line item across ALL pages into ONE combined invoice response.
 
 Return strict valid JSON with the following schema:
 
@@ -48,14 +51,17 @@ Return strict valid JSON with the following schema:
       "hsn_code": "3004",
       "expiry_date": "YYYY-MM-DD. Convert MM/YY (e.g. 3/28 or 03/28) to 2028-03-01. Return null if unreadable.",
       "manufacturing_date": "YYYY-MM-DD or null",
+      "page_number": 1,
       "confidence": 0.95
     }
   ]
 }
 
-CRITICAL RULES:
-1. EXTRACT ALL LINE ITEMS: Extract EVERY SINGLE medicine row in the table, regardless of whether there are 1, 5, 10, 14, 20, 50, or 100+ line items. Do not truncate or limit items.
-2. FINANCIAL SUMMARY EXTRACTION:
+CRITICAL MULTI-PAGE & EXTRACTION RULES:
+1. COMBINE ALL PAGES INTO ONE INVOICE: Treat all provided images as consecutive pages of ONE single invoice. Extract every line item from Page 1, Page 2, Page 3, etc. into the single "items" array in sequence. Do NOT limit items (10, 20, 30, 50+ items).
+2. TRACK PAGE NUMBERS: For each item in "items", set "page_number" to 1 for items on the first photo/page, 2 for the second photo/page, etc.
+3. FINANCIAL SUMMARY EXTRACTION:
+   - Extract summary financial totals (Subtotal, CD Amt, Taxable Base, CGST, SGST, Total Tax, Other Adjustments, Grand Total) from the document (usually on Page 1 header or final page footer).
    - "subtotal": Gross line item total before CD Amt / invoice discount (e.g. 6135.60).
    - "discount_amount" / "cd_amount": Cash Discount (CD Amt) or Trade Discount printed in summary footer (e.g., CD Amt = 245.42).
    - "taxable_amount": Net taxable base (e.g. Subtotal - Discount = 5890.18).
@@ -63,27 +69,20 @@ CRITICAL RULES:
    - "tax_amount": Total GST amount (e.g. 294.50).
    - "other_amount": Other adjustments, TCS, or round-off printed at footer (e.g., OTHER = -0.32). Preserve negative sign (-0.32).
    - "total_amount": Final Net Payable Invoice Value printed on invoice (e.g. 6185.00).
-3. PTR vs MRP:
+4. PTR vs MRP:
    - P.T.R. (Price to Retailer / Purchase Rate / Rate) is the wholesale price charged to the pharmacy for 1 unit/pack.
    - M.R.P. is the Maximum Retail Price printed on the package.
    - Extract PTR into "ptr", "unit_price", and "purchase_price". Extract MRP into "mrp".
-   - If PTR is not explicitly named but Rate or Amount & Qty are visible, calculate ptr = row_amount / quantity.
    - DO NOT copy MRP into ptr or purchase_price.
-4. GST %:
-   - Extract the total GST percentage (CGST% + SGST% or IGST%) into "gst_rate" as a float (e.g. 5.0, 12.0, 18.0, 0.0).
-   - If CGST (2.5%) and SGST (2.5%) are separate columns, add them (5.0).
-   - If GST% is not readable or missing, return JSON null. DO NOT DEFAULT TO 12.0!
-5. QUANTITY & SCHEME / FREE QTY:
+5. GST %:
+   - Extract total GST percentage (CGST% + SGST% or IGST%) into "gst_rate" as a float (e.g. 5.0, 12.0, 18.0, 0.0). If missing, return JSON null. DO NOT DEFAULT TO 12.0!
+6. QUANTITY & SCHEME / FREE QTY:
    - "quantity": Billed quantity as an integer.
    - "free_qty": Free / scheme quantity (e.g., if 10+2 is written, quantity is 10 and free_qty is 2). Default free_qty to 0.
-   - If quantity is unreadable or missing, return JSON null. DO NOT DEFAULT TO 1!
-6. EXPIRY DATE:
-   - Convert MM/YY (e.g. "3/28", "03/28") to "2028-03-01".
-   - Convert MM/YYYY (e.g. "09/2028") to "2028-09-01".
-   - Convert DD-MM-YYYY or DD/MM/YYYY to "YYYY-MM-DD".
-   - If unreadable, return JSON null.
-7. NO SILENT DEFAULTS:
-   - If a numeric field (quantity, ptr, mrp, gst_rate, expiry_date, batch_number) is missing or unreadable, return JSON null instead of inventing values or defaulting to 1, 0.0, or 12.0.
-8. Return ONLY valid JSON. Do not wrap in markdown backticks.
+7. EXPIRY DATE:
+   - Convert MM/YY (e.g. "3/28", "03/28") to "2028-03-01". If unreadable, return JSON null.
+8. NO SILENT DEFAULTS:
+   - If a numeric field is missing or unreadable, return JSON null instead of inventing values or defaulting to 1, 0.0, or 12.0.
+9. Return ONLY valid JSON. Do not wrap in markdown backticks.
 """
 

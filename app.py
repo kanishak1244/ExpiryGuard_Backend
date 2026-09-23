@@ -5735,35 +5735,43 @@ def scan_multi_item_endpoint(
 @limiter.limit("30/hour")
 def scan_invoice_endpoint(
     request: Request,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    files: Optional[List[UploadFile]] = File(None),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Scans a purchase bill invoice document (PDF/JPEG/PNG) using Gemini Vision Purchase Invoice OCR.
-    Handles invoices with 1, 5, 10, 14, 20, 50, 100+ line items with full fidelity.
-    Extracts PTR, MRP, GST%, Discount%, Batch, Expiry, Supplier info, and Invoice Number.
+    Scans single or multi-page purchase bill invoice documents (JPEG/PNG/PDF) using Gemini Vision OCR.
+    Combines consecutive pages into ONE purchase invoice and extracts all line items across all pages.
     """
-    extension = Path(file.filename or "").suffix.lower()
-    if extension not in ALLOWED_DOC_EXTENSIONS:
-        extension = ".jpg"
+    upload_list = []
+    if files and len(files) > 0:
+        upload_list = files
+    elif file is not None:
+        upload_list = [file]
 
-    check_file_size(file, MAX_FILE_SIZE_10MB)
-    file_bytes = file.file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded invoice file is empty.")
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="No invoice files provided.")
 
-    validate_file_content_and_magic(file_bytes, extension)
+    image_bytes_list = []
+    for f in upload_list:
+        ext = Path(f.filename or "").suffix.lower()
+        if ext not in ALLOWED_DOC_EXTENSIONS:
+            ext = ".jpg"
 
-    temp_dir = BASE_DIR / "temp_uploads"
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_file_path = temp_dir / f"invoice_{uuid.uuid4().hex}{extension}"
+        check_file_size(f, MAX_FILE_SIZE_10MB)
+        file_bytes = f.file.read()
+        if not file_bytes:
+            continue
+
+        validate_file_content_and_magic(file_bytes, ext)
+        image_bytes_list.append(file_bytes)
+
+    if not image_bytes_list:
+        raise HTTPException(status_code=400, detail="Uploaded invoice files were empty or invalid.")
 
     try:
-        with open(temp_file_path, "wb") as f:
-            f.write(file_bytes)
-
-        scan_res = scan_invoice(str(temp_file_path))
+        scan_res = scan_invoice(image_bytes_list)
         if not scan_res.get("success"):
             raise HTTPException(
                 status_code=502,

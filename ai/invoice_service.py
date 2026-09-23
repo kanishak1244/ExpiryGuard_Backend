@@ -152,6 +152,7 @@ def _normalize_item(item: dict) -> dict:
     hsn = str(item.get("hsn_code") or "").strip()
     brand = str(item.get("brand") or "").strip()
     unit = str(item.get("unit") or "strip").strip()
+    page_no = _safe_int(item.get("page_number"), default=1)
     confidence = _safe_float(item.get("confidence"), default=1.0)
     
     needs_review = len(review_reasons) > 0
@@ -174,6 +175,7 @@ def _normalize_item(item: dict) -> dict:
         "expiry_date": exp_date,
         "hsn_code": hsn,
         "gst_rate": gst_val,
+        "page_number": page_no,
         "confidence": confidence,
         "needs_review": needs_review,
         "review_reasons": review_reasons,
@@ -197,44 +199,48 @@ def validate_invoice_data(data: dict) -> bool:
     return True
 
 
-def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/jpeg") -> dict:
+def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, bytes]]], mime_type: str = "image/jpeg") -> dict:
     """
     Scan supplier invoice using Gemini Vision.
-    Features image optimization, schema validation, and retry logic.
+    Supports single or multiple image/page inputs belonging to the same invoice.
+    Features image optimization, multi-page chunking, schema validation, overlap deduplication, and retry logic.
     """
     start_time = time.time()
 
-    if isinstance(image_input, (str, Path)):
-        image_path = str(image_input)
-        optimize_image(image_path)
-        image_file = Path(image_path)
-        if not image_file.exists():
-            logger.error(f"[OCR] File not found: {image_path}")
-            return {
-                "success": False,
-                "data": None,
-                "error": "Image file not found."
-            }
-
-        guessed_mime, _ = mimetypes.guess_type(image_file)
-        if guessed_mime is not None:
-            mime_type = guessed_mime
-        else:
-            mime_type = "application/pdf" if image_file.suffix.lower() == ".pdf" else "image/jpeg"
-
-        image_bytes = image_file.read_bytes()
-        doc_label = image_path
-    elif isinstance(image_input, bytes):
-        image_bytes = image_input
-        doc_label = "raw_bytes"
+    # Normalize image_input to a list of (image_bytes, mime_type)
+    image_items = []
+    if isinstance(image_input, list):
+        input_list = image_input
     else:
+        input_list = [image_input]
+
+    for inp in input_list:
+        if isinstance(inp, (str, Path)):
+            ipath = str(inp)
+            optimize_image(ipath)
+            ifile = Path(ipath)
+            if not ifile.exists():
+                logger.error(f"[OCR] File not found: {ipath}")
+                continue
+            guessed_mime, _ = mimetypes.guess_type(ifile)
+            mtype = guessed_mime or ("application/pdf" if ifile.suffix.lower() == ".pdf" else "image/jpeg")
+            image_items.append((ifile.read_bytes(), mtype))
+        elif isinstance(inp, bytes):
+            image_items.append((inp, mime_type))
+
+    if not image_items:
         return {
             "success": False,
             "data": None,
-            "error": "Invalid image input format."
+            "error": "No valid image files provided."
         }
 
-    logger.info(f"[OCR:START] Scanning invoice document: {doc_label} ({len(image_bytes)} bytes, mime: {mime_type})")
+    logger.info(f"[OCR:START] Scanning invoice document with {len(image_items)} page image(s)...")
+
+    # Build Gemini prompt contents with all image parts in user-selected page order
+    contents = [INVOICE_PROMPT]
+    for ibytes, mtype in image_items:
+        contents.append(types.Part.from_bytes(data=ibytes, mime_type=mtype))
 
     last_error = None
     candidate_models = [
@@ -250,13 +256,10 @@ def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/j
 
     for target_model in candidate_models:
         try:
-            logger.info(f"[OCR:TRY] Attempting invoice OCR with model: {target_model}")
+            logger.info(f"[OCR:TRY] Attempting invoice OCR ({len(image_items)} pages) with model: {target_model}")
             response = client.models.generate_content(
                 model=target_model,
-                contents=[
-                    INVOICE_PROMPT,
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                ],
+                contents=contents,
                 config=types.GenerateContentConfig(
                     temperature=0.0,
                     response_mime_type="application/json",
@@ -294,9 +297,34 @@ def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/j
             raw_items = result.get("items", [])
             normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
 
+            # Deduplicate overlapping rows across multi-photo scans
+            deduped_items = []
+            seen_signatures = set()
+            for it in normalized_items:
+                name_clean = re.sub(r"[^a-z0-9]", "", (it.get("product_name") or "").lower())
+                batch_clean = re.sub(r"[^a-z0-9]", "", (it.get("batch_number") or "").lower())
+                qty = str(it.get("quantity") or "")
+                ptr = f"{it.get('ptr') or 0.0:.2f}"
+                
+                if name_clean and batch_clean:
+                    sig = f"{name_clean}|{batch_clean}|{qty}|{ptr}"
+                    if sig in seen_signatures:
+                        logger.info(f"[OCR:DEDUP] Dropped overlapping duplicate line item '{it.get('product_name')}' (Batch {it.get('batch_number')})")
+                        continue
+                    seen_signatures.add(sig)
+                elif name_clean and not batch_clean:
+                    exp = str(it.get("expiry_date") or "")
+                    sig = f"{name_clean}|nobatch|{qty}|{ptr}|{exp}"
+                    if sig in seen_signatures:
+                        logger.info(f"[OCR:DEDUP] Dropped duplicate line item '{it.get('product_name')}' without batch")
+                        continue
+                    seen_signatures.add(sig)
+                    
+                deduped_items.append(it)
+
             # Reconcile calculations dynamically
-            if raw_subtotal == 0.0 and normalized_items:
-                raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in normalized_items), 2)
+            if raw_subtotal == 0.0 and deduped_items:
+                raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in deduped_items), 2)
 
             if raw_taxable == 0.0 and raw_subtotal > 0:
                 raw_taxable = round(max(0.0, raw_subtotal - raw_disc), 2)
@@ -325,13 +353,13 @@ def scan_invoice(image_input: Union[str, Path, bytes], mime_type: str = "image/j
                 "tax_amount": raw_tax,
                 "other_amount": raw_other,
                 "total_amount": raw_total,
-                "items": normalized_items
+                "items": deduped_items
             }
 
             logger.info(
                 f"[OCR:SUCCESS] Invoice #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
                 f"Subtotal: ₹{invoice['subtotal']} | CD Amt: -₹{invoice['discount_amount']} | Taxable: ₹{invoice['taxable_amount']} | "
-                f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(normalized_items)}"
+                f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(deduped_items)}"
             )
 
             latency = time.time() - start_time
