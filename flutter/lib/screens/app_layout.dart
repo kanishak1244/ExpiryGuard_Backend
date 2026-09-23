@@ -243,11 +243,9 @@ class _AppLayoutState extends State<AppLayout> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // Primary KPI: Today's Sales
             _buildKPIKard('Today\'s Sales', '₹${_todaySales.toStringAsFixed(2)}', Icons.trending_up, AppColors.statusSafe, sub: '$_todayBillsCount Bills'),
             const SizedBox(height: AppSpacing.md),
 
-            // Secondary KPIs Grid
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
@@ -262,7 +260,6 @@ class _AppLayoutState extends State<AppLayout> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // SECTION: NEEDS YOUR ATTENTION -> SMART ACTION CENTER
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
@@ -311,7 +308,6 @@ class _AppLayoutState extends State<AppLayout> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // Returned Items Management Banner
             InkWell(
               onTap: () => _selectModule('Returned Items'),
               borderRadius: BorderRadius.circular(12),

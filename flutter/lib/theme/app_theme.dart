@@ -3,7 +3,6 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 import 'app_spacing.dart';
 
-/// DawaiFlow Shared ThemeData
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -163,7 +162,6 @@ class AppTheme {
   }
 }
 
-/// Global Single Source of Truth for Flutter Theme State
 class AppThemeController extends ChangeNotifier {
   static final AppThemeController instance = AppThemeController._internal();
   AppThemeController._internal();

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-/// DawaiFlow Clinical Pharmacy Design System — Typography & Numeric Scales
 class AppTypography {
   static const String fontUi = 'Inter';
   static const String fontMono = 'JetBrainsMono';
 
-  // Headings
   static const TextStyle displayLarge = TextStyle(
     fontFamily: fontUi,
     fontSize: 24,
@@ -37,7 +35,6 @@ class AppTypography {
     color: AppColors.textPrimary,
   );
 
-  // Body Text
   static const TextStyle body = TextStyle(
     fontFamily: fontUi,
     fontSize: 13.5,
@@ -69,7 +66,6 @@ class AppTypography {
     height: 1.2,
   );
 
-  // Dedicated Tabular Numerics for Invoicing, Batch Codes, and Prices
   static const TextStyle numericGrandTotal = TextStyle(
     fontFamily: fontMono,
     fontSize: 22,
