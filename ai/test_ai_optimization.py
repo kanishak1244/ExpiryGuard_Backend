@@ -107,6 +107,16 @@ def test_scan_multi_item():
     print(f"Extracted items count: {len(res.get('items', []))}")
     print(f"Errors (if any): {res.get('error')}")
 
+def test_scan_multi_page_invoice():
+    print("\n--- Testing scan_invoice with Multiple Image Pages (Multi-Photo Scan) ---")
+    t0 = time.time()
+    res = scan_invoice([TEST_IMAGE, TEST_IMAGE])
+    t1 = time.time()
+    print(f"multi_page_invoice latency: {t1-t0:.2f}s")
+    print(f"Response success status: {res.get('success')}")
+    items = res.get('data', {}).get('items', []) if res.get('data') else []
+    print(f"Extracted items count across pages: {len(items)}")
+
 def test_ai_chat():
     print("\n--- Testing AI Assistant Chat (Grounded RAG) ---")
     from database import SessionLocal
@@ -128,6 +138,7 @@ if __name__ == "__main__":
     test_label_validation()
     test_scan_label()
     test_scan_invoice()
+    test_scan_multi_page_invoice()
     test_scan_multi_item()
     test_ai_chat()
     print("\n========== ALL AI OPTIMIZATION DIAGNOSTIC TESTS PASSED ==========")
