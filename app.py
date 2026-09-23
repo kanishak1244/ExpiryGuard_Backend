@@ -5817,12 +5817,11 @@ def scan_invoice_endpoint(
             "needs_review": has_review,
             "error": None
         }
-    finally:
-        if temp_file_path.exists():
-            try:
-                os.remove(temp_file_path)
-            except Exception:
-                pass
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.error(f"[SCAN_INVOICE_ENDPOINT_ERROR] {err}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Invoice OCR error: {err}")
 
 
 
