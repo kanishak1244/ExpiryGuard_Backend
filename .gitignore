@@ -4,6 +4,9 @@
 .env.production
 .env.development
 
+# Proprietary AI Prompts & Templates
+ai/prompts/
+
 # Service Account Credentials
 credentials/
 *.json
