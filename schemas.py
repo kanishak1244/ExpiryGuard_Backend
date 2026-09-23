@@ -90,6 +90,9 @@ class UserProfileUpdate(BaseModel):
     preferred_theme: Optional[str] = None
 
 
+UserSettingsUpdate = UserProfileUpdate
+
+
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6)

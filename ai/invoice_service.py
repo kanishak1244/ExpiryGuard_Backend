@@ -285,14 +285,23 @@ def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, byte
             norm_inv_date = _normalize_date(str(raw_inv_date))
             
             raw_subtotal = _safe_float(result.get("subtotal"))
-            raw_disc = _safe_float(result.get("discount_amount") or result.get("cd_amount"))
+            raw_scheme = _safe_float(result.get("scheme_amount"))
+            raw_cd = _safe_float(result.get("cd_amount"))
+            raw_disc = _safe_float(result.get("discount_amount"))
+            if raw_disc == 0.0 and (raw_scheme > 0 or raw_cd > 0):
+                raw_disc = round(raw_scheme + raw_cd, 2)
+                
             raw_taxable = _safe_float(result.get("taxable_amount"))
             raw_cgst = _safe_float(result.get("cgst_amount"))
             raw_sgst = _safe_float(result.get("sgst_amount"))
             raw_igst = _safe_float(result.get("igst_amount"))
             raw_tax = _safe_float(result.get("tax_amount"))
+            if raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0:
+                raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
+
             raw_other = _safe_float(result.get("other_amount") or result.get("roundoff_amount"))
             raw_total = _safe_float(result.get("total_amount") or result.get("grand_total") or result.get("net_amount"))
+            raw_total_label = str(result.get("total_amount_label") or "").strip()
 
             raw_items = result.get("items", [])
             normalized_items = [_normalize_item(it) for it in raw_items if isinstance(it, dict)]
@@ -323,17 +332,52 @@ def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, byte
                 deduped_items.append(it)
 
             # Reconcile calculations dynamically
+            calculated_subtotal = round(sum((it.get("total_price") or 0.0) for it in deduped_items), 2)
             if raw_subtotal == 0.0 and deduped_items:
-                raw_subtotal = round(sum((it.get("total_price") or 0.0) for it in deduped_items), 2)
+                raw_subtotal = calculated_subtotal
 
+            effective_discounts = raw_disc if raw_disc > 0 else (raw_scheme + raw_cd)
+            calculated_taxable = round(max(0.0, raw_subtotal - effective_discounts), 2)
             if raw_taxable == 0.0 and raw_subtotal > 0:
-                raw_taxable = round(max(0.0, raw_subtotal - raw_disc), 2)
+                raw_taxable = calculated_taxable
 
-            if raw_tax == 0.0 and (raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0):
-                raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
-
+            calculated_net_total = round(raw_taxable + raw_tax + raw_other, 2)
             if raw_total == 0.0 and raw_taxable > 0:
-                raw_total = round(raw_taxable + raw_tax + raw_other, 2)
+                raw_total = calculated_net_total
+
+            # Field-level reconciliation verification
+            subtotal_match = abs(raw_subtotal - calculated_subtotal) <= 1.00
+            net_total_match = abs(raw_total - calculated_net_total) <= 1.00
+
+            reconciliation = {
+                "subtotal_status": "PASS" if subtotal_match else "REVIEW",
+                "calculated_subtotal": calculated_subtotal,
+                "printed_subtotal": raw_subtotal,
+                "subtotal_diff": round(raw_subtotal - calculated_subtotal, 2),
+
+                "discount_status": "PASS",
+                "scheme_amount": raw_scheme,
+                "cd_amount": raw_cd,
+                "total_discount": effective_discounts,
+
+                "taxable_status": "PASS" if abs(raw_taxable - calculated_taxable) <= 1.00 else "REVIEW",
+                "calculated_taxable": calculated_taxable,
+                "printed_taxable": raw_taxable,
+
+                "gst_status": "PASS",
+                "cgst_amount": raw_cgst,
+                "sgst_amount": raw_sgst,
+                "igst_amount": raw_igst,
+                "total_gst": raw_tax,
+
+                "net_total_status": "PASS" if net_total_match else "REVIEW",
+                "calculated_net_total": calculated_net_total,
+                "printed_net_total": raw_total,
+                "net_total_diff": round(raw_total - calculated_net_total, 2),
+                "total_amount_label": raw_total_label,
+
+                "overall_status": "PASS" if (subtotal_match and net_total_match) else "REVIEW",
+            }
 
             invoice = {
                 "supplier_name": str(result.get("supplier_name") or "").strip(),
@@ -344,8 +388,9 @@ def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, byte
                 "invoice_number": str(result.get("invoice_number") or "").strip(),
                 "invoice_date": norm_inv_date,
                 "subtotal": raw_subtotal,
+                "scheme_amount": raw_scheme,
+                "cd_amount": raw_cd,
                 "discount_amount": raw_disc,
-                "cd_amount": raw_disc,
                 "taxable_amount": raw_taxable,
                 "cgst_amount": raw_cgst,
                 "sgst_amount": raw_sgst,
@@ -353,13 +398,16 @@ def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, byte
                 "tax_amount": raw_tax,
                 "other_amount": raw_other,
                 "total_amount": raw_total,
+                "total_amount_label": raw_total_label,
+                "reconciliation": reconciliation,
                 "items": deduped_items
             }
 
             logger.info(
                 f"[OCR:SUCCESS] Invoice #{invoice['invoice_number']} | Date: {invoice['invoice_date']} | "
-                f"Subtotal: ₹{invoice['subtotal']} | CD Amt: -₹{invoice['discount_amount']} | Taxable: ₹{invoice['taxable_amount']} | "
-                f"GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | Total: ₹{invoice['total_amount']} | Items: {len(deduped_items)}"
+                f"Subtotal: ₹{invoice['subtotal']} | Scheme: -₹{invoice['scheme_amount']} | CD Amt: -₹{invoice['cd_amount']} | "
+                f"Taxable: ₹{invoice['taxable_amount']} | GST: ₹{invoice['tax_amount']} | Other: ₹{invoice['other_amount']} | "
+                f"Total: ₹{invoice['total_amount']} ({invoice['total_amount_label']}) | Reconciliation: {reconciliation['overall_status']} | Items: {len(deduped_items)}"
             )
 
             latency = time.time() - start_time

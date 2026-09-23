@@ -24,15 +24,17 @@ Return strict valid JSON with the following schema:
   "invoice_number": "Invoice / Bill Number (e.g. CA006418, INV-2048, 24-25/1042) (string or null)",
   "invoice_date": "Invoice date formatted strictly as YYYY-MM-DD (e.g. 2026-07-29). Convert DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD.",
   "subtotal": 6135.60,
-  "discount_amount": 245.42,
+  "scheme_amount": 83.79,
+  "discount_amount": 83.79,
   "cd_amount": 245.42,
-  "taxable_amount": 5890.18,
+  "taxable_amount": 5806.39,
   "cgst_amount": 147.25,
   "sgst_amount": 147.25,
   "igst_amount": 0.0,
   "tax_amount": 294.50,
   "other_amount": -0.32,
-  "total_amount": 6185.00,
+  "total_amount": 6100.57,
+  "total_amount_label": "Invoice Value Net",
   "items": [
     {
       "product_name": "Full medicine / item description including packing and strength (e.g. ELTROXIN 75 MG 100'S, PAN 40 TAB)",
@@ -61,14 +63,18 @@ CRITICAL MULTI-PAGE & EXTRACTION RULES:
 1. COMBINE ALL PAGES INTO ONE INVOICE: Treat all provided images as consecutive pages of ONE single invoice. Extract every line item from Page 1, Page 2, Page 3, etc. into the single "items" array in sequence. Do NOT limit items (10, 20, 30, 50+ items).
 2. TRACK PAGE NUMBERS: For each item in "items", set "page_number" to 1 for items on the first photo/page, 2 for the second photo/page, etc.
 3. FINANCIAL SUMMARY EXTRACTION:
-   - Extract summary financial totals (Subtotal, CD Amt, Taxable Base, CGST, SGST, Total Tax, Other Adjustments, Grand Total) from the document (usually on Page 1 header or final page footer).
-   - "subtotal": Gross line item total before CD Amt / invoice discount (e.g. 6135.60).
-   - "discount_amount" / "cd_amount": Cash Discount (CD Amt) or Trade Discount printed in summary footer (e.g., CD Amt = 245.42).
-   - "taxable_amount": Net taxable base (e.g. Subtotal - Discount = 5890.18).
+   - Extract summary financial totals (Subtotal, Scheme Amt, CD Amt, Taxable Base, CGST, SGST, Total Tax, Other Adjustments, Grand Total) from the document (usually on Page 1 header or final page footer).
+   - "subtotal": Gross line item total before discounts (e.g. 6135.60 or sum of Qty * PTR).
+   - "scheme_amount": Trade / Scheme discount printed in summary footer (e.g., Scheme Amt = 83.79). If none, set 0.0.
+   - "cd_amount": Cash Discount (CD Amt / CD %) printed in summary footer (e.g., CD Amt = 245.42). If none, set 0.0.
+   - "discount_amount": Total discount (sum of scheme_amount + cd_amount or total line discounts).
+   - "taxable_amount": Net taxable base (e.g. Subtotal - Scheme - CD = 5806.39).
    - "cgst_amount" & "sgst_amount": CGST (e.g. 147.25) and SGST (e.g. 147.25) printed at summary.
    - "tax_amount": Total GST amount (e.g. 294.50).
    - "other_amount": Other adjustments, TCS, or round-off printed at footer (e.g., OTHER = -0.32). Preserve negative sign (-0.32).
-   - "total_amount": Final Net Payable Invoice Value printed on invoice (e.g. 6185.00).
+   - "total_amount": Final Net Payable Invoice Value printed on invoice (e.g. 12986.80 or 6100.57).
+   - "total_amount_label": Extract the exact printed label text adjacent to total_amount (e.g., "Invoice Value Net", "Net Amount", "Grand Total", "Total Payable").
+   - STRICT RULE FOR TOTAL AMOUNT: Extract "total_amount" ONLY from explicit net payable invoice total labels like "Invoice Value Net", "Net Amount", "Grand Total", "Total Payable", "Net Payable", or "Bill Total". NEVER, UNDER ANY CIRCUMSTANCES, select "Total MRP", "MRP Total", "Previous Balance", "Current Balance", "Account Balance", "Balance Due", or "Amount in words" if it represents account balance or MRP total.
 4. PTR vs MRP:
    - P.T.R. (Price to Retailer / Purchase Rate / Rate) is the wholesale price charged to the pharmacy for 1 unit/pack.
    - M.R.P. is the Maximum Retail Price printed on the package.
