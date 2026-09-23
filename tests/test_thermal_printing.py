@@ -15,12 +15,12 @@ import json
 from datetime import datetime
 
 # Setup paths
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import models
 import schemas
 import crud
-import thermal_formatter
+from services import thermal_formatter
 from database import SessionLocal, engine
 from fastapi import Depends
 from sqlalchemy.orm import Session

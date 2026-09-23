@@ -3,7 +3,7 @@ import os
 import json
 from sqlalchemy import text
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import engine, Base
 import models

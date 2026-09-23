@@ -23,10 +23,10 @@ from dependencies import (
 import models
 import schemas
 import crud
-from pdf_generator import generate_invoice_pdf
-import thermal_formatter
-import backup_service
-import import_service
+from services.pdf_generator import generate_invoice_pdf
+from services import thermal_formatter
+from services import backup_service
+from services import import_service
 
 logger = logging.getLogger("expiryguard.routes.documents")
 

@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from notification_service import send_expiry_notifications
+from services.notification_service import send_expiry_notifications
 from database import SessionLocal
 import crud
 
@@ -21,7 +21,7 @@ def purge_expired_inventory_job():
 
 def automated_backup_job():
     """Daily scheduled backup job for all active pharmacies."""
-    import backup_service
+    from services import backup_service
     import models
     db = SessionLocal()
     try:

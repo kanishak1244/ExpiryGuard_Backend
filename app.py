@@ -26,7 +26,7 @@ import models
 import schemas
 import crud
 from scheduler import start_scheduler
-from email_service import check_smtp_health
+from services.email_service import check_smtp_health
 
 # Domain Routers
 from routes import (
