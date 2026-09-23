@@ -4,7 +4,6 @@
 
 DawaiFlow is an AI-powered billing and inventory management platform designed for independent pharmacies in India. It connects medicine identification, purchase intake, inventory, billing, payments, expiry management and pharmacy operations into one connected workflow.
 
-- **Hackathon:** Innovate Without Borders  
 - **Category:** Healthcare & MedTech
 
 ---
