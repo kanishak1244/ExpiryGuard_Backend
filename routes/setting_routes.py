@@ -84,3 +84,57 @@ def register_fcm_token(
         raise HTTPException(status_code=400, detail="fcm_token is required")
     crud.register_fcm_token(db, current_user.id, token)
     return {"message": "FCM token registered"}
+
+
+# ==============================================================================
+# STORE BRANCHES & MULTI-LOCATION ENDPOINTS
+# ==============================================================================
+
+@router.get("/branches", response_model=List[schemas.StoreBranchResponse])
+def get_store_branches(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retrieve list of store/pharmacy branches."""
+    return crud.get_store_branches(db, current_user.id)
+
+
+@router.post("/branches", response_model=schemas.StoreBranchResponse, status_code=201)
+def create_store_branch(
+    branch_data: schemas.StoreBranchCreate,
+    current_user: AuthenticatedUser = Depends(require_permission("SETTINGS_EDIT")),
+    db: Session = Depends(get_db),
+):
+    """Create a new store branch."""
+    created = crud.create_store_branch(db, branch_data, current_user.id)
+    fast_cache.invalidate_user(current_user.id)
+    return created
+
+
+@router.put("/branches/{branch_id}", response_model=schemas.StoreBranchResponse)
+def update_store_branch(
+    branch_id: int,
+    branch_data: schemas.StoreBranchUpdate,
+    current_user: AuthenticatedUser = Depends(require_permission("SETTINGS_EDIT")),
+    db: Session = Depends(get_db),
+):
+    """Update store branch details."""
+    updated = crud.update_store_branch(db, branch_id, branch_data, current_user.id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Store branch not found")
+    fast_cache.invalidate_user(current_user.id)
+    return updated
+
+
+@router.delete("/branches/{branch_id}")
+def delete_store_branch(
+    branch_id: int,
+    current_user: AuthenticatedUser = Depends(require_permission("SETTINGS_EDIT")),
+    db: Session = Depends(get_db),
+):
+    """Delete store branch."""
+    success = crud.delete_store_branch(db, branch_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Store branch not found")
+    fast_cache.invalidate_user(current_user.id)
+    return {"message": "Branch deleted successfully"}

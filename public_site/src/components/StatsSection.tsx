@@ -23,7 +23,7 @@ export const StatsSection: React.FC<StatsSectionProps> = () => {
       subtext: 'Multi-item camera scanning and auto-inventory matching.',
     },
     {
-      value: 3,
+      value: 10,
       prefix: '< ',
       suffix: ' sec',
       label: 'Avg Dispensing Checkout',

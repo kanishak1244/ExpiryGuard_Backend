@@ -6608,6 +6608,425 @@ def remove_priority_sale(
     return {"is_priority_sale": False, "message": "Removed from Priority Sale", "product_id": product_id}
 
 
+# ==============================================================================
+# SALES & BILLING HISTORY CRUD
+# ==============================================================================
+
+def get_sales_history(
+    db: Session,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    period: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    sales_type: Optional[str] = None,
+) -> List[models.Sale]:
+    query = (
+        db.query(models.Sale)
+        .options(
+            joinedload(models.Sale.items),
+            joinedload(models.Sale.payments),
+            joinedload(models.Sale.returns),
+        )
+        .filter(models.Sale.user_id == user_id)
+    )
+
+    eff_start = start_date or from_date
+    eff_end = end_date or to_date
+
+    now = datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+
+    if period == "today":
+        query = query.filter(models.Sale.created_at >= today_start)
+    elif period == "yesterday":
+        yest_start = today_start - timedelta(days=1)
+        query = query.filter(models.Sale.created_at >= yest_start, models.Sale.created_at < today_start)
+    elif period == "this_week":
+        week_start = today_start - timedelta(days=now.weekday())
+        query = query.filter(models.Sale.created_at >= week_start)
+    elif period == "this_month":
+        month_start = datetime(now.year, now.month, 1)
+        query = query.filter(models.Sale.created_at >= month_start)
+    elif period and period.isdigit():
+        year = int(period)
+        year_start = datetime(year, 1, 1)
+        year_end = datetime(year + 1, 1, 1)
+        query = query.filter(models.Sale.created_at >= year_start, models.Sale.created_at < year_end)
+
+    if eff_start:
+        try:
+            s_dt = datetime.strptime(eff_start, "%Y-%m-%d")
+            query = query.filter(models.Sale.created_at >= s_dt)
+        except ValueError:
+            pass
+
+    if eff_end:
+        try:
+            e_dt = datetime.strptime(eff_end, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(models.Sale.created_at < e_dt)
+        except ValueError:
+            pass
+
+    if sales_type == "historical":
+        query = query.filter(models.Sale.is_historical == True)
+    elif sales_type == "live":
+        query = query.filter(or_(models.Sale.is_historical == False, models.Sale.is_historical == None))
+
+    if payment_method:
+        query = query.filter(models.Sale.payment_method.ilike(payment_method.strip()))
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                models.Sale.bill_number.ilike(term),
+                models.Sale.original_bill_number.ilike(term),
+                models.Sale.customer_name.ilike(term),
+                models.Sale.customer_phone.ilike(term),
+                models.Sale.doctor_name.ilike(term),
+            )
+        )
+
+    sales = query.order_by(models.Sale.created_at.desc()).offset(skip).limit(limit).all()
+    return sales
+
+
+def get_sale_by_id(db: Session, sale_id: int, user_id: int) -> Optional[models.Sale]:
+    return (
+        db.query(models.Sale)
+        .options(
+            joinedload(models.Sale.items),
+            joinedload(models.Sale.payments),
+            joinedload(models.Sale.returns),
+        )
+        .filter(models.Sale.id == sale_id, models.Sale.user_id == user_id)
+        .first()
+    )
+
+
+def get_sale_returns(db: Session, user_id: int, skip: int = 0, limit: int = 50) -> List[models.SaleReturn]:
+    return (
+        db.query(models.SaleReturn)
+        .filter(models.SaleReturn.user_id == user_id)
+        .order_by(models.SaleReturn.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def process_customer_return(db: Session, user_id: int, data: dict):
+    sale_id = data.get("sale_id")
+    if not sale_id:
+        raise HTTPException(status_code=400, detail="sale_id is required")
+    return process_sale_return(db=db, user_id=user_id, return_payload=data)
+
+
+# ==============================================================================
+# STAFF & USER MANAGEMENT CRUD
+# ==============================================================================
+
+def get_staff_members(db: Session, user_id: int) -> List[models.StaffMember]:
+    return (
+        db.query(models.StaffMember)
+        .filter(models.StaffMember.user_id == user_id)
+        .order_by(models.StaffMember.id.asc())
+        .all()
+    )
+
+
+def get_staff_member_by_id(db: Session, staff_id: int, user_id: int) -> Optional[models.StaffMember]:
+    return (
+        db.query(models.StaffMember)
+        .filter(models.StaffMember.id == staff_id, models.StaffMember.user_id == user_id)
+        .first()
+    )
+
+
+def create_staff_member(
+    db: Session,
+    staff_data: schemas.StaffMemberCreate,
+    user_id: int,
+) -> models.StaffMember:
+    existing_user = db.query(models.User).filter(func.lower(models.User.email) == staff_data.email.strip().lower()).first() if staff_data.email else None
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email is already registered as a pharmacy account.")
+
+    existing_staff = db.query(models.StaffMember).filter(
+        models.StaffMember.user_id == user_id,
+        func.lower(models.StaffMember.username) == staff_data.username.strip().lower(),
+    ).first()
+    if existing_staff:
+        raise HTTPException(status_code=400, detail="Username is already taken by another team member.")
+
+    hashed_pw = safe_hash_password(staff_data.password)
+    perm_list = staff_data.permissions if staff_data.permissions is not None else []
+    permissions_json = json.dumps(perm_list)
+
+    staff = models.StaffMember(
+        user_id=user_id,
+        name=staff_data.name.strip(),
+        phone=staff_data.phone.strip() if staff_data.phone else None,
+        email=staff_data.email.strip() if staff_data.email else None,
+        username=staff_data.username.strip(),
+        password=hashed_pw,
+        role=staff_data.role,
+        status=staff_data.status or "ACTIVE",
+        permissions_json=permissions_json,
+        created_at=datetime.utcnow(),
+    )
+
+    db.add(staff)
+    db.commit()
+    db.refresh(staff)
+    return staff
+
+
+def update_staff_member(
+    db: Session,
+    staff_id: int,
+    staff_data: schemas.StaffMemberUpdate,
+    user_id: int,
+) -> Optional[models.StaffMember]:
+    staff = get_staff_member_by_id(db, staff_id, user_id)
+    if not staff:
+        return None
+
+    if staff_data.name is not None:
+        staff.name = staff_data.name.strip()
+    if staff_data.phone is not None:
+        staff.phone = staff_data.phone.strip()
+    if staff_data.email is not None:
+        staff.email = staff_data.email.strip()
+    if staff_data.role is not None:
+        staff.role = staff_data.role
+    if staff_data.status is not None:
+        staff.status = staff_data.status
+    if staff_data.permissions is not None:
+        staff.permissions_json = json.dumps(staff_data.permissions)
+
+    db.commit()
+    db.refresh(staff)
+    return staff
+
+
+def delete_staff_member(db: Session, staff_id: int, user_id: int) -> bool:
+    staff = get_staff_member_by_id(db, staff_id, user_id)
+    if not staff:
+        return False
+
+    db.delete(staff)
+    db.commit()
+    return True
+
+
+# ==============================================================================
+# STORES & BRANCHES CRUD
+# ==============================================================================
+
+def get_store_branches(db: Session, user_id: int) -> List[models.StoreBranch]:
+    return (
+        db.query(models.StoreBranch)
+        .filter(models.StoreBranch.user_id == user_id)
+        .order_by(models.StoreBranch.id.asc())
+        .all()
+    )
+
+
+def get_store_branch_by_id(db: Session, branch_id: int, user_id: int) -> Optional[models.StoreBranch]:
+    return (
+        db.query(models.StoreBranch)
+        .filter(models.StoreBranch.id == branch_id, models.StoreBranch.user_id == user_id)
+        .first()
+    )
+
+
+def create_store_branch(
+    db: Session,
+    branch_data: schemas.StoreBranchCreate,
+    user_id: int,
+) -> models.StoreBranch:
+    if branch_data.is_main:
+        db.query(models.StoreBranch).filter(models.StoreBranch.user_id == user_id).update({"is_main": False})
+
+    branch = models.StoreBranch(
+        user_id=user_id,
+        branch_name=branch_data.branch_name.strip(),
+        code=branch_data.code.strip() if branch_data.code else None,
+        address=branch_data.address.strip() if branch_data.address else None,
+        city=branch_data.city.strip() if branch_data.city else None,
+        phone=branch_data.phone.strip() if branch_data.phone else None,
+        is_main=branch_data.is_main if branch_data.is_main is not None else False,
+        status=branch_data.status or "ACTIVE",
+        created_at=datetime.utcnow(),
+    )
+
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+
+def update_store_branch(
+    db: Session,
+    branch_id: int,
+    branch_data: schemas.StoreBranchUpdate,
+    user_id: int,
+) -> Optional[models.StoreBranch]:
+    branch = get_store_branch_by_id(db, branch_id, user_id)
+    if not branch:
+        return None
+
+    if branch_data.is_main:
+        db.query(models.StoreBranch).filter(models.StoreBranch.user_id == user_id, models.StoreBranch.id != branch_id).update({"is_main": False})
+
+    if branch_data.branch_name is not None:
+        branch.branch_name = branch_data.branch_name.strip()
+    if branch_data.code is not None:
+        branch.code = branch_data.code.strip()
+    if branch_data.address is not None:
+        branch.address = branch_data.address.strip()
+    if branch_data.city is not None:
+        branch.city = branch_data.city.strip()
+    if branch_data.phone is not None:
+        branch.phone = branch_data.phone.strip()
+    if branch_data.is_main is not None:
+        branch.is_main = branch_data.is_main
+    if branch_data.status is not None:
+        branch.status = branch_data.status
+
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+
+def delete_store_branch(db: Session, branch_id: int, user_id: int) -> bool:
+    branch = get_store_branch_by_id(db, branch_id, user_id)
+    if not branch:
+        return False
+
+    db.delete(branch)
+    db.commit()
+    return True
+
+
+# ==============================================================================
+# ALIASES & ROUTE HELPERS FOR UNIFIED CRUD CONTRACT
+# ==============================================================================
+
+def get_priority_sales(db: Session, user_id: int) -> List[dict]:
+    return get_priority_sales_items(db, user_id)
+
+def mark_priority_sale(db: Session, user_id: int, product_id: int, notes: Optional[str] = None) -> dict:
+    return toggle_priority_sale(db, user_id, product_id, notes=notes)
+
+def get_marked_for_return(db: Session, user_id: int) -> List[dict]:
+    return get_marked_for_return_items(db, user_id)
+
+def mark_product_for_return(db: Session, user_id: int, product_id: int, return_qty: int = 1, notes: Optional[str] = None) -> dict:
+    return mark_item_for_return(db, user_id, product_id, return_qty, notes)
+
+def remove_marked_for_return(db: Session, user_id: int, return_id: int) -> bool:
+    return delete_marked_for_return_item(db, user_id, return_id)
+
+def get_product_by_barcode(db: Session, user_id: int, barcode: str) -> Optional[models.Product]:
+    if not barcode:
+        return None
+    return (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            models.Product.barcode == barcode.strip()
+        )
+        .first()
+    )
+
+def update_product_quantity(db: Session, product_id: int, quantity: int, user_id: int) -> Optional[models.Product]:
+    prod = get_product(db, product_id, user_id)
+    if not prod:
+        return None
+    prod.quantity = max(0, quantity)
+    db.commit()
+    db.refresh(prod)
+    invalidate_products_cache(user_id)
+    return prod
+
+def update_user_settings(db: Session, user_id: int, settings_data: schemas.UserSettingsUpdate) -> models.User:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    for field, val in settings_data.model_dump(exclude_unset=True).items():
+        if hasattr(user, field):
+            setattr(user, field, val)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+def register_fcm_token(db: Session, user_id: int, token: str) -> models.DeviceToken:
+    if not token:
+        raise HTTPException(status_code=400, detail="Token cannot be empty")
+    existing = db.query(models.DeviceToken).filter(
+        models.DeviceToken.user_id == user_id,
+        models.DeviceToken.token == token.strip()
+    ).first()
+    if existing:
+        return existing
+
+    device = models.DeviceToken(user_id=user_id, token=token.strip(), created_at=datetime.utcnow())
+    db.add(device)
+    db.commit()
+    db.refresh(device)
+    return device
+
+
+def create_customer(db: Session, customer_data: schemas.CustomerCreate, user_id: int) -> models.Customer:
+    return create_or_update_customer(db, user_id, customer_data.model_dump())
+
+def update_customer(db: Session, customer_id: int, customer_data: schemas.CustomerUpdate, user_id: int) -> Optional[models.Customer]:
+    cust = db.query(models.Customer).filter(models.Customer.id == customer_id, models.Customer.user_id == user_id).first()
+    if not cust:
+        return None
+    for k, v in customer_data.model_dump(exclude_unset=True).items():
+        setattr(cust, k, v)
+    db.commit()
+    db.refresh(cust)
+    return cust
+
+def delete_customer(db: Session, customer_id: int, user_id: int) -> bool:
+    cust = db.query(models.Customer).filter(models.Customer.id == customer_id, models.Customer.user_id == user_id).first()
+    if not cust:
+        return False
+    db.delete(cust)
+    db.commit()
+    return True
+
+def get_outstanding_customers(db: Session, user_id: int) -> List[models.Customer]:
+    return db.query(models.Customer).filter(models.Customer.user_id == user_id, models.Customer.pending_amount > 0).all()
+
+def record_customer_payment(db: Session, user_id: int, customer_id: int, amount: float, payment_method: str = "CASH", notes: Optional[str] = None):
+    return create_customer_payment(db, user_id, customer_id, amount, payment_method, notes)
+
+def get_purchases_dashboard(db: Session, user_id: int) -> dict:
+    return get_purchase_dashboard(db, user_id)
+
+def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
+    return get_supplier_detail(db, user_id, supplier_id)
+
+def record_supplier_payment(db: Session, user_id: int, supplier_id: int, amount: float, payment_method: str = "CASH", reference_no: Optional[str] = None, notes: Optional[str] = None):
+    return create_supplier_payment(db, user_id, supplier_id, amount, payment_method, reference_no, notes)
+
+
+
+
 
 
 

@@ -178,6 +178,11 @@ def get_sales_history(
     payment_method: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    period: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    sales_type: Optional[str] = None,
+    include_exported: Optional[bool] = None,
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -191,6 +196,10 @@ def get_sales_history(
         payment_method=payment_method,
         start_date=start_date,
         end_date=end_date,
+        period=period,
+        from_date=from_date,
+        to_date=to_date,
+        sales_type=sales_type,
     )
 
 

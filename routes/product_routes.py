@@ -224,15 +224,37 @@ def delete_product(
     return {"message": "Product deleted successfully"}
 
 
+@router.get("/billing/search-products")
+def billing_search_products_endpoint(
+    query: str = Query("", description="Search query string"),
+    search_mode: Optional[str] = Query("name", description="Search mode: name, barcode, composition"),
+    limit: int = Query(15, ge=1, le=50),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Fast medicine billing product search with inventory ranking."""
+    return crud.get_billing_search_products(
+        db=db,
+        user_id=current_user.id,
+        query=query,
+        search_mode=search_mode,
+        limit=limit,
+    )
+
+
 @router.get("/products/search", response_model=List[schemas.MedicineCatalogResponse])
 @router.get("/catalog/search", response_model=List[schemas.MedicineCatalogResponse])
 def search_medicine_catalog_endpoint(
-    q: str = Query(..., min_length=1, description="Search query string"),
+    q: Optional[str] = Query(None, description="Search query string"),
+    query: Optional[str] = Query(None, description="Search query string alias"),
     limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
     """Ultra-fast multi-tier medicine master catalog search."""
-    return crud.search_medicine_catalog(db, q, limit)
+    search_q = q or query or ""
+    if not search_q.strip():
+        return []
+    return crud.search_medicine_catalog(db, search_q.strip(), limit)
 
 
 @router.get("/products/barcode/{barcode}")
