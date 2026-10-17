@@ -83,23 +83,18 @@ def register_user(
 def reset_password(
     request: Request,
     data: schemas.PasswordResetRequest,
-    db: Session = Depends(get_db),
 ):
-    """Reset account password by email."""
-    try:
-        user = db.query(models.User).filter(models.User.email.ilike(data.email.strip())).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="Account with this email address was not found")
+    """DISABLED for security.
 
-        user.password = safe_hash_password(data.new_password)
-        db.commit()
-        return {"message": "Password updated successfully. You can now log in."}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"[Password Reset Error] {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Reset error: {str(e)}")
+    This route used to let ANYONE set a new password for ANY account knowing only its email address, with no
+    login and no proof of ownership. No app screen uses it. A safe reset needs proof of ownership (for example
+    a one-time code sent to the account's email) or an administrator, so it stays off until that exists.
+    """
+    logger.warning("[Security] Blocked an unauthenticated password-reset request.")
+    raise HTTPException(
+        status_code=403,
+        detail="Password reset by email is disabled. Please ask your administrator to reset your password.",
+    )
 
 
 @router.post("/login")

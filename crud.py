@@ -3426,7 +3426,9 @@ def find_matching_suppliers(
     }
 
 
-def get_suppliers(db: Session, user_id: int, query: Optional[str] = None, status: Optional[str] = None):
+def get_suppliers(db: Session, user_id: int, query: Optional[str] = None, status: Optional[str] = None, search: Optional[str] = None):
+    # "search" is the name the HTTP route uses; "query" is kept for older callers.
+    query = query or search
     q = db.query(models.Supplier).filter(models.Supplier.user_id == user_id)
     if status and status.upper() != "ALL":
         q = q.filter(models.Supplier.status == status)
@@ -3441,7 +3443,6 @@ def get_suppliers(db: Session, user_id: int, query: Optional[str] = None, status
     suppliers = q.order_by(models.Supplier.name.asc()).all()
     
     # Eager-load aggregate stats for all documents of this user grouped by supplier_id in a single database query to fix the N+1 loop query issue
-    from sqlalchemy import func
     doc_stats = db.query(
         models.Document.supplier_id,
         func.sum(models.Document.total_amount).label("total_purchases"),
