@@ -1085,6 +1085,9 @@ def create_sale_transaction(
     """
     Completes one pharmacy bill in a single optimized database transaction.
     """
+    # Keep the freshly created objects usable after commit: with the default expire-on-commit every attribute
+    # read for the response would re-SELECT the sale, items, payments and returns (4 extra database trips).
+    db.expire_on_commit = False
     try:
         if current_user is not None:
             shop = current_user
