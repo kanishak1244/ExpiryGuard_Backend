@@ -121,6 +121,7 @@ def lookup_batch_endpoint(
 @router.get("/api/inventory/quick-batch-lookup")
 def get_quick_batch_lookup(
     batch: str = Query(..., alias="batch"),
+    exact_only: bool = Query(False),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
