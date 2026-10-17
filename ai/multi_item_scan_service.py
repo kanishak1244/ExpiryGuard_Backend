@@ -139,9 +139,9 @@ def validate_multi_item_data(data: dict) -> bool:
     return False
 
 
-def scan_multi_item(image_path: str | None = None, raw_bytes: bytes | None = None, mime_type: str = "image/jpeg") -> dict:
+def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: bytes | None = None, mime_type: str = "image/jpeg") -> dict:
     """
-    Scans one image containing 1-7 medicines using OpenCV multi-barcode + gemini-3.1-flash-lite.
+    Scans one image containing 1-7 medicines using OpenCV multi-barcode + gemini-3.6-flash.
     Supports direct in-memory raw_bytes processing to avoid disk I/O latency.
     Zero fallback cascade, non-thinking configuration, fast visual OCR extraction.
     """
@@ -151,6 +151,8 @@ def scan_multi_item(image_path: str | None = None, raw_bytes: bytes | None = Non
     comp_start = time.time()
     if raw_bytes is not None:
         image_bytes = optimize_image_bytes(raw_bytes)
+    elif isinstance(image_path, bytes):
+        image_bytes = optimize_image_bytes(image_path)
     elif image_path is not None:
         optimize_image(image_path)
         image_file = Path(image_path)
@@ -184,131 +186,155 @@ def scan_multi_item(image_path: str | None = None, raw_bytes: bytes | None = Non
     if detected_barcodes:
         logger.info(f"[BARCODE_FIRST] Detected {len(detected_barcodes)} barcode(s) in {bc_latency:.1f}ms: {detected_barcodes}")
 
+    candidate_models = [
+        "gemini-3.8-flash",
+        GEMINI_PRIMARY_MODEL,
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+    ]
+    seen_models = set()
+    models_to_try = [m for m in candidate_models if m and not (m in seen_models or seen_models.add(m))]
+
     last_error = None
-    target_model = GEMINI_PRIMARY_MODEL  # gemini-3.1-flash-lite
+    response = None
+    gemini_latency = 0.0
 
-    # Non-thinking configuration for maximum OCR speed
-    thinking_config = None
-    try:
-        thinking_config = types.ThinkingConfig(thinking_budget=0)
-    except Exception:
-        pass
-
-    for attempt in range(2):
-        try:
-            config_args = {
-                "temperature": 0.0,
-                "response_mime_type": "application/json",
-            }
-            if thinking_config:
-                config_args["thinking_config"] = thinking_config
-
-            config = types.GenerateContentConfig(**config_args)
-
-            gemini_start = time.time()
-            response = client.models.generate_content(
-                model=target_model,
-                contents=[
-                    MULTI_ITEM_PROMPT,
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                ],
-                config=config,
-            )
-            gemini_latency = time.time() - gemini_start
-
-            raw_text = response.text or ""
-            cleaned_text = _clean_json_text(raw_text)
-            parsed = json.loads(cleaned_text)
-
-            # Validate schema
-            if not validate_multi_item_data(parsed):
-                raise ValueError("Multi-item scan output failed schema validation.")
-
-            raw_items = parsed.get("medicines") or parsed.get("items") or []
-            extracted_items = []
-            for item in raw_items:
-                if not isinstance(item, dict):
-                    continue
-                name = _clean_str(item.get("name"))
-                code = _clean_str(item.get("code"))
-                strength = _clean_str(item.get("strength"))
-                generic_name = _clean_str(item.get("generic_name"))
-                batch = _clean_str(item.get("batch"))
-                expiry = _clean_str(item.get("expiry"))
-                pack_size = _clean_str(item.get("pack_size"))
-                form = _clean_str(item.get("form"))
-
-                # Keep item if at least name or code is present
-                if name or code:
-                    extracted_items.append({
-                        "name": name,
-                        "code": code,
-                        "strength": strength,
-                        "generic_name": generic_name,
-                        "batch": batch,
-                        "expiry": expiry,
-                        "pack_size": pack_size,
-                        "form": form,
-                    })
-
-            total_latency = time.time() - start_time
-            in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
-            out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
-            
-            log_ai_metrics(
-                "/scan-multi-item",
-                "multi_item_ocr",
-                target_model,
-                True,
-                False,
-                total_latency,
-                in_tokens,
-                out_tokens
-            )
-
-            logger.info(
-                f"[MULTI_ITEM_SCAN] Success: detected {len(extracted_items)} items | "
-                f"Gemini Latency: {gemini_latency:.2f}s | Total Latency: {total_latency:.2f}s"
-            )
-
-            return {
-                "success": True,
-                "items": extracted_items,
-                "detected_barcodes": detected_barcodes,
-                "error": None,
-                "primary_engine": "Dawaiflow AI",
-                "gemini_latency": gemini_latency,
-                "ocr_latency": 0.0,
-                "total_latency": total_latency,
-            }
-
-        except Exception as exc:
-            last_error = str(exc)
-            logger.warning(f"[MULTI_ITEM_WARNING] Model {target_model} attempt {attempt+1} failed: {exc}")
-            
-            is_transient = any(code in last_error for code in ("503", "429", "500", "UNAVAILABLE"))
-            if not is_transient:
+    for target_model in models_to_try:
+        logger.info(f"[START_SALE_SCAN:TRY] Invoking Gemini Vision scan with model: {target_model}")
+        for attempt in range(2):
+            try:
+                gemini_start = time.time()
+                response = client.models.generate_content(
+                    model=target_model,
+                    contents=[
+                        MULTI_ITEM_PROMPT,
+                        types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=0.0,
+                        response_mime_type="application/json",
+                    ),
+                )
+                gemini_latency = time.time() - gemini_start
                 break
-            time.sleep(0.3)
+            except Exception as exc:
+                last_error = str(exc)
+                logger.warning(f"[START_SALE_SCAN:RETRY] Model {target_model} attempt {attempt+1} failed: {exc}")
+                if "503" in last_error or "429" in last_error or "UNAVAILABLE" in last_error:
+                    time.sleep(0.4 * (attempt + 1))
+                else:
+                    break
+        if response is not None:
+            break
 
-    # Failed without invoking fallback model
-    total_latency = time.time() - start_time
-    log_ai_metrics(
-        "/scan-multi-item",
-        "multi_item_ocr",
-        target_model,
-        False,
-        False,
-        total_latency,
-        error=last_error
-    )
-    return {
-        "success": False,
-        "items": [],
-        "detected_barcodes": detected_barcodes,
-        "error": last_error or "Failed to extract medicine information from image.",
-        "primary_engine": "Dawaiflow AI",
-        "gemini_latency": 0.0,
-        "ocr_latency": 0.0,
-        "total_latency": total_latency,
-    }
+    if response is None:
+        total_latency = time.time() - start_time
+        log_ai_metrics(
+            "/scan-multi-item",
+            "multi_item_ocr",
+            target_model,
+            False,
+            False,
+            total_latency,
+            error=last_error
+        )
+        return {
+            "success": False,
+            "items": [],
+            "detected_barcodes": detected_barcodes,
+            "error": last_error or "Failed to extract medicine information from image.",
+            "primary_engine": "Dawaiflow AI",
+            "gemini_latency": 0.0,
+            "ocr_latency": 0.0,
+            "total_latency": total_latency,
+        }
+
+    try:
+        raw_text = response.text or ""
+        cleaned_text = _clean_json_text(raw_text)
+        parsed = json.loads(cleaned_text)
+
+        # Validate schema
+        if not validate_multi_item_data(parsed):
+            raise ValueError("Multi-item scan output failed schema validation.")
+
+        raw_items = parsed.get("medicines") or parsed.get("items") or []
+        extracted_items = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            name = _clean_str(item.get("name"))
+            code = _clean_str(item.get("code"))
+            strength = _clean_str(item.get("strength"))
+            generic_name = _clean_str(item.get("generic_name"))
+            batch = _clean_str(item.get("batch"))
+            expiry = _clean_str(item.get("expiry"))
+            pack_size = _clean_str(item.get("pack_size"))
+            form = _clean_str(item.get("form"))
+
+            # Keep item if at least name or code is present
+            if name or code:
+                extracted_items.append({
+                    "name": name,
+                    "code": code,
+                    "strength": strength,
+                    "generic_name": generic_name,
+                    "batch": batch,
+                    "expiry": expiry,
+                    "pack_size": pack_size,
+                    "form": form,
+                })
+
+        total_latency = time.time() - start_time
+        in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+        out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+        
+        log_ai_metrics(
+            "/scan-multi-item",
+            "multi_item_ocr",
+            target_model,
+            True,
+            False,
+            total_latency,
+            in_tokens,
+            out_tokens
+        )
+
+        logger.info(
+            f"[MULTI_ITEM_SCAN] Success: detected {len(extracted_items)} items | "
+            f"Gemini Latency: {gemini_latency:.2f}s | Total Latency: {total_latency:.2f}s"
+        )
+
+        return {
+            "success": True,
+            "items": extracted_items,
+            "detected_barcodes": detected_barcodes,
+            "error": None,
+            "primary_engine": "Dawaiflow AI",
+            "gemini_latency": gemini_latency,
+            "ocr_latency": 0.0,
+            "total_latency": total_latency,
+        }
+
+    except Exception as exc:
+        total_latency = time.time() - start_time
+        log_ai_metrics(
+            "/scan-multi-item",
+            "multi_item_ocr",
+            target_model,
+            False,
+            False,
+            total_latency,
+            error=str(exc)
+        )
+        return {
+            "success": False,
+            "items": [],
+            "detected_barcodes": detected_barcodes,
+            "error": f"JSON parsing error: {exc}",
+            "primary_engine": "Dawaiflow AI",
+            "gemini_latency": gemini_latency,
+            "ocr_latency": 0.0,
+            "total_latency": total_latency,
+        }

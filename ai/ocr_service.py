@@ -114,10 +114,10 @@ def preprocess_image(img_bgr: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
     - Bilateral filtering to preserve crisp character edges.
     """
     h, w = img_bgr.shape[:2]
-    max_dim = 1200
+    max_dim = 1600
     if max(h, w) > max_dim:
         scale = max_dim / float(max(h, w))
-        img_bgr = cv2.resize(img_bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        img_bgr = cv2.resize(img_bgr, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
 
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     quality = check_image_quality(gray)
@@ -252,21 +252,67 @@ def extract_pack_size(text: str) -> Optional[str]:
     return None
 
 
+def polygon_to_bbox(box: Any) -> List[int]:
+    """Converts OCR box representation (polygon coordinates or bounding rect) into [x1, y1, x2, y2]."""
+    if box is None:
+        return [0, 0, 0, 0]
+    try:
+        arr = np.array(box, dtype=np.float32)
+        if arr.ndim == 2 and arr.shape[0] >= 3:
+            x_min = int(np.min(arr[:, 0]))
+            y_min = int(np.min(arr[:, 1]))
+            x_max = int(np.max(arr[:, 0]))
+            y_max = int(np.max(arr[:, 1]))
+            return [x_min, y_min, x_max, y_max]
+        elif arr.ndim == 1 and len(arr) >= 4:
+            return [int(arr[0]), int(arr[1]), int(arr[2]), int(arr[3])]
+    except Exception:
+        pass
+    return [0, 0, 0, 0]
+
+
+# Match Batch / Lot Label Anchors across all variations and OCR noise (L0T, B.N0, BATCH N0, etc.)
+BATCH_LABEL_ANCHOR_REGEX = re.compile(
+    r"^(?:B\.?\s*N[O0]\.?|B\s*N[O0]|BNO|BATCH\s*N[O0]\.?|BATCH\s*N[O0]|BATCH\s*NUMBER|BATCH|L[O0]T\s*N[O0]\.?|L[O0]T\s*N[O0]|L[O0]T\s*NUMBER|L[O0]T)\b[:.-]*",
+    re.IGNORECASE,
+)
+
+# Search inside text for batch label prefix
+BATCH_LABEL_SEARCH_REGEX = re.compile(
+    r"\b(?:B\.?\s*N[O0]\.?|B\s*N[O0]|BNO|BATCH\s*N[O0]\.?|BATCH\s*N[O0]|BATCH\s*NUMBER|BATCH|L[O0]T\s*N[O0]\.?|L[O0]T\s*N[O0]|L[O0]T\s*NUMBER|L[O0]T)\b[:.-]*",
+    re.IGNORECASE,
+)
+
+# Disqualify labels for other fields (MFD, EXP, MRP, Licence No, GST, etc.)
+IGNORED_FIELD_LABEL_REGEX = re.compile(
+    r"\b(?:MFD|MFG|MANUFACTURED|MFD\.?|MFG\.?|EXP|EXPIRY|USE\s*BEFORE|BEST\s*BEFORE|EXP\.?|"
+    r"MRP|MAX\s*RETAIL\s*PRICE|MAX\s*RETAIL|MAX\.?\s*RETAIL|MAX|RETAIL|PRICE|RS\.?|INR|₹|"
+    r"M\.?L\.?N[O0]\.?|LICENCE\s*N[O0]\.?|LICENSE\s*N[O0]\.?|MFG\.?\s*LIC|DL\.?\s*N[O0]|LIC\.?\s*N[O0]|"
+    r"GST|HSN|COMPOSITION|STRENGTH)\b",
+    re.IGNORECASE,
+)
+
+
 def is_valid_batch_candidate(cand: str) -> bool:
     """
     Strict validation to ensure token is an authentic batch/lot number and NOT:
     MRP, price, GST, lic number, phone number, date, composition strength, or packaging boilerplate.
     """
-    if not cand or len(cand) < 3 or len(cand) > 16:
+    if not cand or len(cand) < 3 or len(cand) > 20:
         return False
 
     cand_upper = cand.strip().upper()
+    # Strip trailing or leading punctuation
+    cand_upper = cand_upper.strip(" :.,;!?)]}\"'\\-/#=")
+
+    if len(cand_upper) < 3 or len(cand_upper) > 20:
+        return False
 
     # 1. Disqualify price / MRP (e.g. 125.00, Rs. 150, ₹171.04, MRP)
     if re.search(r"[₹$]|(?:\b(?:RS|MRP|PRICE|INCL|TAXES|TAX)\b)|\.\d{2}$", cand_upper):
         return False
 
-    # 2. Disqualify dates (e.g. 05/25, 08/2027, 2024-01)
+    # 2. Disqualify dates (e.g. 05/25, 08/2027, 2026-03, 03/2026)
     if re.match(r"^\d{1,2}[/-]\d{2,4}$", cand_upper) or re.match(r"^\d{4}[/-]\d{1,2}$", cand_upper):
         return False
 
@@ -274,20 +320,20 @@ def is_valid_batch_candidate(cand: str) -> bool:
     if re.search(r"\b(?:EXP|MFG|MFD|DATE|USE|BEFORE|BEST)\b", cand_upper):
         return False
 
-    # 4. Disqualify license numbers (e.g. G/25/1042, Mfg Lic No, DL No)
-    if re.search(r"\b(?:LIC|LICENSE|L\.NO|G/|MFG\.?\s*LIC|DL\.?NO)\b", cand_upper):
+    # 4. Disqualify license numbers (e.g. G/25/1042, Mfg Lic No, DL No, PD-198A when associated with M.L.No)
+    if re.search(r"\b(?:LIC|LICENSE|L\.NO|G/|MFG\.?\s*LIC|DL\.?NO|M\.L\.NO)\b", cand_upper):
         return False
 
     # 5. Disqualify dosage strength (e.g. 40MG, 650MG, 500MG, 10ML, 100ML)
     if re.match(r"^\d+\s*(?:MG|MCG|ML|G|GM|IU|%)$", cand_upper):
         return False
 
-    # 6. Disqualify long phone numbers or barcodes (> 8 pure digits)
+    # 6. Disqualify long phone numbers or barcodes (> 8 pure digits without letters)
     if re.match(r"^\d{9,}$", cand_upper):
         return False
 
     # 7. Disqualify packaging terminology
-    if cand_upper in {"TABLET", "TABLETS", "CAPSULE", "CAPSULES", "STRIP", "BLISTER", "DOSE", "KEEP", "OUT", "REACH"}:
+    if cand_upper in {"TABLET", "TABLETS", "CAPSULE", "CAPSULES", "STRIP", "BLISTER", "DOSE", "KEEP", "OUT", "REACH", "STORE", "COOL", "DRY", "PLACE", "MAX", "RETAIL", "MAXRETAIL"}:
         return False
 
     # 8. Must contain at least one alphanumeric character
@@ -295,6 +341,71 @@ def is_valid_batch_candidate(cand: str) -> bool:
         return False
 
     return True
+
+
+def isolate_and_clean_batch_string(raw_str: str) -> Optional[str]:
+    """
+    Isolates the batch number from neighbouring packaging fields (MRP, MAX.RETAIL, MFD, EXP, etc.),
+    strips leading/trailing punctuation, preserves internal hyphens/slashes, and enforces
+    the final-character digit requirement.
+    Returns the cleaned upper-case batch string if valid, or None if uncertain/invalid (e.g. ends in a letter).
+    """
+    if not raw_str:
+        return None
+
+    val = str(raw_str).strip()
+
+    # 1. Stop at space-separated packaging field label boundaries
+    # E.g. "26231140 MFD: 03/2026 EXP: 08/2027" -> "26231140"
+    # E.g. "AC826005 MAX.RETAIL" -> "AC826005"
+    # E.g. "IPL25212 MRP ₹124.00" -> "IPL25212"
+    label_boundary_pattern = re.compile(
+        r"(?:\s+|[.:;\-,/\\]+)(?:"
+        r"MAX\.?\s*RETAIL|MAX\.?\s*RETAIL\s*PRICE|MAX\b|RETAIL\b|"
+        r"MRP|M\.?R\.?P\.?|PRICE|RS\.?|INR|₹|"
+        r"MFD|MFG|MANUFACTURED|EXP|EXPIRY|USE\s*BEFORE|BEST\s*BEFORE|"
+        r"M\.?L\.?N[O0]\.?|LICENCE|LICENSE|LIC\.?\s*N[O0]\.?|DL\.?\s*N[O0]|"
+        r"GST|HSN|COMPOSITION|STRENGTH|NET|PACK"
+        r")\b.*$",
+        re.IGNORECASE
+    )
+    val = label_boundary_pattern.sub("", val).strip()
+
+    # 2. Stop at attached packaging field labels (concatenated without space due to OCR merging/misreading)
+    # E.g. "AC826005MAXRETAN" -> "AC826005"
+    # E.g. "AC826005MAX.RETAIL" -> "AC826005"
+    # E.g. "AC826005MRP" -> "AC826005"
+    # E.g. "AC826005MFD" -> "AC826005"
+    attached_label_pattern = re.compile(
+        r"(?<=[A-Z0-9])(?:"
+        r"MAX\.?\s*RETAIL|MAXRETAIL|MAXRETAN|MAXRETA|MAXRET|MAXRTL|MAX|RETAIL|"
+        r"MRP|M\.?R\.?P\.?|PRICE|RS|INR|"
+        r"MFD|MFG|MANUFACTURED|EXP|EXPIRY|"
+        r"M\.?L\.?N[O0]\.?|LICENCE|LICENSE|LIC|DL|GST|HSN"
+        r")(?!\d).*$",
+        re.IGNORECASE
+    )
+    val = attached_label_pattern.sub("", val).strip()
+
+    # 3. Strip leading & trailing punctuation
+    # Punctuation to remove from ends: ., ,, :, ;, !, ?, ), ], }, >, ", ', \, -, /
+    val = val.strip(" :.,;!?)]}\"'\\-/#=")
+
+    if not val:
+        return None
+
+    # 4. Check if basic candidate criteria are satisfied (length, not a date/price/boilplate, etc.)
+    if not is_valid_batch_candidate(val):
+        return None
+
+    # 5. Final-character digit requirement:
+    # Extracted batch number must end in a digit (0-9).
+    # If it ends in a letter (e.g. ABC123X), DO NOT silently truncate it; mark as uncertain (return None).
+    if not val[-1].isdigit():
+        logger.info(f"[BATCH_VALIDATION] Rejected candidate '{val}' because final character '{val[-1]}' is not a digit.")
+        return None
+
+    return val.upper()
 
 
 def extract_batch_from_crop(
@@ -313,7 +424,7 @@ def extract_batch_from_crop(
     if patch_bgr is None or patch_bgr.size == 0 or patch_bgr.shape[0] < 8 or patch_bgr.shape[1] < 12:
         return None, 0.0
 
-    batch_token_cleaner = re.compile(r"^(?:B\.?\s*No\.?|Batch\s*(?:No\.?)?|Lot\s*(?:No\.?)?|LOT|#|:)[\s.:=-]*", re.IGNORECASE)
+    batch_token_cleaner = re.compile(r"^(?:B\.?\s*N[O0]\.?|Batch\s*(?:N[O0]\.?)?|L[O0]t\s*(?:N[O0]\.?)?|L[O0]T|#|:)[\s.:=-]*", re.IGNORECASE)
 
     def _eval_pass(img):
         cands = {}
@@ -325,11 +436,15 @@ def extract_batch_from_crop(
                 for t, s in zip(texts, scores):
                     t_clean = str(t).strip()
                     val = batch_token_cleaner.sub("", t_clean).strip(" :.=-").upper()
-                    tokens = val.split()
-                    for tok in tokens:
-                        if is_valid_batch_candidate(tok):
-                            cands[tok] = float(s)
-                            break
+                    clean_tok = isolate_and_clean_batch_string(val)
+                    if clean_tok:
+                        cands[clean_tok] = float(s)
+                    else:
+                        for tok in val.split():
+                            c_sub = isolate_and_clean_batch_string(tok)
+                            if c_sub:
+                                cands[c_sub] = float(s)
+                                break
         except Exception as e:
             logger.debug(f"[BATCH_CROP_PASS_ERROR] {e}")
         return cands
@@ -378,6 +493,287 @@ def extract_batch_from_crop(
     return best_cand, round(consensus_conf, 2)
 
 
+def extract_batch_spatially(
+    all_boxes: List[Any],
+    all_texts: List[str],
+    all_scores: List[float],
+    img_shape: Optional[Tuple[int, int]] = None,
+    ocr_engine = None,
+    processed_img: Optional[np.ndarray] = None,
+    raw_img: Optional[np.ndarray] = None,
+) -> Dict[str, Any]:
+    """
+    CORE SPATIAL BATCH EXTRACTION ENGINE:
+    1. Identifies BATCH/LOT label anchors (handling OCR noise like L0T, B.N0, BATCH N0).
+    2. Determines the value spatially associated with the anchor:
+       - Priority 1: High-resolution un-downscaled micro-crop OCR around anchor stamp.
+       - Priority 2: Text immediately to the RIGHT on the same line (or embedded in same text line).
+       - Priority 3: Text immediately BELOW the anchor.
+       - Priority 4: Bounding-box spatial proximity.
+    3. Strictly filters out values associated with MFD, EXP, MRP, M.L.NO, GST, etc.
+    4. Validates batch format and returns structured spatial result.
+    """
+    if not all_texts:
+        return {
+            "success": False,
+            "batch_number": "BATCH_NOT_CONFIDENT",
+            "anchor": None,
+            "confidence": 0.0,
+            "bbox": None,
+            "associated_text": None,
+            "message": "No text detected in OCR."
+        }
+
+    norm_boxes = [polygon_to_bbox(b) for b in all_boxes]
+
+    items = []
+    for idx, (text, score, box) in enumerate(zip(all_texts, all_scores, norm_boxes)):
+        items.append({
+            "text": str(text).strip(),
+            "score": float(score),
+            "box": box,
+            "index": idx,
+        })
+
+    candidates = []
+
+    for item in items:
+        text = item["text"]
+        box = item["box"]
+        score = item["score"]
+
+        # Check if line contains a BATCH/LOT label anchor
+        m_anchor = BATCH_LABEL_SEARCH_REGEX.search(text)
+        if not m_anchor:
+            continue
+
+        raw_anchor = m_anchor.group(0).strip(" :.-")
+        matched_span = m_anchor.span()
+
+        # 1. PRIORITY 1: High-Resolution Targeted Micro-Crop OCR on un-downscaled raw_img
+        crop_target_img = raw_img if raw_img is not None else processed_img
+        if crop_target_img is not None and ocr_engine is not None and box and (box[2] - box[0]) > 5:
+            x1, y1, x2, y2 = box[:4]
+            h = y2 - y1
+            w = x2 - x1
+            img_h, img_w = crop_target_img.shape[:2]
+
+            # Scale box coordinates if raw_img shape differs from processed_img shape
+            if processed_img is not None and raw_img is not None and processed_img.shape[:2] != raw_img.shape[:2]:
+                sy = raw_img.shape[0] / float(processed_img.shape[0])
+                sx = raw_img.shape[1] / float(processed_img.shape[1])
+                crop_x1 = max(0, int((x1 - 5) * sx))
+                crop_y1 = max(0, int((y1 - 8) * sy))
+                crop_x2 = min(img_w, int((x2 + w * 3.5) * sx))
+                crop_y2 = min(img_h, int((y2 + h * 1.8) * sy))
+            else:
+                crop_x1 = max(0, x1 - 5)
+                crop_y1 = max(0, y1 - 8)
+                crop_x2 = min(img_w, x2 + int(w * 3.5))
+                crop_y2 = min(img_h, y2 + int(h * 1.8))
+
+            if crop_x2 > crop_x1 + 10 and crop_y2 > crop_y1 + 8:
+                patch = crop_target_img[crop_y1:crop_y2, crop_x1:crop_x2]
+                crop_batch, crop_conf = extract_batch_from_crop(patch, ocr_engine)
+                if crop_batch:
+                    clean_crop = isolate_and_clean_batch_string(crop_batch)
+                    if clean_crop:
+                        candidates.append({
+                            "batch": clean_crop,
+                            "anchor": raw_anchor.upper(),
+                            "confidence": crop_conf,
+                            "priority": 1,
+                            "bbox": [crop_x1, crop_y1, crop_x2, crop_y2],
+                            "associated_text": text,
+                            "distance": 0.0,
+                        })
+
+        # 2. PRIORITY 2: Same-line embedded text value (text after label)
+        remainder = text[matched_span[1]:].strip(" :.=-")
+        if remainder:
+            clean_cand = isolate_and_clean_batch_string(remainder)
+            if clean_cand:
+                candidates.append({
+                    "batch": clean_cand,
+                    "anchor": raw_anchor.upper(),
+                    "confidence": min(score + 0.05, 1.0),
+                    "priority": 2,
+                    "bbox": box,
+                    "associated_text": text,
+                    "distance": 0.5,
+                })
+
+        # 3. PRIORITY 3: Text immediately to the RIGHT on the same line in a subsequent OCR box
+        x1_a, y1_a, x2_a, y2_a = box
+        h_a = max(y2_a - y1_a, 1)
+
+        for other in items:
+            if other["index"] == item["index"]:
+                continue
+
+            o_text = other["text"]
+            o_box = other["box"]
+            x1_o, y1_o, x2_o, y2_o = o_box
+            h_o = max(y2_o - y1_o, 1)
+
+            # Check if other line is on the same line (vertical overlap / center alignment)
+            v_overlap = min(y2_a, y2_o) - max(y1_a, y1_o)
+            cy_diff = abs(((y1_a + y2_a) / 2.0) - ((y1_o + y2_o) / 2.0))
+
+            is_same_line = (v_overlap > 0.3 * min(h_a, h_o)) or (cy_diff < max(h_a, h_o) * 0.75)
+            is_to_right = x1_o >= (x1_a - 15)
+
+            if is_same_line and is_to_right:
+                if IGNORED_FIELD_LABEL_REGEX.search(o_text):
+                    continue
+
+                clean_cand = isolate_and_clean_batch_string(o_text)
+                if clean_cand:
+                    dist = abs(x1_o - x2_a)
+                    candidates.append({
+                        "batch": clean_cand,
+                        "anchor": raw_anchor.upper(),
+                        "confidence": min((score + other["score"]) / 2.0 + 0.05, 1.0),
+                        "priority": 3,
+                        "bbox": o_box,
+                        "associated_text": f"{text} {o_text}",
+                        "distance": dist,
+                    })
+
+        # 4. PRIORITY 4: Text box immediately BELOW the anchor
+        for other in items:
+            if other["index"] == item["index"]:
+                continue
+
+            o_text = other["text"]
+            o_box = other["box"]
+            x1_o, y1_o, x2_o, y2_o = o_box
+
+            is_below = y1_o >= (y1_a - 5) and (y1_o - y2_a) <= (h_a * 2.5)
+            h_overlap = min(x2_a, x2_o) - max(x1_a, x1_o)
+            cx_diff = abs(((x1_a + x2_a) / 2.0) - ((x1_o + x2_o) / 2.0))
+
+            is_aligned_below = (h_overlap > 0.2 * min(x2_a - x1_a, x2_o - x1_o)) or (cx_diff < max(x2_a - x1_a, x2_o - x1_o) * 1.2)
+
+            if is_below and is_aligned_below:
+                if IGNORED_FIELD_LABEL_REGEX.search(o_text):
+                    continue
+
+                clean_cand = isolate_and_clean_batch_string(o_text)
+                if clean_cand:
+                    v_dist = y1_o - y2_a
+                    candidates.append({
+                        "batch": clean_cand,
+                        "anchor": raw_anchor.upper(),
+                        "confidence": min((score + other["score"]) / 2.0, 0.95),
+                        "priority": 4,
+                        "bbox": o_box,
+                        "associated_text": f"{text}\n{o_text}",
+                        "distance": v_dist,
+                    })
+
+    if not candidates:
+        return {
+            "success": False,
+            "batch_number": "BATCH_NOT_CONFIDENT",
+            "anchor": None,
+            "confidence": 0.0,
+            "bbox": None,
+            "associated_text": None,
+            "message": "No confident batch label spatial match detected."
+        }
+
+    # Rank candidates by (priority ASC, distance ASC, confidence DESC)
+    candidates.sort(key=lambda c: (c["priority"], c["distance"], -c["confidence"]))
+
+    best = candidates[0]
+    if best["confidence"] < 0.55:
+        return {
+            "success": False,
+            "batch_number": "BATCH_NOT_CONFIDENT",
+            "anchor": best["anchor"],
+            "confidence": round(best["confidence"], 2),
+            "bbox": best["bbox"],
+            "associated_text": best["associated_text"],
+            "message": "Extracted candidate confidence is below confidence threshold."
+        }
+
+    return {
+        "success": True,
+        "batch_number": best["batch"],
+        "anchor": best["anchor"],
+        "confidence": round(best["confidence"], 2),
+        "bbox": best["bbox"],
+        "associated_text": best["associated_text"],
+        "message": f"Successfully extracted batch '{best['batch']}' associated with anchor '{best['anchor']}'."
+    }
+
+
+def extract_medicine_batch_from_image(
+    raw_bytes: bytes,
+    mime_type: str = "image/jpeg",
+) -> Dict[str, Any]:
+    """
+    Stand-alone camera scanner engine to extract ONLY the batch/lot number from a packaging image.
+    Executes:
+      1. OpenCV Image Decode & Dynamic Preprocessing.
+      2. PaddleOCR Mobile Text Detection & Bounding Boxes.
+      3. Core Spatial Batch Anchor Extraction Engine.
+    Returns structured JSON with extracted batch, anchor, confidence, and bounding box.
+    """
+    t_start = time.perf_counter()
+    nparr = np.frombuffer(raw_bytes, np.uint8)
+    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if img_bgr is None:
+        return {
+            "success": False,
+            "batch_number": "BATCH_NOT_CONFIDENT",
+            "anchor": None,
+            "confidence": 0.0,
+            "bbox": None,
+            "associated_text": None,
+            "ocr_latency_ms": 0.0,
+            "error": "Failed to decode uploaded packaging image."
+        }
+
+    processed_img, quality_info = preprocess_image(img_bgr)
+    ocr_engine = get_ocr_engine()
+
+    t_ocr0 = time.perf_counter()
+    ocr_results = ocr_engine.predict(processed_img)
+    ocr_ms = (time.perf_counter() - t_ocr0) * 1000.0
+
+    all_texts: List[str] = []
+    all_scores: List[float] = []
+    all_boxes: List[Any] = []
+
+    for res in ocr_results:
+        rec_texts = res.get("rec_texts") if res.get("rec_texts") is not None else []
+        rec_scores = res.get("rec_scores") if res.get("rec_scores") is not None else []
+        rec_boxes = res.get("rec_boxes") if res.get("rec_boxes") is not None else []
+        for t, s, b in zip(rec_texts, rec_scores, rec_boxes):
+            t_str = str(t).strip()
+            if t_str and float(s) > 0.30:
+                all_texts.append(t_str)
+                all_scores.append(float(s))
+                all_boxes.append(b)
+
+    spatial_res = extract_batch_spatially(
+        all_boxes=all_boxes,
+        all_texts=all_texts,
+        all_scores=all_scores,
+        img_shape=processed_img.shape,
+        ocr_engine=ocr_engine,
+        processed_img=processed_img,
+        raw_img=img_bgr,
+    )
+
+    total_ms = (time.perf_counter() - t_start) * 1000.0
+    spatial_res["ocr_latency_ms"] = round(total_ms, 1)
+    return spatial_res
+
+
 def extract_batch_dedicated_pipeline(
     processed_img: Optional[np.ndarray],
     all_boxes: List[List[int]],
@@ -386,52 +782,24 @@ def extract_batch_dedicated_pipeline(
     ocr_engine,
 ) -> Tuple[Optional[str], float]:
     """
-    Dedicated Batch Number Pipeline:
-    1. First searches for explicit batch labels (B.No, Batch No, Lot, LOT) in OCR results.
-    2. If value is embedded in the same line (e.g. 'B.No: ABC1234'), extracts directly if valid.
-    3. Crops a targeted bounding-box region around the label and executes the 3-pass micro-OCR.
-    4. Consensus validation ensures zero confusion with MRP, dates, or license numbers.
-    5. Returns (batch, confidence). If confidence < 0.60, returns (None, 0.0) without guessing.
+    Dedicated Batch Number Pipeline using Spatial Anchor Extractor:
+    Locates BATCH / LOT anchors and extracts spatially associated value.
+    Returns (batch, confidence). If confidence < 0.55, returns (None, 0.0) without guessing.
     """
-    label_pattern = re.compile(
-        r"\b(?:B\.?\s*No\.?|Batch\s*(?:No\.?|#)?|Lot\s*(?:No\.?|#)?|LOT|B\.N\b)",
-        re.IGNORECASE,
+    spatial_res = extract_batch_spatially(
+        all_boxes=all_boxes,
+        all_texts=all_texts,
+        all_scores=all_scores,
+        img_shape=processed_img.shape if processed_img is not None else None,
+        ocr_engine=ocr_engine,
+        processed_img=processed_img,
     )
 
-    # 1. Check if any line has label + valid batch value directly
-    for text, score, box in zip(all_texts, all_scores, all_boxes):
-        if label_pattern.search(text):
-            val = label_pattern.sub("", text).strip(" :.=-").upper()
-            tokens = val.split()
-            if tokens and is_valid_batch_candidate(tokens[0]):
-                return tokens[0], min(score + 0.05, 1.0)
+    if spatial_res.get("success") and spatial_res.get("batch_number") != "BATCH_NOT_CONFIDENT":
+        return spatial_res["batch_number"], spatial_res["confidence"]
 
-            # 2. Crop localized stamp region to the right and slightly below
-            if processed_img is not None and box and len(box) >= 4 and ocr_engine is not None:
-                x1, y1, x2, y2 = [int(v) for v in box[:4]]
-                h = y2 - y1
-                w = x2 - x1
-                img_h, img_w = processed_img.shape[:2]
-
-                crop_x1 = max(0, x1 - 5)
-                crop_y1 = max(0, y1 - 8)
-                crop_x2 = min(img_w, x2 + int(w * 3.5))
-                crop_y2 = min(img_h, y2 + int(h * 1.5))
-
-                if crop_x2 > crop_x1 + 10 and crop_y2 > crop_y1 + 8:
-                    patch = processed_img[crop_y1:crop_y2, crop_x1:crop_x2]
-                    crop_batch, crop_conf = extract_batch_from_crop(patch, ocr_engine)
-                    if crop_batch:
-                        return crop_batch, crop_conf
-
-    # 3. Fallback: Search adjacent lines
-    lines_with_scores = list(zip(all_texts, all_scores))
-    fb_batch, fb_conf = extract_batch_number(lines_with_scores)
-    if fb_batch and is_valid_batch_candidate(fb_batch) and fb_conf >= 0.60:
-        return fb_batch, fb_conf
-
-    # Never invent
     return None, 0.0
+
 
 
 def extract_batch_number(lines_with_scores: List[Tuple[str, float]]) -> Tuple[Optional[str], float]:
@@ -443,7 +811,7 @@ def extract_batch_number(lines_with_scores: List[Tuple[str, float]]) -> Tuple[Op
     """
     batch_pattern = (
         r"(?:B\.?\s*No\.?|Batch\s*(?:No\.?|#)?|Lot\s*(?:No\.?|#)?|B\.?\s*NUM)"
-        r"[\s.:=-]*([A-Z0-9/-]{3,16})\b"
+        r"[\s.:=-]*([A-Z0-9/\-.:]{3,30})"
     )
 
     # 1. Search in individual lines
@@ -453,18 +821,18 @@ def extract_batch_number(lines_with_scores: List[Tuple[str, float]]) -> Tuple[Op
 
         m = re.search(batch_pattern, line, re.IGNORECASE)
         if m:
-            cand = m.group(1).strip().upper()
-            if is_valid_batch_candidate(cand):
-                return cand, min(score + 0.05, 1.0)
+            clean_cand = isolate_and_clean_batch_string(m.group(1))
+            if clean_cand:
+                return clean_cand, min(score + 0.05, 1.0)
 
     # 2. Search across combined adjacent lines (e.g. line 1: "B.No:", line 2: "ABC123")
     for i in range(len(lines_with_scores) - 1):
         line1, s1 = lines_with_scores[i]
         line2, s2 = lines_with_scores[i + 1]
         if re.search(r"^(?:B\.?\s*No\.?|Batch\s*No\.?|Lot\s*No\.?)\s*[:.-]?$", line1.strip(), re.IGNORECASE):
-            cand = line2.strip().upper()
-            if is_valid_batch_candidate(cand):
-                return cand, min(s2, 0.95)
+            clean_cand = isolate_and_clean_batch_string(line2)
+            if clean_cand:
+                return clean_cand, min(s2, 0.95)
 
     return None, 0.0
 

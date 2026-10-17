@@ -7,10 +7,12 @@ background database warmup, exception handling, and mounts all domain APIRouters
 import os
 import json
 import logging
+from typing import Optional, List, Dict, Any
 from pathlib import Path
+
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Depends, HTTPException, Request, Response, status
+from fastapi import FastAPI, Depends, HTTPException, Request, Response, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,8 +22,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 # Internal Shared Context & Database
-from dependencies import get_db, limiter, fast_cache
+from dependencies import get_db, get_current_user, AuthenticatedUser, limiter, fast_cache
 from database import engine, Base, SessionLocal
+from sqlalchemy.orm import Session
 import models
 import schemas
 import crud
@@ -41,6 +44,7 @@ from routes import (
     setting_routes,
     document_routes,
     gst_routes,
+    ca_routes,
 )
 
 # Logging Setup
@@ -122,7 +126,13 @@ async def add_security_headers_and_csrf_guard(request: Request, call_next):
 def warmup_database():
     try:
         try:
-            start_scheduler()
+            # Local development can set ENABLE_SCHEDULER=0 so a test server on a PC does not send expiry
+            # notifications or run the daily purge/backup against the live database. Default (unset): ON,
+            # exactly as before.
+            if os.getenv("ENABLE_SCHEDULER", "1").strip().lower() in ("0", "false", "no", "off"):
+                logger.info("[Startup] Scheduler disabled by ENABLE_SCHEDULER.")
+            else:
+                start_scheduler()
         except Exception as sched_err:
             logger.warning(f"[Startup] Scheduler start notice: {sched_err}")
 
@@ -177,6 +187,7 @@ app.include_router(staff_routes.router)
 app.include_router(setting_routes.router)
 app.include_router(document_routes.router)
 app.include_router(gst_routes.router)
+app.include_router(ca_routes.router)
 
 
 # Global Health & Static Route Handlers
@@ -199,6 +210,56 @@ def api_health():
         "database": "connected" if db_connected else "disconnected",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@app.get("/dashboard/summary")
+@app.get("/api/dashboard/summary")
+@app.get("/dashboard/stats")
+@app.get("/api/dashboard/stats")
+def app_dashboard_summary(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Computes real-time KPI metrics for the mobile business dashboard with optimized SQL queries."""
+    return crud.get_dashboard_stats(db=db, user_id=current_user.id)
+
+
+@app.get("/app/version")
+@app.get("/api/app/version")
+def get_app_version():
+    """Mobile app update version check endpoint."""
+    return {
+        "version": "1.0.0",
+        "latest_version": "1.0.0",
+        "min_supported_version": "1.0.0",
+        "download_url": "https://api.dawaiflow.com/static/dawaiflow-latest.apk",
+        "release_notes": "Official DawaiFlow Mobile App release with AI multi-item scanner and real-time inventory management.",
+        "force_update": False
+    }
+
+
+@app.get("/inventory/lookup-batch")
+@app.get("/api/inventory/lookup-batch")
+def app_lookup_batch(
+    batch: str = Query(..., alias="batch"),
+    medicine: Optional[str] = Query(None, alias="medicine"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tenant-safe exact batch number lookup."""
+    return crud.lookup_batch_in_inventory(db=db, user_id=current_user.id, batch_number=batch, medicine_name=medicine)
+
+
+@app.get("/inventory/quick-batch-lookup")
+@app.get("/api/inventory/quick-batch-lookup")
+def app_quick_batch_lookup(
+    batch: str = Query(..., alias="batch"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Dedicated, isolated Quick Batch Scan endpoint."""
+    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch)
+
 
 
 @app.get("/robots.txt")
@@ -273,7 +334,7 @@ async def custom_404_handler(request: Request, exc: HTTPException):
     is_html_request = "text/html" in accept
     is_api_path = any(request.url.path.startswith(prefix) for prefix in [
         "/api", "/billing", "/inventory", "/customers", "/sales", "/auth",
-        "/analytics", "/printer", "/docs", "/redoc", "/openapi.json"
+        "/analytics", "/ca", "/ca-connect", "/printer", "/docs", "/redoc", "/openapi.json"
     ])
     if request.method == "GET" and is_html_request and not is_api_path:
         custom_404_page = PUBLIC_SERVE_DIR / "404.html"

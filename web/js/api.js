@@ -234,7 +234,7 @@ class ApiClient {
     return headers;
   }
 
-  async request(endpoint, options = {}) {
+  async request(endpoint, options = {}, bodyBuilder = null) {
     const isMultipart = options.body instanceof FormData;
     let headers = await this.getHeaders(isMultipart);
 
@@ -256,6 +256,9 @@ class ApiClient {
         const newToken = await this.ensureAuthenticated(true);
         if (newToken) {
           config.headers['Authorization'] = `Bearer ${newToken}`;
+          if (typeof bodyBuilder === 'function') {
+            config.body = bodyBuilder();
+          }
           response = await fetch(`${API_BASE_URL}${endpoint}`, config);
         }
         if (response.status === 401) {
@@ -922,12 +925,15 @@ class ApiClient {
   }
 
   async scanMultiItem(file) {
-    const formData = new FormData();
-    formData.append('file', file);
+    const buildBody = () => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return formData;
+    };
     return await this.request('/scan-multi-item', {
       method: 'POST',
-      body: formData
-    });
+      body: buildBody()
+    }, buildBody);
   }
 
   async completeSale(payload) {

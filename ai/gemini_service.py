@@ -5,6 +5,7 @@ import time
 import re
 import logging
 from pathlib import Path
+from typing import Union, Optional, List, Dict, Any
 from PIL import Image
 import cv2
 from dotenv import load_dotenv
@@ -41,7 +42,26 @@ class _LazyGeminiClientProxy:
         return getattr(self._get_client(), name)
 
 client = _LazyGeminiClientProxy()
-GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-2.5-flash-lite")
+GEMINI_PRIMARY_MODEL = os.getenv("GEMINI_PRIMARY_MODEL", "gemini-3.8-flash")
+
+def log_ai_metrics(
+    endpoint: str,
+    action: str,
+    model: str,
+    success: bool,
+    fallback_used: bool = False,
+    latency: float = 0.0,
+    in_tokens: int = 0,
+    out_tokens: int = 0,
+    error: Optional[str] = None,
+):
+    """Logs AI inference metrics for latency, token counts, and errors."""
+    status_str = "SUCCESS" if success else "FAILED"
+    logger.info(
+        f"[AI_METRICS] {endpoint} | Action: {action} | Model: {model} | Status: {status_str} | "
+        f"Latency: {latency:.2f}s | InTokens: {in_tokens} | OutTokens: {out_tokens}"
+        + (f" | Error: {error}" if error else "")
+    )
 
 # Centralized Barcode/QR Code Map (Cost-Saving Interceptor)
 BARCODE_MAP = {
@@ -124,44 +144,53 @@ def optimize_image_bytes(image_bytes: bytes, max_size=(2560, 2560), quality=90) 
         logger.warning(f"[IN-MEMORY OPTIMIZATION FAILED] {e}")
         return image_bytes
 
-def optimize_image(file_path: str, max_size=(2560, 2560), quality=90) -> str:
+def optimize_image(file_path: Union[str, Path, bytes], max_size: tuple = (1600, 1600), quality: int = 85) -> Union[str, Path, bytes]:
     """
-    Resizes image if dimensions exceed max_size, and compresses it.
-    Modifies the file in-place to reduce upload payload while keeping full OCR text readability.
+    Safely resizes and compresses image to speed up Gemini API processing while preserving text clarity.
+    Supports file paths and raw byte strings.
     """
     try:
-        if not os.path.exists(file_path) or file_path.lower().endswith(".pdf"):
+        if isinstance(file_path, bytes):
             return file_path
         
-        file_size = os.path.getsize(file_path)
-        if file_size < 800 * 1024:  # If less than 800KB, skip to preserve crisp OCR detail
+        path_str = str(file_path)
+        if not os.path.exists(path_str) or path_str.lower().endswith(".pdf"):
+            return file_path
+        
+        file_size = os.path.getsize(path_str)
+        if file_size < 800 * 1024:
             return file_path
 
-        with Image.open(file_path) as img:
+        with Image.open(path_str) as img:
             original_format = img.format or "JPEG"
             if img.width > max_size[0] or img.height > max_size[1]:
                 img.thumbnail(max_size, Image.Resampling.LANCZOS)
             
-            # Avoid saving MPO format directly
             save_format = "JPEG" if original_format == "MPO" else original_format
-            img.save(file_path, format=save_format, quality=quality, optimize=True)
+            img.save(path_str, format=save_format, quality=quality, optimize=True)
             
-        new_size = os.path.getsize(file_path)
-        logger.info(f"[IMAGE OPTIMIZATION] Optimized '{os.path.basename(file_path)}' from {file_size/1024:.1f}KB to {new_size/1024:.1f}KB")
+        new_size = os.path.getsize(path_str)
+        logger.info(f"[IMAGE OPTIMIZATION] Optimized '{os.path.basename(path_str)}' from {file_size/1024:.1f}KB to {new_size/1024:.1f}KB")
     except Exception as e:
         logger.warning(f"[IMAGE OPTIMIZATION FAILED] {e}")
     return file_path
 
-def detect_and_lookup_barcode(image_path: str) -> dict | None:
+
+def detect_and_lookup_barcode(image_input: Union[str, Path, bytes]) -> dict | None:
     """
     Decodes barcode/QR code from the image using OpenCV.
-    If match is found in the static map, returns the metadata immediately (saves API cost).
+    If match is found in the static map, returns the metadata immediately.
     """
     try:
-        if image_path.lower().endswith(".pdf"):
-            return None
+        if isinstance(image_input, bytes):
+            nparr = np.frombuffer(image_input, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        else:
+            path_str = str(image_input)
+            if path_str.lower().endswith(".pdf"):
+                return None
+            img = cv2.imread(path_str)
 
-        img = cv2.imread(image_path)
         if img is None:
             return None
 
@@ -185,44 +214,26 @@ def detect_and_lookup_barcode(image_path: str) -> dict | None:
                 return BARCODE_MAP[clean_qr]
     except Exception as e:
         logger.warning(f"[BARCODE DETECTION FAILED] {e}")
-    return None
-
-def log_ai_metrics(
-    endpoint: str,
-    scan_type: str,
-    model_used: str,
-    success: bool,
-    fallback_used: bool,
-    latency: float,
-    input_tokens: int = 0,
-    output_tokens: int = 0,
-    error: str = None
-):
-    """Logs detailed performance, cost, and usage metrics of AI operations."""
-    logger.info(
-        f"[AI_METRIC] Endpoint: {endpoint} | Scan Type: {scan_type} | Model: {model_used} | "
-        f"Success: {success} | Fallback: {fallback_used} | Latency: {latency:.2f}s | "
-        f"Tokens: In={input_tokens}, Out={output_tokens} | Error: {error}"
-    )
-
 def validate_label_data(data: dict) -> bool:
-    """Validates that extracted medicine data matches minimum required format."""
+    """Validates extracted medicine label dictionary."""
     if not isinstance(data, dict):
         return False
-    # If product name is missing or blank, the scan failed to recognize the medicine strip
-    if not data.get("product_name") or not isinstance(data["product_name"], str) or not data["product_name"].strip():
-        return False
-    return True
+    if data.get("product_name") or data.get("brand") or data.get("name"):
+        return True
+    return False
 
-def scan_label(image_path: str) -> dict:
+
+def scan_label(image_input: Union[str, Path, bytes], raw_bytes: Optional[bytes] = None) -> dict:
     """
     Scan a product label using Gemini Vision.
     Implements barcode lookup, image optimization, schema validation, and retry logic.
+    Supports both file paths (str/Path) and in-memory raw bytes.
     """
     start_time = time.time()
+    mime_type = "image/jpeg"
     
-    # 1. Barcode-First Interception (100% Cost Saving)
-    barcode_data = detect_and_lookup_barcode(image_path)
+    # 1. Barcode-First Interception
+    barcode_data = detect_and_lookup_barcode(image_input if not raw_bytes else raw_bytes)
     if barcode_data:
         latency = time.time() - start_time
         log_ai_metrics("/scan-label", "label", "local-barcode-db", True, False, latency, 0, 0)
@@ -233,94 +244,92 @@ def scan_label(image_path: str) -> dict:
             "error": None
         }
 
-    # 2. Image Resizing & Compression
-    optimize_image(image_path)
-
-    image_file = Path(image_path)
-    if not image_file.exists():
+    # 2. Image Byte Acquisition
+    if isinstance(image_input, bytes):
+        image_bytes = optimize_image_bytes(image_input)
+    elif raw_bytes is not None:
+        image_bytes = optimize_image_bytes(raw_bytes)
+    elif isinstance(image_input, (str, Path)):
+        optimize_image(image_input)
+        image_file = Path(image_input)
+        if not image_file.exists():
+            return {
+                "success": False,
+                "needs_manual_review": True,
+                "data": None,
+                "error": "Image file not found."
+            }
+        mime_guess, _ = mimetypes.guess_type(str(image_file))
+        mime_type = mime_guess or "image/jpeg"
+        image_bytes = image_file.read_bytes()
+    else:
         return {
             "success": False,
             "needs_manual_review": True,
             "data": None,
-            "error": "Image file not found."
+            "error": "No valid image input provided."
         }
 
-    mime_type, _ = mimetypes.guess_type(image_file)
-    mime_type = mime_type or "image/jpeg"
-    image_bytes = image_file.read_bytes()
-
-    last_error = None
     target_model = GEMINI_PRIMARY_MODEL
+    logger.info(f"[START_SALE_LABEL:TRY] Invoking Gemini Vision label scan with model: {target_model}")
 
-    for attempt in range(2):
-        try:
-            config = types.GenerateContentConfig(
-                temperature=0,
-                response_mime_type="application/json"
-            )
+    try:
+        response = client.models.generate_content(
+            model=target_model,
+            contents=[
+                PROMPT,
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                response_mime_type="application/json",
+            ),
+        )
 
-            response = client.models.generate_content(
-                model=target_model,
-                contents=[
-                    PROMPT,
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                ],
-                config=config,
-            )
+        raw_text = response.text or ""
+        # Strip potential markdown wrapper fences
+        if raw_text.strip().startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.IGNORECASE)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
 
-            raw_text = response.text or ""
-            # Strip potential markdown wrapper fences
-            if raw_text.strip().startswith("```"):
-                raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.IGNORECASE)
-                raw_text = re.sub(r"\s*```$", "", raw_text)
+        data = json.loads(raw_text)
 
-            data = json.loads(raw_text)
+        # Validate data schema
+        if not validate_label_data(data):
+            raise ValueError("Extracted JSON failed schema validation (missing product_name).")
 
-            # Validate data schema
-            if not validate_label_data(data):
-                raise ValueError("Extracted JSON failed schema validation (missing product_name).")
+        # Parse missing fields
+        required_fields = ["product_name", "brand", "batch_number", "manufacturing_date", "expiry_date"]
+        missing_fields = []
+        for field in required_fields:
+            value = data.get(field)
+            if value is None or (isinstance(value, str) and value.strip() == ""):
+                data[field] = None
+                missing_fields.append(field)
 
-            # Parse missing fields
-            required_fields = ["product_name", "brand", "batch_number", "manufacturing_date", "expiry_date"]
-            missing_fields = []
-            for field in required_fields:
-                value = data.get(field)
-                if value is None or (isinstance(value, str) and value.strip() == ""):
-                    data[field] = None
-                    missing_fields.append(field)
+        data["missing_fields"] = missing_fields
 
-            data["missing_fields"] = missing_fields
+        # Success path
+        latency = time.time() - start_time
+        in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+        out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+        
+        log_ai_metrics("/scan-label", "label", target_model, True, False, latency, in_tokens, out_tokens)
+        
+        return {
+            "success": True,
+            "needs_manual_review": len(missing_fields) > 0,
+            "data": data,
+            "error": None,
+        }
 
-            # Success path
-            latency = time.time() - start_time
-            in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
-            out_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
-            
-            log_ai_metrics("/scan-label", "label", target_model, True, False, latency, in_tokens, out_tokens)
-            
-            return {
-                "success": True,
-                "needs_manual_review": len(missing_fields) > 0,
-                "data": data,
-                "error": None,
-            }
-
-        except Exception as e:
-            last_error = str(e)
-            logger.warning(f"[SCAN_LABEL_WARNING] Model {target_model} attempt {attempt+1} failed: {e}")
-            
-            # Check for rate limit or server errors for quick retry
-            is_transient = any(code in last_error for code in ("429", "503", "500", "UNAVAILABLE"))
-            if not is_transient:
-                break
-            time.sleep(0.5 * (2 ** attempt))
-
-    # All attempts failed or produced invalid schemas
-    latency = time.time() - start_time
-    log_ai_metrics("/scan-label", "label", GEMINI_PRIMARY_MODEL, False, False, latency, error=last_error)
-    return {
-        "success": False,
-        "needs_manual_review": True,
-        "data": None,
-        "error": "Dawaiflow AI couldn't extract medicine details. Please try again or enter manually.",
-    }
+    except Exception as e:
+        latency = time.time() - start_time
+        logger.error(f"[SCAN_LABEL_ERROR] Model {target_model} scan failed: {e}")
+        log_ai_metrics("/scan-label", "label", target_model, False, False, latency, error=str(e))
+        return {
+            "success": False,
+            "needs_manual_review": True,
+            "data": None,
+            "error": f"Dawaiflow AI couldn't extract medicine details: {e}",
+        }

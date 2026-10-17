@@ -3,6 +3,7 @@ AI Vision Scanning and Assistant Routes for DawaiFlow / ExpiryGuard.
 Handles Gemini Vision multi-item shelf scan, single-strip camera scan, purchase bill invoice OCR, and RAG grounded chat.
 """
 
+import re
 import time
 import logging
 from pathlib import Path
@@ -24,6 +25,7 @@ import crud
 from ai.gemini_service import scan_label
 from ai.multi_item_scan_service import scan_multi_item
 from ai.invoice_service import scan_invoice
+from ai.ocr_service import extract_medicine_batch_from_image
 
 logger = logging.getLogger("expiryguard.routes.ai")
 
@@ -32,6 +34,52 @@ router = APIRouter(tags=["AI Vision & Intelligence"])
 ALLOWED_DOC_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 MAX_FILE_SIZE_10MB = 10 * 1024 * 1024
+
+
+def _format_ai_error_exception(err_msg: str) -> HTTPException:
+    err_clean = re.sub(r'AI_KEY=\S+|Bearer \S+|AQ\.[A-Za-z0-9_\-]+', '[REDACTED]', str(err_msg or ""))
+    err_lower = err_clean.lower()
+
+    if "429" in err_clean or "quota" in err_lower or "resource_exhausted" in err_lower:
+        return HTTPException(
+            status_code=429,
+            detail=f"Gemini API error: 429 — Rate limit or quota exceeded ({err_clean})"
+        )
+    elif "401" in err_clean or "unauthorized" in err_lower or "invalid_api_key" in err_lower or "expired token" in err_lower or "invalid token" in err_lower:
+        return HTTPException(
+            status_code=401,
+            detail=f"Authentication error: 401 — Unauthorized ({err_clean})"
+        )
+    elif "403" in err_clean or "permission" in err_lower or "forbidden" in err_lower:
+        return HTTPException(
+            status_code=403,
+            detail=f"API permission error: 403 — Permission denied ({err_clean})"
+        )
+    elif "408" in err_clean or "timeout" in err_lower:
+        return HTTPException(
+            status_code=408,
+            detail=f"Request timeout: 408 — Request timed out while contacting DawaiFlow server ({err_clean})"
+        )
+    elif "503" in err_clean or "unavailable" in err_lower:
+        return HTTPException(
+            status_code=503,
+            detail=f"Backend temporarily unavailable: 503 ({err_clean})"
+        )
+    elif "504" in err_clean:
+        return HTTPException(
+            status_code=504,
+            detail=f"Backend timeout: 504 ({err_clean})"
+        )
+    elif "json" in err_lower or "schema" in err_lower or "parse" in err_lower:
+        return HTTPException(
+            status_code=422,
+            detail=f"AI response received, but medicine information could not be parsed ({err_clean})"
+        )
+    else:
+        return HTTPException(
+            status_code=502,
+            detail=f"AI service error: 502 — {err_clean}"
+        )
 
 
 def _validate_file_magic(file_bytes: bytes, ext: str):
@@ -71,26 +119,131 @@ def scan_single_label_endpoint(
     request: Request,
     file: UploadFile = File(...),
     current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Scans a single medicine strip/box image for camera billing using Gemini AI.
     """
+    t_start = time.time()
+    logger.info("[AI SCAN] request started endpoint=/scan-label user_id=%s", current_user.id)
+
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_IMAGE_EXTENSIONS:
         ext = ".jpg"
 
     file_bytes = file.file.read()
     if not file_bytes:
+        duration_ms = int((time.time() - t_start) * 1000)
+        logger.warning("[AI SCAN] response status: 400 | duration: %d ms | failure type: EmptyFile | failure message: Uploaded image file is empty.", duration_ms)
         raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
 
     _validate_file_magic(file_bytes, ext)
     res = scan_label(file_bytes)
     if not res.get("success"):
-        raise HTTPException(status_code=502, detail=res.get("error") or "Failed to scan medicine label.")
+        duration_ms = int((time.time() - t_start) * 1000)
+        err_str = res.get("error") or "Failed to scan medicine label."
+        logger.warning("[AI SCAN] response status: failure | duration: %d ms | failure type: AIServiceError | failure message: %s", duration_ms, err_str)
+        raise _format_ai_error_exception(err_str)
+    
+    # Enrich with shop-scoped inventory matching
+    data = res.get("data")
+    if data and isinstance(data, dict):
+        scanned_name = data.get("product_name") or data.get("brand") or ""
+        batch = data.get("batch_number")
+        if scanned_name:
+            match_res = crud.match_scanned_medicine_to_inventory(
+                db=db,
+                user_id=current_user.id,
+                scanned_name=scanned_name,
+                batch_number=batch,
+            )
+            data["inventory_match"] = match_res
+            if match_res.get("status") == "no_match":
+                data["inventory_error"] = f"Medicine identified: '{scanned_name}', but no matching medicine was found in inventory/catalog."
+
+    duration_ms = int((time.time() - t_start) * 1000)
+    logger.info("[AI SCAN] response status: 200 | duration: %d ms", duration_ms)
     return res
 
 
+@router.post("/scan-batch-label")
+@router.post("/documents/scan-batch-label")
+@router.post("/api/scan-batch-label")
+@limiter.limit("60/minute")
+def scan_batch_label_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Dedicated Camera Scanner Endpoint for Medicine Batch/Lot Extraction.
+    Extracts ONLY the Batch/Lot number from packaging image via spatial OCR
+    and performs immediate exact shop inventory lookup.
+    """
+    t_start = time.time()
+    logger.info("[AI SCAN BATCH] request started endpoint=/scan-batch-label user_id=%s", current_user.id)
+
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        ext = ".jpg"
+
+    file_bytes = file.file.read()
+    if not file_bytes:
+        duration_ms = int((time.time() - t_start) * 1000)
+        raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+    _validate_file_magic(file_bytes, ext)
+
+    # 1. Run Spatial OCR Batch Extractor
+    ocr_res = extract_medicine_batch_from_image(file_bytes)
+
+    if not ocr_res.get("success") or ocr_res.get("batch_number") == "BATCH_NOT_CONFIDENT":
+        duration_ms = int((time.time() - t_start) * 1000)
+        return {
+            "success": False,
+            "extracted_batch": "BATCH_NOT_CONFIDENT",
+            "anchor": ocr_res.get("anchor"),
+            "confidence": 0.0,
+            "bbox": None,
+            "associated_text": None,
+            "inventory_match": {
+                "found": False,
+                "status": "batch_not_detected",
+                "message": "Could not confidently locate BATCH/LOT label on packaging image."
+            },
+            "duration_ms": duration_ms
+        }
+
+    extracted_batch = ocr_res.get("batch_number")
+
+    # 2. Direct Exact Shop Inventory Lookup using Batch Number as Primary Key
+    lookup_res = crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=extracted_batch)
+
+    duration_ms = int((time.time() - t_start) * 1000)
+    logger.info(
+        "[AI SCAN BATCH] status=200 duration=%d ms extracted_batch=%s anchor=%s found=%s",
+        duration_ms,
+        extracted_batch,
+        ocr_res.get("anchor"),
+        lookup_res.get("found"),
+    )
+
+    return {
+        "success": True,
+        "extracted_batch": extracted_batch,
+        "anchor": ocr_res.get("anchor"),
+        "confidence": ocr_res.get("confidence"),
+        "bbox": ocr_res.get("bbox"),
+        "associated_text": ocr_res.get("associated_text"),
+        "inventory_match": lookup_res,
+        "duration_ms": duration_ms
+    }
+
+
 @router.post("/scan-multi-item")
+@router.post("/documents/scan-multi-item")
+@router.post("/api/scan-multi-item")
 @limiter.limit("60/minute")
 def scan_multi_item_endpoint(
     request: Request,
@@ -101,17 +254,78 @@ def scan_multi_item_endpoint(
     """
     Scans multiple medicine strips/boxes on counter shelf using Gemini Vision AI.
     """
-    ext = Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        ext = ".jpg"
+    t_start = time.time()
+    logger.info("[AI SCAN] request started endpoint=/scan-multi-item user_id=%s", current_user.id)
 
-    file_bytes = file.file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+    try:
+        ext = Path(file.filename or "").suffix.lower()
+        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+            ext = ".jpg"
 
-    _validate_file_magic(file_bytes, ext)
-    res = scan_multi_item(file_bytes)
-    return res
+        file_bytes = file.file.read()
+        if not file_bytes:
+            duration_ms = int((time.time() - t_start) * 1000)
+            logger.warning("[AI SCAN] response status: 400 | duration: %d ms | failure type: EmptyFile | failure message: Uploaded image file is empty.", duration_ms)
+            raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+
+        _validate_file_magic(file_bytes, ext)
+        res = scan_multi_item(file_bytes)
+
+        if not res.get("success"):
+            duration_ms = int((time.time() - t_start) * 1000)
+            err_str = res.get("error") or "Failed to scan multi-item medicines."
+            logger.warning("[AI SCAN] response status: failure | duration: %d ms | failure type: AIServiceError | failure message: %s", duration_ms, err_str)
+            raise _format_ai_error_exception(err_str)
+
+        items = res.get("items") or []
+        if not items:
+            duration_ms = int((time.time() - t_start) * 1000)
+            logger.warning("[AI SCAN] response status: 422 | duration: %d ms | failure type: EmptyExtraction | failure message: No medicine items extracted", duration_ms)
+            raise HTTPException(
+                status_code=422,
+                detail="AI response received, but no medicine information could be extracted from image. Please ensure packaging text is clearly visible."
+            )
+
+        # Enrich each extracted item with shop-scoped inventory matching
+        unmatched_names = []
+        for item in items:
+            scanned_name = item.get("name") or ""
+            batch = item.get("batch")
+            strength = item.get("strength")
+            if scanned_name:
+                try:
+                    match_res = crud.match_scanned_medicine_to_inventory(
+                        db=db,
+                        user_id=current_user.id,
+                        scanned_name=scanned_name,
+                        strength=strength,
+                        batch_number=batch,
+                    )
+                    item["inventory_match"] = match_res
+                    if match_res.get("status") == "no_match":
+                        unmatched_names.append(scanned_name)
+                except Exception as match_err:
+                    logger.error("[AI SCAN] Inventory match error for '%s': %s", scanned_name, match_err, exc_info=True)
+                    item["inventory_match"] = {
+                        "status": "no_match",
+                        "matched_product": None,
+                        "catalog_item": None,
+                        "message": f"Inventory lookup warning: {match_err}"
+                    }
+
+        if unmatched_names:
+            res["inventory_error"] = f"Medicine identified: '{', '.join(unmatched_names)}', but no matching medicine was found in inventory/catalog."
+            logger.info("[AI SCAN] Inventory matching warning: %s", res["inventory_error"])
+
+        duration_ms = int((time.time() - t_start) * 1000)
+        logger.info("[AI SCAN] response status: 200 | duration: %d ms | items_count: %d", duration_ms, len(items))
+        return res
+    except HTTPException:
+        raise
+    except Exception as exc:
+        duration_ms = int((time.time() - t_start) * 1000)
+        logger.error("[AI SCAN] Unhandled multi-item scan exception | duration: %d ms | error: %s", duration_ms, exc, exc_info=True)
+        raise _format_ai_error_exception(str(exc))
 
 
 @router.post("/scan-invoice")

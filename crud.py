@@ -40,6 +40,38 @@ def invalidate_customers_cache(user_id: int):
     global _CUSTOMERS_CACHE
     _CUSTOMERS_CACHE.pop(user_id, None)
 
+def local_today() -> date:
+    """Today's date in India (IST, UTC+5:30), independent of the server's own time zone."""
+    return (datetime.utcnow() + timedelta(hours=5, minutes=30)).date()
+
+
+# How expiry is judged for selling. "date" (current behaviour): a batch is sellable up to and including its
+# stored expiry date. "month_end": sellable until the end of its expiry month (strips print MM/YYYY), which
+# matters for batches stored as the 1st of the month. Changing this is a business decision.
+EXPIRY_RULE = "date"
+
+
+def expiry_cutoff(today: Optional[date] = None) -> date:
+    """Batches whose expiry date is before this date are expired."""
+    today = today or local_today()
+    return today.replace(day=1) if EXPIRY_RULE == "month_end" else today
+
+
+def is_batch_expired(expiry_date, today: Optional[date] = None) -> bool:
+    """True when the batch must not be sold any more (see EXPIRY_RULE). A missing expiry date is not
+    treated as expired here."""
+    if expiry_date is None:
+        return False
+    if isinstance(expiry_date, datetime):
+        expiry_date = expiry_date.date()
+    if isinstance(expiry_date, str):
+        try:
+            expiry_date = date.fromisoformat(expiry_date[:10])
+        except ValueError:
+            return False
+    return expiry_date < expiry_cutoff(today)
+
+
 def safe_date_format(val):
     if not val:
         return None
@@ -487,6 +519,8 @@ def get_billing_search_products(
 
     s_pref = f"{clean_q}%"
     s_term = f"%{clean_q}%"
+    # Expired batches (see is_batch_expired) are listed after sellable ones.
+    expiry_cut = expiry_cutoff()
 
     cols = [
         models.Product.id,
@@ -532,6 +566,7 @@ def get_billing_search_products(
     ).order_by(
         case((func.lower(models.Product.product_name) == clean_q, 1), else_=2),
         case((func.lower(models.Product.product_name).like(s_pref), 1), else_=2),
+        case((models.Product.expiry_date < expiry_cut, 2), else_=1),
         models.Product.expiry_date.asc().nullslast()
     ).limit(limit)
 
@@ -552,7 +587,10 @@ def get_billing_search_products(
                 models.Product.batch_number.ilike(s_term),
                 models.Product.barcode.ilike(s_term),
             )
-        ).order_by(models.Product.expiry_date.asc().nullslast()).limit(needed)
+        ).order_by(
+            case((models.Product.expiry_date < expiry_cut, 2), else_=1),
+            models.Product.expiry_date.asc().nullslast(),
+        ).limit(needed)
         rows.extend(sub_query.all())
 
     results = []
@@ -585,7 +623,22 @@ def get_billing_search_products(
             "pack_size_label": row[24],
             "composition": row[25],
             "barcode": row[26],
+            "is_expired": is_batch_expired(row[21]),
+            "fefo_first": False,
         })
+
+    # FEFO (first expiry, first out): for each medicine, mark the batch to sell first: not expired, in stock,
+    # earliest expiry. The app adds this batch when a medicine is chosen by name.
+    best_by_name: Dict[str, dict] = {}
+    for r in results:
+        if r["is_expired"] or (r["quantity"] or 0) <= 0:
+            continue
+        key = (r["product_name"] or "").strip().lower()
+        cur = best_by_name.get(key)
+        if cur is None or (r["expiry_date"] or "9999-12-31") < (cur["expiry_date"] or "9999-12-31"):
+            best_by_name[key] = r
+    for r in best_by_name.values():
+        r["fefo_first"] = True
 
     return results
 
@@ -907,7 +960,7 @@ def deduct_product_stock(
         )
 
     # Expiry Guard: Never dispense expired medicine batches
-    if product.expiry_date and product.expiry_date < date.today():
+    if is_batch_expired(product.expiry_date):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -1109,6 +1162,18 @@ def create_sale_transaction(
                 )
                 if selected_batch_product:
                     product = selected_batch_product
+
+            # Never sell an expired batch (its expiry month has passed). The app checks this too; this is the
+            # authoritative check, so held bills, old app versions and every other path are covered.
+            if is_batch_expired(product.expiry_date):
+                exp_label = product.expiry_date.strftime("%m/%Y") if product.expiry_date else "unknown"
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Expired batch cannot be sold: {product.product_name} "
+                        f"(batch {product.batch_number or '-'}, expired {exp_label}). Remove it from the bill."
+                    ),
+                )
 
             is_strip = str(item.unit_type or "strip").lower() in ["strip", "pack"]
 
@@ -4415,11 +4480,16 @@ def get_dashboard_stats(db: Session, user_id: int):
     ).scalar() or 0.0
     total_payables = max(0.0, float(total_purchases) - float(total_supplier_paid))
 
-    # 3. Today's Revenue and Monthly Revenue
+    # 3. Today's Revenue, Sales Count, and Monthly Revenue
     today_revenue = db.query(func.sum(models.Sale.total_amount)).filter(
         models.Sale.user_id == user_id,
         models.Sale.created_at >= start_of_today
     ).scalar() or 0.0
+
+    today_sales_count = db.query(func.count(models.Sale.id)).filter(
+        models.Sale.user_id == user_id,
+        models.Sale.created_at >= start_of_today
+    ).scalar() or 0
 
     month_revenue = db.query(func.sum(models.Sale.total_amount)).filter(
         models.Sale.user_id == user_id,
@@ -4437,6 +4507,14 @@ def get_dashboard_stats(db: Session, user_id: int):
         models.Product.user_id == user_id,
         models.Product.is_deleted == False,
         models.Product.expiry_date < today
+    ).scalar() or 0
+
+    sixty_days_hence = today + datetime.timedelta(days=60)
+    expiring_soon_count = db.query(func.count(models.Product.id)).filter(
+        models.Product.user_id == user_id,
+        models.Product.is_deleted == False,
+        models.Product.expiry_date >= today,
+        models.Product.expiry_date <= sixty_days_hence
     ).scalar() or 0
 
     expired_value = db.query(func.sum(models.Product.quantity * models.Product.purchase_price)).filter(
@@ -4466,13 +4544,21 @@ def get_dashboard_stats(db: Session, user_id: int):
 
     return {
         "today_revenue": round(float(today_revenue), 2),
+        "today_sales_count": int(today_sales_count),
         "month_revenue": round(float(month_revenue), 2),
         "net_profit": round(float(net_profit), 2),
         "low_stock_count": int(low_stock_count),
         "expired_count": int(expired_count),
+        "expiring_soon_count": int(expiring_soon_count),
         "expired_value": round(float(expired_value), 2),
         "credit_receivables": round(float(total_receivables), 2),
-        "supplier_payables": round(float(total_payables), 2)
+        "supplier_payables": round(float(total_payables), 2),
+        "needs_attention": {
+            "expired_count": int(expired_count),
+            "expiring_soon_count": int(expiring_soon_count),
+            "low_stock_count": int(low_stock_count),
+            "customer_outstanding": round(float(total_receivables), 2)
+        }
     }
 
 
@@ -7023,6 +7109,971 @@ def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
 
 def record_supplier_payment(db: Session, user_id: int, supplier_id: int, amount: float, payment_method: str = "CASH", reference_no: Optional[str] = None, notes: Optional[str] = None):
     return create_supplier_payment(db, user_id, supplier_id, amount, payment_method, reference_no, notes)
+
+
+# ==============================================================================
+# AI SCANNING & INVENTORY MATCHING ENGINE
+# ==============================================================================
+
+def serialize_product(p: models.Product) -> dict:
+    """Serializes a Product ORM model instance into a JSON-friendly dictionary."""
+    if not p:
+        return {}
+    return {
+        "id": p.id,
+        "user_id": p.user_id,
+        "product_name": p.product_name,
+        "brand": p.brand,
+        "category": p.category,
+        "batch_number": p.batch_number,
+        "quantity": p.quantity,
+        "hsn_code": p.hsn_code,
+        "gst_rate": p.gst_rate,
+        "purchase_price": p.purchase_price,
+        "unit_price": p.unit_price,
+        "mrp": getattr(p, "mrp", p.unit_price),
+        "selling_price": p.unit_price,
+        "tablets_per_strip": p.tablets_per_strip,
+        "loose_tablet_price": p.loose_tablet_price,
+        "loose_tablet_stock": p.loose_tablet_stock,
+        "manufacturing_date": p.manufacturing_date.isoformat() if p.manufacturing_date else None,
+        "expiry_date": p.expiry_date.isoformat() if p.expiry_date else None,
+        "composition": getattr(p, "composition", None),
+        "is_deleted": p.is_deleted,
+    }
+
+
+def match_scanned_medicine_to_inventory(
+    db: Session,
+    user_id: int,
+    scanned_name: str,
+    strength: Optional[str] = None,
+    batch_number: Optional[str] = None,
+) -> dict:
+    """
+    Robust multi-tiered matching engine that links AI-recognized medicine names
+    to the shop's active inventory (models.Product) or master catalog (models.MedicineCatalog).
+    Tolerates spelling variations, hyphens/spaces, noise suffixes, and strength differences.
+    """
+    if not scanned_name or not scanned_name.strip():
+        return {
+            "status": "no_match",
+            "matched_product": None,
+            "catalog_item": None,
+            "message": "No medicine name provided for matching."
+        }
+
+    raw_name = scanned_name.strip()
+    
+    # Clean noise words while building search tokens
+    clean_text = re.sub(r'[^a-zA-Z0-9\s]', ' ', raw_name)
+    tokens = [t.lower() for t in clean_text.split() if t.strip()]
+
+    # Filter out common dosage form noise words for token matching if multiple tokens exist
+    noise_words = {"strip", "strips", "tablet", "tablets", "tab", "tabs", "capsule", "capsules", "cap", "caps", "syrup", "inj", "injection", "box", "pack"}
+    meaningful_tokens = [t for t in tokens if t not in noise_words] if len(tokens) > 1 else tokens
+    if not meaningful_tokens:
+        meaningful_tokens = tokens
+
+    norm_query = " ".join(meaningful_tokens)
+
+    # --------------------------------------------------------------------------
+    # 1. Search Shop Active Inventory (models.Product)
+    # --------------------------------------------------------------------------
+    shop_products = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False
+        )
+        .all()
+    )
+
+    candidate_products = []
+    
+    # Priority A: If exact batch number extracted, check batch match first
+    if batch_number and batch_number.strip():
+        clean_batch = batch_number.strip().upper()
+        batch_matches = [p for p in shop_products if p.batch_number and p.batch_number.strip().upper() == clean_batch]
+        if batch_matches:
+            # Pick FEFO (in stock first, earliest expiry)
+            best_batch = sorted(batch_matches, key=lambda p: (0 if (p.quantity or 0) > 0 else 1, p.expiry_date or date.max))[0]
+            return {
+                "status": "in_stock" if (best_batch.quantity or 0) > 0 else "out_of_stock",
+                "matched_product": serialize_product(best_batch),
+                "catalog_item": None,
+                "matched_by": "exact_batch",
+                "message": f"Matched by batch '{best_batch.batch_number}': {best_batch.product_name}"
+            }
+
+    # Priority B: Exact / Normalized String Match & Token-All Match
+    for p in shop_products:
+        p_name_norm = " ".join([t.lower() for t in re.sub(r'[^a-zA-Z0-9\s]', ' ', p.product_name or "").split() if t.strip()])
+        p_brand_norm = " ".join([t.lower() for t in re.sub(r'[^a-zA-Z0-9\s]', ' ', p.brand or "").split() if t.strip()])
+        p_comp_norm = " ".join([t.lower() for t in re.sub(r'[^a-zA-Z0-9\s]', ' ', p.composition or "").split() if t.strip()])
+
+        if norm_query == p_name_norm or norm_query == p_brand_norm or norm_query == p_comp_norm:
+            candidate_products.append((1, p))
+            continue
+
+        # Check if all meaningful tokens appear in product_name, brand, or composition
+        p_combined = f"{p_name_norm} {p_brand_norm} {p_comp_norm}"
+        if all(token in p_combined for token in meaningful_tokens):
+            candidate_products.append((2, p))
+
+    if candidate_products:
+        # Sort by match priority (1 is exact, 2 is token-all), then stock availability, then FEFO expiry
+        candidate_products.sort(key=lambda item: (
+            item[0],
+            0 if (item[1].quantity or 0) > 0 else 1,
+            item[1].expiry_date or date.max
+        ))
+        selected_prod = candidate_products[0][1]
+        has_stock = (selected_prod.quantity or 0) > 0
+
+        return {
+            "status": "in_stock" if has_stock else "out_of_stock",
+            "matched_product": serialize_product(selected_prod),
+            "catalog_item": None,
+            "matched_by": "normalized_name" if candidate_products[0][0] == 1 else "token_match",
+            "message": f"Matched in shop inventory: {selected_prod.product_name} (Batch {selected_prod.batch_number}, Qty: {selected_prod.quantity})"
+        }
+
+    # --------------------------------------------------------------------------
+    # 2. Master Catalog Fallback (models.MedicineCatalog)
+    # --------------------------------------------------------------------------
+    catalog_query = db.query(models.MedicineCatalog)
+    for token in meaningful_tokens:
+        catalog_query = catalog_query.filter(
+            or_(
+                models.MedicineCatalog.product_name.ilike(f"%{token}%"),
+                models.MedicineCatalog.brand.ilike(f"%{token}%"),
+                models.MedicineCatalog.composition.ilike(f"%{token}%"),
+            )
+        )
+
+    catalog_item = catalog_query.first()
+    if catalog_item:
+        return {
+            "status": "not_in_inventory",
+            "matched_product": None,
+            "catalog_item": {
+                "id": catalog_item.id,
+                "product_name": catalog_item.product_name,
+                "brand": catalog_item.brand,
+                "category": catalog_item.category,
+                "hsn_code": catalog_item.hsn_code,
+                "gst_percentage": getattr(catalog_item, "gst_rate", 12.0),
+                "composition": catalog_item.composition,
+                "mrp": getattr(catalog_item, "default_price", 0.0),
+            },
+            "matched_by": "master_catalog",
+            "message": f"Medicine '{catalog_item.product_name}' identified in master catalog, but not currently stocked in your inventory."
+        }
+
+def normalize_batch_number(val: str) -> str:
+    """
+    Normalizes printed OCR batch strings by removing noise prefixes (B.No, Batch, Lot, etc.)
+    and stripping spaces, colons, hyphens, and slashes while preserving alphanumeric characters.
+    """
+    if not val:
+        return ""
+    s = val.strip()
+    s = re.sub(r'^(?:b\.?\s*no|batch\s*no|batch|lot\s*no|lot|b/n|b\.n)[:\.\s-]*', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'[\s\-:/\.]+', '', s)
+    return s.upper()
+
+
+def _levenshtein_dist(s1: str, s2: str) -> int:
+    if len(s1) < len(s2):
+        return _levenshtein_dist(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (0 if c1 == c2 else 1)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def lookup_batch_in_inventory(db: Session, user_id: int, batch_number: str, medicine_name: Optional[str] = None) -> dict:
+    """
+    Tenant-safe, direct fast batch lookup engine for DawaiFlow Quick Batch Scan.
+    Strictly queries the authenticated shop's active inventory (models.Product) without AI.
+    Hierarchy:
+      1. Level 1: Exact batch match (raw / normalized via direct indexed SQL query).
+      2. Level 2: Unique 5+ char prefix/containment match (e.g. '6SA09' -> '6SA0915' or '6SA0915MED' -> '6SA0915').
+      3. Level 3: Global shop self-correction (Levenshtein distance <= 2).
+      4. Level 4: Optional Medicine-First Reconciliation (fallback if medicine hint provided).
+      5. Level 5: Ambiguous candidate suggestions.
+    """
+    if not batch_number or not str(batch_number).strip():
+        return {
+            "found": False,
+            "scanned_batch": batch_number or "",
+            "normalized_batch": "",
+            "match_type": "none",
+            "product": None,
+            "possible_matches": [],
+            "message": "No Batch No. detected."
+        }
+
+    raw_batch = str(batch_number).strip()
+    norm_batch = normalize_batch_number(raw_batch)
+
+    # 1. LEVEL 1: Fast Direct Indexed SQL Query for Exact Batch Match
+    matched_product = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            func.upper(func.trim(models.Product.batch_number)) == raw_batch.upper()
+        )
+        .first()
+    )
+
+    if not matched_product and norm_batch:
+        matched_product = (
+            db.query(models.Product)
+            .filter(
+                models.Product.user_id == user_id,
+                models.Product.is_deleted == False,
+                func.upper(func.trim(models.Product.batch_number)) == norm_batch
+            )
+            .first()
+        )
+
+    if matched_product:
+        return {
+            "found": True,
+            "match_type": "exact",
+            "scanned_batch": raw_batch,
+            "normalized_batch": norm_batch,
+            "corrected_batch": matched_product.batch_number,
+            "product": serialize_product(matched_product),
+            "possible_matches": [],
+            "message": f"Exact batch '{matched_product.batch_number}' matched in inventory."
+        }
+
+    shop_products = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False
+        )
+        .all()
+    )
+
+    # 2. LEVEL 2: Direct Unique 5+ Char Prefix / Containment Match
+    if len(norm_batch) >= 5 or len(raw_batch) >= 5:
+        prefix_matches = []
+        for p in shop_products:
+            if not p.batch_number:
+                continue
+            p_norm = normalize_batch_number(p.batch_number)
+            if not p_norm or len(p_norm) < 4:
+                continue
+            
+            # Case A: Scanned is prefix of DB batch (e.g. scanned '6SA09' -> DB '6SA0915')
+            # Case B: DB batch is prefix of scanned (e.g. scanned '6SA0915MED' -> DB '6SA0915')
+            if p_norm.startswith(norm_batch) or norm_batch.startswith(p_norm):
+                prefix_matches.append(p)
+
+        if len(prefix_matches) == 1:
+            best_p = prefix_matches[0]
+            logger.info(f"[BATCH PREFIX MATCH] Scanned '{raw_batch}' matched DB batch '{best_p.batch_number}'")
+            return {
+                "found": True,
+                "match_type": "prefix_matched",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "corrected_batch": best_p.batch_number,
+                "product": serialize_product(best_p),
+                "possible_matches": [],
+                "message": f"Prefix match found: batch '{best_p.batch_number}'."
+            }
+        elif len(prefix_matches) > 1:
+            possible_list = [
+                {
+                    "batch_number": p.batch_number,
+                    "similarity": round(float(len(norm_batch)) / max(len(norm_batch), len(normalize_batch_number(p.batch_number) or "A")), 2),
+                    "product": serialize_product(p)
+                }
+                for p in prefix_matches[:5]
+            ]
+            return {
+                "found": False,
+                "ambiguous": True,
+                "match_type": "ambiguous_prefix_matches",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "product": None,
+                "possible_matches": possible_list,
+                "message": f"Multiple batches match prefix '{raw_batch}'."
+            }
+
+    # 3. LEVEL 3: Global Shop Self-Correction (Fuzzy Levenshtein Search)
+    close_candidates = []
+    if len(norm_batch) >= 3:
+        max_dist = 1 if len(norm_batch) <= 5 else 2
+
+        for p in shop_products:
+            if not p.batch_number:
+                continue
+            p_norm = normalize_batch_number(p.batch_number)
+            if not p_norm:
+                continue
+
+            if abs(len(p_norm) - len(norm_batch)) > max_dist:
+                continue
+
+            dist = _levenshtein_dist(norm_batch, p_norm)
+            if dist <= max_dist:
+                sim = 1.0 - (dist / float(max(len(norm_batch), len(p_norm))))
+                close_candidates.append({
+                    "dist": dist,
+                    "similarity": round(sim, 2),
+                    "product": p
+                })
+
+    close_candidates.sort(key=lambda x: (x["dist"], -x["similarity"]))
+
+    if len(close_candidates) == 1 or (len(close_candidates) > 1 and close_candidates[0]["dist"] < close_candidates[1]["dist"]):
+        best = close_candidates[0]
+        best_p = best["product"]
+        logger.info(f"[BATCH SELF-CORRECT] Scanned '{raw_batch}' (norm: '{norm_batch}') auto-corrected to DB batch '{best_p.batch_number}' (dist={best['dist']})")
+        return {
+            "found": True,
+            "match_type": "auto_corrected",
+            "scanned_batch": raw_batch,
+            "normalized_batch": norm_batch,
+            "corrected_batch": best_p.batch_number,
+            "similarity": best["similarity"],
+            "product": serialize_product(best_p),
+            "possible_matches": [],
+            "message": f"Auto-corrected OCR batch '{raw_batch}' -> '{best_p.batch_number}'."
+        }
+
+    # 4. LEVEL 4: Medicine-First Fallback (if medicine hint provided and batch lookup couldn't resolve)
+    if medicine_name and str(medicine_name).strip():
+        clean_med = str(medicine_name).strip().upper()
+        med_products = []
+        for p in shop_products:
+            p_name = (p.product_name or "").upper()
+            p_brand = (p.brand or "").upper()
+            p_comp = (p.composition or "").upper()
+
+            if clean_med in p_name or p_name in clean_med or clean_med in p_brand or clean_med in p_comp:
+                med_products.append(p)
+
+        if med_products:
+            med_close_candidates = []
+            max_dist_med = max(3, int(len(norm_batch) * 0.5))
+
+            for p in med_products:
+                if not p.batch_number:
+                    continue
+                p_norm = normalize_batch_number(p.batch_number)
+                if not p_norm:
+                    continue
+
+                dist = _levenshtein_dist(norm_batch, p_norm)
+                if dist <= max_dist_med:
+                    sim = 1.0 - (dist / float(max(len(norm_batch), len(p_norm))))
+                    med_close_candidates.append({
+                        "dist": dist,
+                        "similarity": round(sim, 2),
+                        "product": p
+                    })
+
+            med_close_candidates.sort(key=lambda x: (x["dist"], -x["similarity"]))
+
+            if len(med_close_candidates) == 1 or (len(med_close_candidates) > 1 and med_close_candidates[0]["dist"] < med_close_candidates[1]["dist"]):
+                best = med_close_candidates[0]
+                best_p = best["product"]
+                logger.info(f"[MEDICINE BATCH RECONCILE] Scanned '{raw_batch}' for medicine '{clean_med}' auto-corrected to DB batch '{best_p.batch_number}'")
+                return {
+                    "found": True,
+                    "match_type": "medicine_auto_corrected",
+                    "scanned_batch": raw_batch,
+                    "normalized_batch": norm_batch,
+                    "corrected_batch": best_p.batch_number,
+                    "similarity": best["similarity"],
+                    "product": serialize_product(best_p),
+                    "possible_matches": [],
+                    "message": f"Found '{best_p.product_name}' batch '{best_p.batch_number}' via medicine matching."
+                }
+
+    # 5. LEVEL 5: Ambiguous candidates across shop inventory
+    if len(close_candidates) > 1:
+        possible_list = [
+            {
+                "batch_number": cand["product"].batch_number,
+                "similarity": cand["similarity"],
+                "product": serialize_product(cand["product"])
+            }
+            for cand in close_candidates[:5]
+        ]
+        return {
+            "found": False,
+            "ambiguous": True,
+            "match_type": "ambiguous",
+            "scanned_batch": raw_batch,
+            "normalized_batch": norm_batch,
+            "product": None,
+            "possible_matches": possible_list,
+            "message": f"Multiple possible batch matches found for '{raw_batch}'."
+        }
+
+    return {
+        "found": False,
+        "ambiguous": False,
+        "match_type": "none",
+        "scanned_batch": raw_batch,
+        "normalized_batch": norm_batch,
+        "product": None,
+        "possible_matches": [],
+        "message": f"Batch '{raw_batch}' not found in shop inventory."
+    }
+
+
+def _normalize_batch_str(s: Optional[str]) -> str:
+    """Strips spaces, hyphens, colons, and punctuation for normalized batch matching."""
+    if not s:
+        return ""
+    return "".join(c for c in str(s).upper() if c.isalnum())
+
+
+def _levenshtein_dist(s1: str, s2: str) -> int:
+    """Computes Levenshtein edit distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein_dist(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (0 if c1 == c2 else 1)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
+def serialize_quick_batch_record(product: models.Product) -> dict:
+    """Serializes a Product model instance into a complete Quick Batch record payload."""
+    return {
+        "batch_id": product.id,
+        "batch_number": product.batch_number,
+        "product_id": product.id,
+        "medicine_name": product.product_name,
+        "brand": product.brand or "",
+        "category": product.category or "allopathy",
+        "composition": product.composition or "",
+        "expiry_date": safe_date_format(product.expiry_date),
+        "manufacturing_date": safe_date_format(product.manufacturing_date),
+        "mrp": float(product.total_price or product.unit_price or 0.0),
+        "purchase_price": float(product.purchase_price or 0.0),
+        "selling_price": float(product.unit_price or 0.0),
+        "stock_quantity": product.quantity or 0,
+        "unit": "Strips" if product.is_countable else "Packs",
+        "hsn_code": product.hsn_code or "3004",
+        "gst_rate": float(product.gst_rate or 12.0),
+        "tablets_per_strip": product.tablets_per_strip or 10,
+        "shop_id": product.user_id,
+        "branch_id": None
+    }
+
+
+def quick_batch_lookup(db: Session, user_id: int, raw_batch_str: str, medicine_name: Optional[str] = None) -> dict:
+    """
+    Dedicated, isolated Quick Batch Scan backend service.
+    Directly queries active shop products by batch_number.
+    ONE responsibility: BATCH NUMBER -> EXISTING INVENTORY BATCH RECORD.
+    """
+    if not raw_batch_str or not str(raw_batch_str).strip():
+        return {
+            "found": False,
+            "status": "error",
+            "match_type": "none",
+            "scanned_batch": raw_batch_str or "",
+            "normalized_batch": "",
+            "batch": None,
+            "message": "No batch string provided."
+        }
+
+    raw_batch = str(raw_batch_str).strip()
+    
+    # Clean trailing punctuation and attached packaging text if needed
+    try:
+        from ai.ocr_service import isolate_and_clean_batch_string
+        cleaned_batch = isolate_and_clean_batch_string(raw_batch) or raw_batch.strip(" :.,;!?)]}\"'\\-/#=").upper()
+    except Exception:
+        cleaned_batch = raw_batch.strip(" :.,;!?)]}\"'\\-/#=").upper()
+
+    norm_batch = _normalize_batch_str(cleaned_batch or raw_batch)
+
+    # 1. Level 1: Direct Exact SQL Query for ALL products with matching batch
+    matches = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            or_(
+                func.upper(func.trim(models.Product.batch_number)) == raw_batch.upper(),
+                func.upper(func.trim(models.Product.batch_number)) == cleaned_batch
+            )
+        )
+        .all()
+    )
+
+    if not matches and norm_batch:
+        matches = (
+            db.query(models.Product)
+            .filter(
+                models.Product.user_id == user_id,
+                models.Product.is_deleted == False,
+                func.upper(func.trim(models.Product.batch_number)) == norm_batch
+            )
+            .all()
+        )
+
+    if len(matches) == 1:
+        matched = matches[0]
+        return {
+            "found": True,
+            "status": "success",
+            "match_type": "exact",
+            "scanned_batch": raw_batch,
+            "normalized_batch": norm_batch,
+            "batch": serialize_quick_batch_record(matched),
+            "message": f"Exact match for batch '{matched.batch_number}'."
+        }
+    elif len(matches) > 1:
+        # If multiple products share the exact same batch number in this shop (e.g. 4 products for IPL25212)
+        # Check if medicine_name filter matches any product
+        if medicine_name and medicine_name.strip():
+            clean_med = medicine_name.strip().upper()
+            med_match = next((p for p in matches if clean_med in p.product_name.upper() or p.product_name.upper() in clean_med), None)
+            if med_match:
+                return {
+                    "found": True,
+                    "status": "success",
+                    "match_type": "exact_medicine_aligned",
+                    "scanned_batch": raw_batch,
+                    "normalized_batch": norm_batch,
+                    "batch": serialize_quick_batch_record(med_match),
+                    "message": f"Exact batch '{raw_batch}' matched with medicine '{med_match.product_name}'."
+                }
+
+        # Prefer product with higher quantity or exact name match
+        matches.sort(key=lambda p: (-p.quantity, p.id))
+        matched = matches[0]
+        return {
+            "found": True,
+            "status": "success",
+            "match_type": "exact_multi_candidate",
+            "scanned_batch": raw_batch,
+            "normalized_batch": norm_batch,
+            "batch": serialize_quick_batch_record(matched),
+            "possible_batches": [serialize_quick_batch_record(p) for p in matches[:5]],
+            "message": f"Exact match for batch '{matched.batch_number}' ({matched.product_name})."
+        }
+
+
+    # 2. Level 2: Controlled Prefix / Truncation Fallback
+    shop_products = (
+        db.query(models.Product)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False
+        )
+        .all()
+    )
+
+    if len(norm_batch) >= 4 or len(raw_batch) >= 4:
+        prefix_matches = []
+        for p in shop_products:
+            if not p.batch_number:
+                continue
+            p_norm = _normalize_batch_str(p.batch_number)
+            if not p_norm or len(p_norm) < 3:
+                continue
+            if p_norm.startswith(norm_batch) or norm_batch.startswith(p_norm):
+                prefix_matches.append(p)
+
+        if len(prefix_matches) == 1:
+            best_p = prefix_matches[0]
+            return {
+                "found": True,
+                "status": "success",
+                "match_type": "prefix",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "batch": serialize_quick_batch_record(best_p),
+                "message": f"Prefix match found: batch '{best_p.batch_number}'."
+            }
+        elif len(prefix_matches) > 1:
+            return {
+                "found": False,
+                "status": "ambiguous",
+                "match_type": "ambiguous_prefix",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "batch": None,
+                "possible_batches": [serialize_quick_batch_record(p) for p in prefix_matches[:5]],
+                "message": f"Multiple batches match prefix '{raw_batch}'."
+            }
+
+    # 3. Level 3: Database-supported Levenshtein correction (dist <= 2)
+    if len(norm_batch) >= 3:
+        max_dist = 1 if len(norm_batch) <= 5 else 2
+        close_cands = []
+        for p in shop_products:
+            if not p.batch_number:
+                continue
+            p_norm = _normalize_batch_str(p.batch_number)
+            if not p_norm:
+                continue
+            if abs(len(p_norm) - len(norm_batch)) > max_dist:
+                continue
+            dist = _levenshtein_dist(norm_batch, p_norm)
+            if dist <= max_dist:
+                close_cands.append(p)
+
+        if len(close_cands) == 1:
+            best_p = close_cands[0]
+            return {
+                "found": True,
+                "status": "success",
+                "match_type": "correction",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "batch": serialize_quick_batch_record(best_p),
+                "message": f"Corrected match found: batch '{best_p.batch_number}'."
+            }
+        elif len(close_cands) > 1:
+            return {
+                "found": False,
+                "status": "ambiguous",
+                "match_type": "ambiguous_fuzzy",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "batch": None,
+                "possible_batches": [serialize_quick_batch_record(p) for p in close_cands[:5]],
+                "message": f"Multiple fuzzy matches found for '{raw_batch}'."
+            }
+            return {
+                "found": False,
+                "status": "ambiguous",
+                "match_type": "ambiguous_fuzzy",
+                "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch,
+                "batch": None,
+                "possible_batches": [serialize_quick_batch_record(p) for p in close_cands[:5]],
+                "message": f"Multiple fuzzy matches found for '{raw_batch}'."
+            }
+
+    return {
+        "found": False,
+        "status": "not_found",
+        "match_type": "none",
+        "scanned_batch": raw_batch,
+        "normalized_batch": norm_batch,
+        "batch": None,
+        "message": f"Batch '{raw_batch}' was not found in your inventory."
+    }
+
+
+# ==============================================================================
+# CA CONNECT & GST FINANCIAL REPORTING ENGINE
+# ==============================================================================
+
+def get_ca_profile(db: Session, user_id: int) -> dict | None:
+    prof = db.query(models.CaProfile).filter(models.CaProfile.user_id == user_id).first()
+    if not prof:
+        return None
+    last_log = (
+        db.query(models.CaShareLog)
+        .filter(models.CaShareLog.user_id == user_id)
+        .order_by(models.CaShareLog.sent_at.desc())
+        .first()
+    )
+    return {
+        "id": prof.id,
+        "user_id": prof.user_id,
+        "ca_email": prof.ca_email,
+        "ca_name": prof.ca_name,
+        "ca_phone": prof.ca_phone,
+        "created_at": prof.created_at.isoformat() if prof.created_at else None,
+        "updated_at": prof.updated_at.isoformat() if prof.updated_at else None,
+        "last_shared_at": last_log.sent_at.isoformat() if (last_log and last_log.sent_at) else None,
+    }
+
+
+def save_ca_profile(db: Session, user_id: int, ca_email: str, ca_name: Optional[str] = None, ca_phone: Optional[str] = None) -> dict:
+    clean_email = ca_email.strip().lower()
+    prof = db.query(models.CaProfile).filter(models.CaProfile.user_id == user_id).first()
+    if prof:
+        prof.ca_email = clean_email
+        prof.ca_name = ca_name.strip() if ca_name else None
+        prof.ca_phone = ca_phone.strip() if ca_phone else None
+        prof.updated_at = datetime.utcnow()
+    else:
+        prof = models.CaProfile(
+            user_id=user_id,
+            ca_email=clean_email,
+            ca_name=ca_name.strip() if ca_name else None,
+            ca_phone=ca_phone.strip() if ca_phone else None,
+        )
+        db.add(prof)
+    db.commit()
+    db.refresh(prof)
+    return get_ca_profile(db, user_id)
+
+
+def delete_ca_profile(db: Session, user_id: int) -> bool:
+    prof = db.query(models.CaProfile).filter(models.CaProfile.user_id == user_id).first()
+    if not prof:
+        return False
+    db.delete(prof)
+    db.commit()
+    return True
+
+
+def get_ca_share_history(db: Session, user_id: int, limit: int = 50) -> list:
+    logs = (
+        db.query(models.CaShareLog)
+        .filter(models.CaShareLog.user_id == user_id)
+        .order_by(models.CaShareLog.sent_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for log in logs:
+        try:
+            reports = json.loads(log.reports_shared) if isinstance(log.reports_shared, str) else log.reports_shared
+        except Exception:
+            reports = [str(log.reports_shared)]
+        result.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "sender_email": log.sender_email,
+            "ca_email": log.ca_email,
+            "reports_shared": reports,
+            "date_range_label": log.date_range_label,
+            "date_range_start": log.date_range_start.isoformat() if log.date_range_start else None,
+            "date_range_end": log.date_range_end.isoformat() if log.date_range_end else None,
+            "status": log.status,
+            "sent_at": log.sent_at.isoformat() if log.sent_at else None,
+            "notes": log.notes,
+        })
+    return result
+
+
+def get_gst_financial_summary(
+    db: Session,
+    user_id: int,
+    preset: str = "current_month",
+    start_date_str: Optional[str] = None,
+    end_date_str: Optional[str] = None,
+) -> dict:
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_utc = datetime.utcnow()
+    now_ist = now_utc + ist_offset
+    today = now_ist.date()
+
+    start_of_today = datetime.combine(today, datetime.min.time())
+    end_of_today = datetime.combine(today, datetime.max.time())
+
+    p = (preset or "current_month").lower().strip()
+    if p in ("custom", "custom_range") and start_date_str:
+        try:
+            sd = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            start_date = datetime.combine(sd, datetime.min.time())
+            if end_date_str:
+                ed = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                end_date = datetime.combine(ed, datetime.max.time())
+            else:
+                end_date = datetime.combine(sd, datetime.max.time())
+        except Exception:
+            start_date = datetime.combine(today.replace(day=1), datetime.min.time())
+            end_date = end_of_today
+    elif p == "today":
+        start_date = start_of_today
+        end_date = end_of_today
+    elif p in ("this_week", "current_week"):
+        start_date = start_of_today - timedelta(days=today.weekday())
+        end_date = end_of_today
+    elif p in ("this_month", "current_month"):
+        start_date = datetime.combine(today.replace(day=1), datetime.min.time())
+        end_date = end_of_today
+    elif p in ("previous_month", "last_month"):
+        first_of_this_month = today.replace(day=1)
+        last_day_of_last_month = first_of_this_month - timedelta(days=1)
+        first_day_of_last_month = last_day_of_last_month.replace(day=1)
+        start_date = datetime.combine(first_day_of_last_month, datetime.min.time())
+        end_date = datetime.combine(last_day_of_last_month, datetime.max.time())
+    elif p in ("this_quarter", "current_quarter"):
+        q_month = ((today.month - 1) // 3) * 3 + 1
+        start_date = datetime.combine(today.replace(month=q_month, day=1), datetime.min.time())
+        end_date = end_of_today
+    elif p in ("financial_year", "fy"):
+        fy_year = today.year if today.month >= 4 else today.year - 1
+        start_date = datetime.combine(date(fy_year, 4, 1), datetime.min.time())
+        end_date = end_of_today
+    else:
+        start_date = datetime.combine(today.replace(day=1), datetime.min.time())
+        end_date = end_of_today
+
+    query_start = start_date - ist_offset
+    query_end = end_date - ist_offset
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    pharmacy_name = user.shop_name if user else "DawaiFlow Pharmacy"
+    owner_name = user.owner_name if user else "Pharmacy Admin"
+
+    sales = db.query(models.Sale).filter(
+        models.Sale.user_id == user_id,
+        models.Sale.created_at >= query_start,
+        models.Sale.created_at <= query_end
+    ).all()
+
+    total_sales = sum(float(s.total_amount or 0.0) for s in sales)
+    total_bills = len(sales)
+
+    sale_ids = [s.id for s in sales]
+    hsn_map = {}
+    total_output_gst = 0.0
+
+    if sale_ids:
+        sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id.in_(sale_ids)).all()
+        for item in sale_items:
+            hsn = (item.hsn_code or "3004").strip()
+            total_item_amt = float(item.total_price or 0.0)
+            gst_rate = float(getattr(item, "gst_percentage", 12.0) or 12.0)
+            
+            taxable = round(total_item_amt / (1.0 + gst_rate / 100.0), 2)
+            item_tax = round(total_item_amt - taxable, 2)
+            total_output_gst += item_tax
+
+            if hsn not in hsn_map:
+                hsn_map[hsn] = {
+                    "hsn_code": hsn,
+                    "taxable_amount": 0.0,
+                    "cgst_amount": 0.0,
+                    "sgst_amount": 0.0,
+                    "igst_amount": 0.0,
+                    "total_tax": 0.0,
+                    "total_amount": 0.0
+                }
+            hsn_map[hsn]["taxable_amount"] += taxable
+            hsn_map[hsn]["cgst_amount"] += round(item_tax / 2.0, 2)
+            hsn_map[hsn]["sgst_amount"] += round(item_tax / 2.0, 2)
+            hsn_map[hsn]["total_tax"] += item_tax
+            hsn_map[hsn]["total_amount"] += total_item_amt
+
+    hsn_summary = list(hsn_map.values())
+
+    purchases = db.query(models.PurchaseInvoice).filter(
+        models.PurchaseInvoice.user_id == user_id,
+        models.PurchaseInvoice.created_at >= query_start,
+        models.PurchaseInvoice.created_at <= query_end
+    ).all()
+
+    total_purchases = sum(float(p.total_amount or 0.0) for p in purchases)
+    total_purchase_invoices = len(purchases)
+    total_input_gst = sum(float(getattr(p, "gst_amount", 0.0) or getattr(p, "tax_amount", 0.0) or 0.0) for p in purchases)
+
+    net_gst_payable = round(total_output_gst - total_input_gst, 2)
+
+    return {
+        "pharmacy_name": pharmacy_name,
+        "owner_name": owner_name,
+        "gstin": getattr(user, "gstin", None) or getattr(user, "gst_number", None),
+        "period_label": preset,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
+        "total_sales": round(total_sales, 2),
+        "total_bills": total_bills,
+        "total_purchases": round(total_purchases, 2),
+        "total_purchase_invoices": total_purchase_invoices,
+        "total_output_gst": round(total_output_gst, 2),
+        "total_input_gst": round(total_input_gst, 2),
+        "net_gst_payable": net_gst_payable,
+        "hsn_summary": hsn_summary
+    }
+
+
+def share_reports_with_ca(
+    db: Session,
+    user_id: int,
+    reports: list,
+    preset: str = "this_month",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    target_ca_email: Optional[str] = None,
+    custom_message: Optional[str] = None,
+) -> dict:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    ca_prof = get_ca_profile(db, user_id)
+    
+    ca_email = (target_ca_email or (ca_prof.get("ca_email") if ca_prof else None) or "").strip().lower()
+    if not ca_email:
+        raise HTTPException(status_code=400, detail="No Chartered Accountant email configured or provided.")
+
+    summary = get_gst_financial_summary(db, user_id, preset, start_date, end_date)
+
+    report_label_map = {
+        "gst_summary": "GSTR-1 & GSTR-3B Tax Summary",
+        "sales_register": "Sales Register (Outward Supplies)",
+        "purchase_register": "Purchase Register (Input Tax Credit)",
+        "hsn_summary": "HSN Wise Tax Breakdown",
+        "input_output_gst": "Input vs Output GST Offset Statement",
+        "pnl_summary": "P&L Financial Statement"
+    }
+    shared_labels = [report_label_map.get(r, r) for r in reports]
+
+    from services.email_service import send_ca_report_email
+    mail_res = send_ca_report_email(
+        ca_email=ca_email,
+        sender_email=user.email if user else "pharmacy@dawaiflow.com",
+        pharmacy_name=summary["pharmacy_name"],
+        owner_name=summary["owner_name"],
+        gstin=summary["gstin"],
+        date_range_label=summary["period_label"],
+        reports_shared_labels=shared_labels,
+        summary_dict=summary,
+        custom_message=custom_message
+    )
+
+    share_log = models.CaShareLog(
+        user_id=user_id,
+        sender_email=user.email if user else None,
+        ca_email=ca_email,
+        reports_shared=json.dumps(reports),
+        date_range_label=summary["period_label"],
+        status="SENT" if mail_res.get("success") else "COMPOSED",
+        notes=custom_message or "Dispatched via DawaiFlow system gateway"
+    )
+    db.add(share_log)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Reports successfully dispatched to CA ({ca_email}).",
+        "mail_status": mail_res
+    }
+
+
 
 
 

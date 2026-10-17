@@ -335,12 +335,14 @@ def scan_invoice(image_input: Union[str, Path, bytes, List[Union[str, Path, byte
         "gemini-3.5-flash-lite",
         "gemini-2.5-flash",
         "gemini-2.0-flash",
-        "gemini-3.1-flash-lite-preview",
+        "gemini-3.6-flash",
         "gemini-3.5-flash",
         "gemini-1.5-flash",
     ]
-    if GEMINI_PRIMARY_MODEL and GEMINI_PRIMARY_MODEL not in candidate_models:
-        candidate_models.insert(0, GEMINI_PRIMARY_MODEL)
+    # The configured primary model (GEMINI_PRIMARY_MODEL) is always tried FIRST, even if it also appears
+    # in the fallback list; the rest are only fallbacks, tried in order.
+    if GEMINI_PRIMARY_MODEL:
+        candidate_models = [GEMINI_PRIMARY_MODEL] + [m for m in candidate_models if m != GEMINI_PRIMARY_MODEL]
 
     for target_model in candidate_models:
         try:

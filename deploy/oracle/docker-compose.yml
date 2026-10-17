@@ -1,0 +1,49 @@
+# DawaiFlow backend on one Oracle Cloud Always Free VM (Ubuntu, ARM).
+# Two containers: the FastAPI backend and Caddy (free automatic HTTPS for api.dawaiflow.com).
+# The database stays on Supabase; nothing database-related runs here.
+#
+# Start (on the VM, in this folder):   sudo docker compose up -d --build
+# Logs:                                sudo docker compose logs -f backend
+# Stop:                                sudo docker compose down
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: dawaiflow_backend
+    restart: always
+    env_file:
+      - ../../.env            # copied to the VM by push_from_pc.ps1; never committed to git
+    environment:
+      - ENVIRONMENT=production
+      - PYTHONUNBUFFERED=1
+      # This server is the ONLY place the scheduler runs (expiry notifications, daily purge, backup).
+      # Local PC test servers must run with ENABLE_SCHEDULER=0.
+      - ENABLE_SCHEDULER=1
+      - PORT=8000
+    expose:
+      - "8000"
+    volumes:
+      - uploads_data:/app/uploads
+      - backups_data:/app/backups
+
+  caddy:
+    image: caddy:2
+    container_name: dawaiflow_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+volumes:
+  uploads_data:
+  backups_data:
+  caddy_data:
+  caddy_config:

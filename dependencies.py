@@ -219,7 +219,11 @@ def get_current_user(
         return auth_user
 
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 def require_permission(perm: Union[str, List[str], Set[str], Tuple[str, ...]]):

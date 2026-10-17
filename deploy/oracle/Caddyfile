@@ -1,0 +1,11 @@
+# Caddy gets and renews a free HTTPS certificate for this name automatically.
+# Requirement: the DNS "A" record of api.dawaiflow.com points to this VM's public IP, and ports 80 and 443 are open.
+api.dawaiflow.com {
+    encode gzip
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+    reverse_proxy backend:8000
+}

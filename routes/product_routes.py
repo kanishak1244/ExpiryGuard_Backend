@@ -84,6 +84,16 @@ def read_products(
     return JSONResponse(content=result)
 
 
+@router.get("/dashboard/summary")
+@router.get("/dashboard/stats")
+def get_dashboard_summary(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Computes real-time KPI metrics for the mobile business dashboard with optimized SQL queries."""
+    return crud.get_dashboard_stats(db=db, user_id=current_user.id)
+
+
 @router.get("/inventory/summary")
 def get_inventory_summary(
     current_user: AuthenticatedUser = Depends(get_current_user),
@@ -91,6 +101,37 @@ def get_inventory_summary(
 ):
     """Lightweight SQL-aggregated Inventory Health Dashboard summary metrics."""
     return crud.get_inventory_summary(db=db, user_id=current_user.id)
+
+
+@router.get("/inventory/lookup-batch")
+@router.get("/products/lookup-batch")
+def lookup_batch_endpoint(
+    batch: str = Query(..., alias="batch"),
+    medicine: Optional[str] = Query(None, alias="medicine"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Tenant-safe, exact + medicine-first batch lookup engine for DawaiFlow Quick Batch Scan.
+    """
+    return crud.lookup_batch_in_inventory(db=db, user_id=current_user.id, batch_number=batch, medicine_name=medicine)
+
+
+@router.get("/inventory/quick-batch-lookup")
+@router.get("/api/inventory/quick-batch-lookup")
+def get_quick_batch_lookup(
+    batch: str = Query(..., alias="batch"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Dedicated, isolated Quick Batch Scan endpoint.
+    ONE responsibility: BATCH NUMBER -> EXISTING INVENTORY BATCH RECORD.
+    """
+    if not batch or not batch.strip():
+        raise HTTPException(status_code=400, detail="Batch parameter is required.")
+    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch)
+
 
 
 @router.get("/inventory/intelligence", response_model=schemas.InventoryIntelligenceResponse)
