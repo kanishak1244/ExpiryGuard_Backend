@@ -130,7 +130,7 @@ def get_quick_batch_lookup(
     """
     if not batch or not batch.strip():
         raise HTTPException(status_code=400, detail="Batch parameter is required.")
-    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch)
+    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch, exact_only=exact_only)
 
 
 

@@ -7597,7 +7597,7 @@ def serialize_quick_batch_record(product: models.Product) -> dict:
     }
 
 
-def quick_batch_lookup(db: Session, user_id: int, raw_batch_str: str, medicine_name: Optional[str] = None) -> dict:
+def quick_batch_lookup(db: Session, user_id: int, raw_batch_str: str, medicine_name: Optional[str] = None, exact_only: bool = False) -> dict:
     """
     Dedicated, isolated Quick Batch Scan backend service.
     Directly queries active shop products by batch_number.
@@ -7649,6 +7649,11 @@ def quick_batch_lookup(db: Session, user_id: int, raw_batch_str: str, medicine_n
             )
             .all()
         )
+
+    if not matches and exact_only:
+        # Cheap probe (used by the app to test several OCR guesses at once): no whole-inventory scan on a miss.
+        return {"found": False, "status": "not_found", "match_type": "none", "scanned_batch": raw_batch,
+                "normalized_batch": norm_batch, "batch": None, "message": "No exact match."}
 
     if len(matches) == 1:
         matched = matches[0]
