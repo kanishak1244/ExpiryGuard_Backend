@@ -254,11 +254,12 @@ def app_lookup_batch(
 @app.get("/api/inventory/quick-batch-lookup")
 def app_quick_batch_lookup(
     batch: str = Query(..., alias="batch"),
+    exact_only: bool = Query(False),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Dedicated, isolated Quick Batch Scan endpoint."""
-    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch)
+    return crud.quick_batch_lookup(db=db, user_id=current_user.id, raw_batch_str=batch, exact_only=exact_only)
 
 
 
