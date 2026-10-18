@@ -8144,16 +8144,48 @@ def _shop_batch_index(db: Session, user_id: int) -> Dict[str, Any]:
     return index
 
 
+def _within_one_edit(a: str, b: str) -> bool:
+    """True when a and b differ by at most one changed, missing or extra character."""
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    i = j = edits = 0
+    while i < la and j < lb:
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+            continue
+        edits += 1
+        if edits > 1:
+            return False
+        if la > lb:
+            i += 1
+        elif lb > la:
+            j += 1
+        else:
+            i += 1
+            j += 1
+    edits += (la - i) + (lb - j)
+    return edits <= 1
+
+
 def quick_batch_probe(db: Session, user_id: int, candidates: List[str]) -> dict:
     """
     Tests several OCR guesses against the shop's stocked batch numbers in ONE light query.
-    Returns the distinct stocked batches hit, exact matches first, then look-alike matches
-    (only guesses of 5+ characters are compared by look-alike form).
+    Returns the distinct stocked batches hit, in three tiers:
+      exact     - the guess is a stocked batch
+      lookalike - equal after mapping OCR look-alike characters (G/C/6, O/D/0, I/L/1, S/5, B/8, Z/2); 5+ chars
+      near      - one character missing, extra or changed (also on the look-alike form); guesses of 6+ chars
+    The app accepts a tier only when it has exactly one stocked batch.
     """
     index = _shop_batch_index(db, user_id)
     exact_hits: List[str] = []
     alike_hits: List[str] = []
-    for raw in candidates[:12]:
+    near_hits: List[str] = []
+    near_pool: List[str] = []
+    for raw in candidates[:16]:
         c = re.sub(r"[^A-Z0-9\-/._]", "", (raw or "").strip().upper())
         if len(c) < 3:
             continue
@@ -8165,5 +8197,17 @@ def quick_batch_probe(db: Session, user_id: int, candidates: List[str]) -> dict:
             for b in index["canon"].get(_canonical_batch(c), ()):
                 if b not in alike_hits:
                     alike_hits.append(b)
+        if len(c) >= 6:
+            near_pool.append(c)
+    if not exact_hits and not alike_hits and near_pool:
+        stocked = list(index["exact"].keys())
+        for c in near_pool:
+            cc = _canonical_batch(c)
+            for b in stocked:
+                if len(b) < 6 or abs(len(b) - len(c)) > 1:
+                    continue
+                if _within_one_edit(c, b) or _within_one_edit(cc, _canonical_batch(b)):
+                    if b not in near_hits:
+                        near_hits.append(b)
     alike_hits = [b for b in alike_hits if b not in exact_hits]
-    return {"exact": exact_hits, "lookalike": alike_hits}
+    return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits}
