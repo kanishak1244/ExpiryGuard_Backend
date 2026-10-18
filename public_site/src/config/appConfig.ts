@@ -1,5 +1,5 @@
 // Configuration for DawaiFlow compliance, contact, and product details
-// Sourced and verified from official project records (https://api.dawaiflow.com/)
+// Sourced and verified from official project records (https://dawaiflow.com/)
 
 // WhatsApp configuration - centralized constant for easy updates
 // Default configured business WhatsApp number: '919817066533'

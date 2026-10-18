@@ -1,0 +1,23 @@
+# Redirect rules for the static host of https://dawaiflow.com (Cloudflare Pages / Netlify syntax).
+# The marketing site is static; the web app and API live on https://api.dawaiflow.com.
+
+# Web app: it calls its API on the domain it is opened from, so it must run on api.dawaiflow.com.
+/web            https://api.dawaiflow.com/web/          301
+/web/*          https://api.dawaiflow.com/web/:splat    301
+
+# API docs / health that used to answer on this domain.
+/docs           https://api.dawaiflow.com/docs          301
+/health         https://api.dawaiflow.com/health        301
+
+# Legal and contact pages (previously redirected by the backend to sections of the homepage).
+/terms              /#terms         302
+/terms.html         /#terms         302
+/privacy            /#privacy       302
+/privacy.html       /#privacy       302
+/data-policy        /#data-policy   302
+/data-policy.html   /#data-policy   302
+/disclaimer         /#disclaimer    302
+/medical-disclaimer /#disclaimer    302
+/contact            /#contact       302
+/grievance          /#contact       302
+/support            /#contact       302
