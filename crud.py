@@ -20,6 +20,7 @@ _CUSTOMERS_CACHE = {}
 def invalidate_products_cache(user_id: int):
     global _PRODUCTS_CACHE
     _PRODUCTS_CACHE.pop(user_id, None)
+    _BATCH_INDEX_CACHE.pop(user_id, None)  # stocked batch list used by quick_batch_probe
 
 def get_all_active_products_cached(db: Session, user_id: int) -> List[models.Product]:
     global _PRODUCTS_CACHE
@@ -8092,3 +8093,77 @@ def share_reports_with_ca(
 
 
 
+
+
+# ===========================
+# QUICK BATCH PROBE (several OCR guesses, one database trip)
+# ===========================
+
+# OCR look-alikes on printed strips. Both the guess and the stored batch are mapped to this canonical form,
+# so "C6445066" / "66445066" find G6445066 and "126D070" finds 1260070.
+_BATCH_CONFUSABLES = str.maketrans({
+    "O": "0", "Q": "0", "D": "0",
+    "I": "1", "L": "1", "|": "1", "!": "1",
+    "Z": "2", "S": "5", "B": "8",
+    "G": "6", "C": "6",
+})
+_BATCH_INDEX_CACHE: Dict[int, tuple] = {}
+_BATCH_INDEX_TTL = 60.0
+
+
+def _canonical_batch(value: str) -> str:
+    v = re.sub(r"[^A-Z0-9|!]", "", (value or "").upper())
+    return v.translate(_BATCH_CONFUSABLES)
+
+
+def _shop_batch_index(db: Session, user_id: int) -> Dict[str, Any]:
+    """{exact: {BATCH: [ids]}, canon: {CANON: set(BATCH)}} for the shop, cached briefly (one light query)."""
+    cached = _BATCH_INDEX_CACHE.get(user_id)
+    now = time.time()
+    if cached and now - cached[0] < _BATCH_INDEX_TTL:
+        return cached[1]
+    rows = (
+        db.query(models.Product.id, models.Product.batch_number)
+        .filter(
+            models.Product.user_id == user_id,
+            models.Product.is_deleted == False,
+            models.Product.batch_number.isnot(None),
+        )
+        .all()
+    )
+    exact: Dict[str, List[int]] = {}
+    canon: Dict[str, set] = {}
+    for pid, bn in rows:
+        b = (bn or "").strip().upper()
+        if len(b) < 3:
+            continue
+        exact.setdefault(b, []).append(pid)
+        canon.setdefault(_canonical_batch(b), set()).add(b)
+    index = {"exact": exact, "canon": canon}
+    _BATCH_INDEX_CACHE[user_id] = (now, index)
+    return index
+
+
+def quick_batch_probe(db: Session, user_id: int, candidates: List[str]) -> dict:
+    """
+    Tests several OCR guesses against the shop's stocked batch numbers in ONE light query.
+    Returns the distinct stocked batches hit, exact matches first, then look-alike matches
+    (only guesses of 5+ characters are compared by look-alike form).
+    """
+    index = _shop_batch_index(db, user_id)
+    exact_hits: List[str] = []
+    alike_hits: List[str] = []
+    for raw in candidates[:12]:
+        c = re.sub(r"[^A-Z0-9\-/._]", "", (raw or "").strip().upper())
+        if len(c) < 3:
+            continue
+        if c in index["exact"]:
+            if c not in exact_hits:
+                exact_hits.append(c)
+            continue
+        if len(c) >= 5:
+            for b in index["canon"].get(_canonical_batch(c), ()):
+                if b not in alike_hits:
+                    alike_hits.append(b)
+    alike_hits = [b for b in alike_hits if b not in exact_hits]
+    return {"exact": exact_hits, "lookalike": alike_hits}

@@ -135,6 +135,16 @@ def get_quick_batch_lookup(
 
 
 
+@router.get("/inventory/quick-batch-probe")
+def get_quick_batch_probe(
+    candidates: str = Query(..., description="Comma-separated OCR guesses"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Several OCR batch guesses -> stocked batches they hit (exact, then OCR look-alike). One light query."""
+    return crud.quick_batch_probe(db=db, user_id=current_user.id, candidates=[c for c in candidates.split(",") if c.strip()])
+
+
 @router.get("/inventory/intelligence", response_model=schemas.InventoryIntelligenceResponse)
 def get_inventory_intelligence(
     category: Optional[str] = None,
