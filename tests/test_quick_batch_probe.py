@@ -7,7 +7,7 @@ import unittest
 
 import crud
 
-STOCKED = ["G6445066", "NL2533", "1260070", "5L80836", "28027174", "6SA0133", "AC826005"]
+STOCKED = ["G6445066", "NL2533", "1260070", "5L80836", "28027174", "6SA0133", "AC826005", "112025"]
 
 
 class QuickBatchProbeTest(unittest.TestCase):
@@ -42,6 +42,19 @@ class QuickBatchProbeTest(unittest.TestCase):
     def test_junk_does_not_match(self):
         r = self.probe("202873", "155.96", "XYZ999")
         self.assertEqual((r["exact"], r["lookalike"], r["near"]), ([], [], []))
+
+    def test_batch_inside_glued_ocr_text(self):
+        def contained(t):
+            return crud.quick_batch_probe(None, 999, [], text=t)["contained"]
+        # Real OCR lines from the phone log for the NL2533 strip, glued differently each time.
+        self.assertEqual(contained("Bto. NL2533FD.11{20EXP.10. / MR R. RS, 8"), ["NL2533"])
+        self.assertEqual(contained("325 RFL / Cals / g / ONL2533 FD.L1/2025EXP,10/zc"), ["NL2533"])
+        self.assertEqual(contained("BNQ126 DO70 / MEDMAY.2026"), ["1260070"])
+
+    def test_dates_and_prices_never_count_as_contained(self):
+        # "112025" is stocked (6 digits) but must not match the date 11/2025.
+        r = crud.quick_batch_probe(None, 999, [], text="MFG.DATE 11/2025 PER 10 TABS EXP 11/2027 Rs.155.96")
+        self.assertEqual(r["contained"], [])
 
     def test_within_one_edit(self):
         self.assertTrue(crud._within_one_edit("ABC123", "ABC1234"))

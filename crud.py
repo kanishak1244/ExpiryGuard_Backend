@@ -8171,13 +8171,16 @@ def _within_one_edit(a: str, b: str) -> bool:
     return edits <= 1
 
 
-def quick_batch_probe(db: Session, user_id: int, candidates: List[str]) -> dict:
+def quick_batch_probe(db: Session, user_id: int, candidates: List[str], text: Optional[str] = None) -> dict:
     """
     Tests several OCR guesses against the shop's stocked batch numbers in ONE light query.
     Returns the distinct stocked batches hit, in three tiers:
       exact     - the guess is a stocked batch
       lookalike - equal after mapping OCR look-alike characters (G/C/6, O/D/0, I/L/1, S/5, B/8, Z/2); 5+ chars
       near      - one character missing, extra or changed (also on the look-alike form); guesses of 6+ chars
+      contained - the stocked batch appears inside the whole OCR text (punctuation and spaces removed,
+                  look-alike form), which survives any gluing ("BNO.NL2533FD.11/2025" contains NL2533).
+                  Only batches with a letter and 6+ chars, or 7+ digits, so dates and prices cannot match.
     The app accepts a tier only when it has exactly one stocked batch.
     """
     index = _shop_batch_index(db, user_id)
@@ -8210,4 +8213,15 @@ def quick_batch_probe(db: Session, user_id: int, candidates: List[str]) -> dict:
                     if b not in near_hits:
                         near_hits.append(b)
     alike_hits = [b for b in alike_hits if b not in exact_hits]
-    return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits}
+
+    contained_hits: List[str] = []
+    if text:
+        canon_text = _canonical_batch(text)
+        for b in index["exact"].keys():
+            plain = re.sub(r"[^A-Z0-9]", "", b)
+            has_letter = bool(re.search(r"[A-Z]", plain))
+            if not ((has_letter and len(plain) >= 6) or (not has_letter and len(plain) >= 7)):
+                continue
+            if _canonical_batch(plain) in canon_text and b not in contained_hits:
+                contained_hits.append(b)
+    return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits, "contained": contained_hits}
