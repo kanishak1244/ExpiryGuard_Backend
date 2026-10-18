@@ -60,6 +60,39 @@ export const getPilotWhatsAppUrl = (): string => {
 };
 
 /**
+ * Builds a WhatsApp click-to-chat URL carrying every detail from the pilot request form,
+ * so the full application lands in the founder's WhatsApp chat.
+ */
+export const getPilotApplicationWhatsAppUrl = (app: {
+  contactPerson: string;
+  pharmacyName: string;
+  city: string;
+  phone: string;
+  email?: string;
+  currentBillingMethod: string;
+  estimatedDailyBills: string;
+  numPharmacies: string;
+  notes?: string;
+}): string => {
+  const lines = [
+    '*New DawaiFlow Pilot Request*',
+    '',
+    `*Name:* ${app.contactPerson.trim()}`,
+    `*Pharmacy:* ${app.pharmacyName.trim()}`,
+    `*City / Town:* ${app.city.trim()}`,
+    `*Phone (WhatsApp):* ${app.phone.trim()}`,
+    `*Email:* ${app.email?.trim() || 'Not provided'}`,
+    `*Current billing:* ${app.currentBillingMethod}`,
+    `*Bills per day:* ${app.estimatedDailyBills}`,
+    `*Number of outlets:* ${app.numPharmacies}`,
+    `*Biggest workflow problem:* ${app.notes?.trim() || 'Not provided'}`,
+    '',
+    'Submitted from the dawaiflow.com website.',
+  ];
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+};
+
+/**
  * Generates official WhatsApp click-to-chat URL with pre-filled inquiry message.
  * Formats:
  * With name: "Hi, my name is [Name]. I want to make an inquiry about DawaiFlow and would like to know more about the pilot."
