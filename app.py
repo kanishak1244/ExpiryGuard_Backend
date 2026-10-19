@@ -43,6 +43,7 @@ from routes import (
     staff_routes,
     setting_routes,
     document_routes,
+    document_archive_routes,
     gst_routes,
     ca_routes,
 )
@@ -186,6 +187,7 @@ app.include_router(report_routes.router)
 app.include_router(staff_routes.router)
 app.include_router(setting_routes.router)
 app.include_router(document_routes.router)
+app.include_router(document_archive_routes.router)
 app.include_router(gst_routes.router)
 app.include_router(ca_routes.router)
 
