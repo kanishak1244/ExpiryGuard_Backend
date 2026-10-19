@@ -444,7 +444,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
       barcode: p.barcode || '',
       expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '2028-12-31',
       stock: (p.quantity !== undefined && p.quantity !== null) ? Number(p.quantity) : 0,
-      mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 50.0,
+      mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 0,
       pricePerUnit: p.price_per_unit || p.loose_tablet_price,
       unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10,
       gst: p.gst_percentage || p.gst_rate || 12.0
@@ -581,7 +581,7 @@ function selectMedicineForBill(index, overrides = {}) {
     batchNumber: med.batchNumber || 'BATCH-01',
     expiryDate: med.expiryDate || '2028-12-31',
     stock: med.stock !== undefined ? med.stock : 10,
-    mrp: med.mrp || 50.0,
+    mrp: med.mrp || 0,
     pricePerUnit: med.pricePerUnit,
     unitsPerPack: med.unitsPerPack || 10
   });
@@ -594,7 +594,7 @@ function selectMedicineForBill(index, overrides = {}) {
         batchNumber: sm.batchNumber || 'BATCH-01',
         expiryDate: sm.expiryDate || '2028-12-31',
         stock: sm.stock !== undefined ? sm.stock : 10,
-        mrp: sm.mrp || 50.0,
+        mrp: sm.mrp || 0,
         pricePerUnit: sm.pricePerUnit,
         unitsPerPack: sm.unitsPerPack || 10
       });
@@ -631,7 +631,7 @@ function selectMedicineForBill(index, overrides = {}) {
     batchNumber: med.batchNumber || 'BATCH-01',
     expiryDate: med.expiryDate || '2028-12-31',
     stock: med.stock || 10,
-    mrp: med.mrp || 50.0,
+    mrp: med.mrp || 0,
     pricePerUnit: med.pricePerUnit,
     unitsPerPack: med.unitsPerPack || 10
   }];
@@ -639,7 +639,12 @@ function selectMedicineForBill(index, overrides = {}) {
   // Pre-select first valid earliest-expiry batch (FEFO)
   const primaryBatch = batchesList[0];
   const unitsPerPack = Number(primaryBatch.unitsPerPack || med.unitsPerPack || 10);
-  const packPrice = Number(primaryBatch.mrp || med.mrp || 50.0);
+  const packPrice = Number(primaryBatch.mrp || med.mrp || 0);
+  // Billing is based on MRP: a batch without MRP is never billed at a made-up price.
+  if (!(packPrice > 0)) {
+    alert(`${med.name} has no MRP in inventory. Enter its MRP (Inventory > Edit) before billing.`);
+    return;
+  }
   const loosePrice = primaryBatch.pricePerUnit ? Number(primaryBatch.pricePerUnit) : Number((packPrice / unitsPerPack).toFixed(2));
 
   const requestedUnit = (overrides.unitType === 'loose') ? 'loose' : 'strip';
@@ -2109,7 +2114,7 @@ async function matchVoiceInputToItem(spokenText) {
       batchNumber: p.batch_number || 'BATCH-01',
       expiryDate: p.expiry_date ? p.expiry_date.split('T')[0] : '2028-12-31',
       stock: p.quantity || 10,
-      mrp: p.unit_price || 50.0,
+      mrp: p.unit_price || 0,
       pricePerUnit: p.price_per_unit || p.loose_tablet_price,
       unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10,
       gst: p.gst_percentage || p.gst_rate || 12.0,

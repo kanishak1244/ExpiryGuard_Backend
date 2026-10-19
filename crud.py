@@ -660,6 +660,64 @@ def get_product(db: Session, product_id: int, user_id: int):
 # CREATE PRODUCT
 # ===========================
 
+# ===========================
+# MRP RULES (purchase price and MRP are different values and are never mixed)
+# ===========================
+
+def validate_mrp(
+    mrp: Optional[float],
+    purchase_price: Optional[float],
+    *,
+    name: str,
+    explicit_mrp: bool,
+    confirm_below_cost: bool = False,
+) -> float:
+    """
+    Server-side MRP check used by every flow that saves stock. Returns the MRP to store.
+      - MRP missing or 0                       -> 422 "MRP_REQUIRED"
+      - no explicit MRP sent and the price equals the purchase price (older apps that copied the purchase
+        price into the selling price)          -> 422 "MRP_REQUIRED" unless confirmed
+      - MRP lower than the purchase price      -> 422 "MRP_BELOW_COST" unless confirmed by the user
+    Error texts start with the code so the apps can show the right prompt.
+    """
+    label = (name or "this medicine").strip() or "this medicine"
+    if mrp is None or mrp <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"MRP_REQUIRED: MRP is required for '{label}'. Enter the MRP printed on the pack.",
+        )
+    cost = float(purchase_price or 0)
+    if cost > 0 and not confirm_below_cost:
+        if not explicit_mrp and abs(mrp - cost) < 0.005:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"MRP_REQUIRED: The selling price for '{label}' is the same as the purchase price "
+                    f"(Rs.{cost:.2f}). Enter the MRP printed on the pack."
+                ),
+            )
+        if mrp < cost:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"MRP_BELOW_COST: MRP Rs.{mrp:.2f} for '{label}' is lower than the purchase price "
+                    f"Rs.{cost:.2f}. Check both values, then confirm to save."
+                ),
+            )
+    return round(float(mrp), 2)
+
+
+def _product_mrp_input(product) -> Tuple[Optional[float], bool]:
+    """MRP sent by the client: the explicit `mrp` field, else the legacy aliases price/selling_price/unit_price."""
+    explicit = getattr(product, "mrp", None)
+    if explicit is not None and explicit > 0:
+        return float(explicit), True
+    for alias in (getattr(product, "price", None), getattr(product, "selling_price", None), getattr(product, "unit_price", None)):
+        if alias is not None and alias > 0:
+            return float(alias), False
+    return None, False
+
+
 def create_product(
     db: Session,
     product: schemas.ProductCreate,
@@ -674,8 +732,14 @@ def create_product(
 
     days_remaining, product_status = calculate_product_status(expiry)
 
-    selling_pr = getattr(product, 'selling_price', None)
-    effective_price = product.price if (product.price is not None and product.price > 0) else (selling_pr if (selling_pr is not None and selling_pr > 0) else product.unit_price)
+    mrp_in, explicit_mrp = _product_mrp_input(product)
+    effective_price = validate_mrp(
+        mrp_in,
+        getattr(product, "purchase_price", 0.0),
+        name=product.product_name,
+        explicit_mrp=explicit_mrp,
+        confirm_below_cost=getattr(product, "confirm_mrp_below_cost", False),
+    )
     calc_total_price = product.total_price if product.total_price > 0 else (product.quantity * effective_price)
 
     clean_name = product.product_name.strip()
@@ -770,7 +834,14 @@ def update_product(
 
     days_remaining, product_status = calculate_product_status(expiry)
 
-    effective_price = product.price if (product.price is not None and product.price > 0) else product.unit_price
+    mrp_in, explicit_mrp = _product_mrp_input(product)
+    effective_price = validate_mrp(
+        mrp_in,
+        (product.purchase_price or db_product.purchase_price or 0.0),
+        name=product.product_name,
+        explicit_mrp=explicit_mrp,
+        confirm_below_cost=getattr(product, "confirm_mrp_below_cost", False),
+    )
 
     db_product.product_name = product.product_name
     db_product.brand = product.brand
@@ -1203,6 +1274,27 @@ def create_sale_transaction(
                     unit_price = round(product.unit_price / (tablets_per_pack or 10), 2)
                 else:
                     unit_price = 0.0
+
+            # Selling is based on MRP (products.unit_price = MRP per strip/pack): a batch without MRP cannot be
+            # billed, and no line may be charged above MRP (per strip, or per tablet for loose sales).
+            mrp_strip = float(product.unit_price or 0.0)
+            if mrp_strip <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"MRP_REQUIRED: '{product.product_name}' (batch {product.batch_number or '-'}) has no MRP. "
+                        f"Enter its MRP in inventory before billing."
+                    ),
+                )
+            mrp_line = mrp_strip if is_strip else mrp_strip / float(tablets_per_pack or 10)
+            if unit_price > mrp_line + 0.01:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"PRICE_ABOVE_MRP: Price Rs.{unit_price:.2f} for '{product.product_name}' is above its MRP "
+                        f"Rs.{mrp_line:.2f} per {'strip' if is_strip else 'tablet'}."
+                    ),
+                )
 
             # Atomic and mathematically consistent stock deduction
             deduct_product_stock(
@@ -2850,6 +2942,15 @@ def create_custom_medicine(db: Session, data: schemas.CustomMedicineCreate):
 
 
 def add_real_inventory_item(db: Session, data: schemas.InventoryAddRequest, user_id: int, do_commit: bool = True):
+    # MRP is mandatory and never the purchase price; stored in unit_price.
+    explicit_mrp = data.mrp is not None and data.mrp > 0
+    data.unit_price = validate_mrp(
+        data.mrp if explicit_mrp else data.unit_price,
+        data.purchase_price,
+        name=data.product_name,
+        explicit_mrp=explicit_mrp,
+        confirm_below_cost=data.confirm_mrp_below_cost,
+    )
     exp_date = parse_date(data.expiry_date)
     mfg_date = parse_date(data.manufacturing_date) if data.manufacturing_date else None
 
@@ -3589,8 +3690,22 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
     doc.item_count = len(confirm_req.items)
     doc.ocr_status = "Verified"
 
-    created_products = []
+    # Every line needs its own MRP before anything is saved (whole invoice is rejected otherwise).
+    line_mrps = []
     for item in confirm_req.items:
+        explicit = item.mrp is not None and item.mrp > 0
+        line_mrps.append(
+            validate_mrp(
+                item.mrp if explicit else item.unit_price,
+                item.purchase_price,
+                name=item.product_name,
+                explicit_mrp=explicit,
+                confirm_below_cost=item.confirm_mrp_below_cost,
+            )
+        )
+
+    created_products = []
+    for item, line_mrp in zip(confirm_req.items, line_mrps):
         product_req = schemas.InventoryAddRequest(
             product_name=item.product_name,
             brand=item.brand,
@@ -3600,7 +3715,9 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
             batch_number=item.batch_number,
             quantity=item.quantity,
             purchase_price=item.purchase_price,
-            unit_price=item.unit_price,
+            unit_price=line_mrp,
+            mrp=line_mrp,
+            confirm_mrp_below_cost=item.confirm_mrp_below_cost,
             expiry_date=item.expiry_date
         )
         prod = add_real_inventory_item(db, product_req, user_id, do_commit=False)
@@ -3976,11 +4093,19 @@ def import_inventory_from_file(db: Session, user_id: int, file_bytes: bytes, fil
         except Exception:
             qty = 1
 
+        # Purchase price is never invented from the MRP: missing stays 0 (cost unknown).
         raw_purchase = get_val("purchase_price", "purchase_rate", "cost_price", "cost", "rate")
         try:
-            purchase_val = float(str(raw_purchase).replace("₹", "").replace(",", "").strip()) if raw_purchase is not None else round(mrp_val * 0.7, 2)
+            purchase_val = float(str(raw_purchase).replace("₹", "").replace(",", "").strip()) if raw_purchase is not None and str(raw_purchase).strip() != "" else 0.0
         except Exception:
-            purchase_val = round(mrp_val * 0.7, 2)
+            purchase_val = 0.0
+        if purchase_val > 0 and mrp_val < purchase_val:
+            errors.append({
+                "row": line_num,
+                "product_name": med_name_str,
+                "reason": f"MRP Rs.{mrp_val:.2f} is lower than purchase price Rs.{purchase_val:.2f}. Check both columns; this row was not imported."
+            })
+            continue
 
         raw_pack = get_val("pack_size_label", "pack_size", "packaging", "pack", "units_per_pack")
         pack_label = str(raw_pack).strip() if raw_pack else "1x10 Tablets"
@@ -4119,6 +4244,16 @@ def create_purchase_invoice(db: Session, obj_in: schemas.PurchaseInvoiceCreate, 
 
     if obj_in.payment_status and obj_in.payment_status.upper() in ["PENDING", "CREDIT"]:
         supplier.outstanding_payable = round((supplier.outstanding_payable or 0.0) + obj_in.total_amount, 2)
+
+    # MRP is mandatory on every purchase line and never taken from the purchase price.
+    for item in obj_in.items:
+        validate_mrp(
+            item.mrp,
+            item.purchase_price,
+            name=item.batch_number or f"product {item.product_id}",
+            explicit_mrp=True,
+            confirm_below_cost=getattr(obj_in, "confirm_mrp_below_cost", False),
+        )
 
     for item in obj_in.items:
         db_product = db.query(models.Product).filter(
@@ -4532,8 +4667,9 @@ def get_dashboard_stats(db: Session, user_id: int):
     cogs_result = db.query(
         func.sum(
             models.SaleItem.quantity * func.coalesce(
+                # Real purchase price only; never estimated from the sale price (unknown cost counts as 0).
                 models.Product.purchase_price,
-                models.SaleItem.unit_price * 0.7
+                0.0
             )
         )
     ).join(
@@ -4770,7 +4906,8 @@ def get_inventory_intelligence(
     dead_stock_val = 0.0
 
     for p in products:
-        cost_price = float(p.purchase_price if (p.purchase_price and p.purchase_price > 0) else (p.unit_price * 0.7 if p.unit_price else 0.0))
+        # Cost is the real purchase price only; never estimated from MRP (unknown cost counts as 0).
+        cost_price = float(p.purchase_price if (p.purchase_price and p.purchase_price > 0) else 0.0)
         selling_price = float(p.unit_price or 0.0)
         curr_stock = max(0, int(p.quantity or 0))
         inv_val = round(curr_stock * cost_price, 2)
@@ -5483,8 +5620,9 @@ def get_reports_analytics(
     cogs = db.query(
         func.sum(
             models.SaleItem.quantity * func.coalesce(
+                # Real purchase price only; never estimated from the sale price (unknown cost counts as 0).
                 models.Product.purchase_price,
-                models.SaleItem.unit_price * 0.7
+                0.0
             )
         )
     ).join(
@@ -8225,3 +8363,59 @@ def quick_batch_probe(db: Session, user_id: int, candidates: List[str], text: Op
             if _canonical_batch(plain) in canon_text and b not in contained_hits:
                 contained_hits.append(b)
     return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits, "contained": contained_hits}
+
+
+# ===========================
+# PRICE REVIEW (read-only): batches whose MRP / purchase price need the pharmacist's check
+# ===========================
+
+def get_price_review(db: Session, user_id: int, limit: int = 500) -> dict:
+    """
+    Lists active batches with a missing or suspicious MRP so they can be fixed by hand. Nothing is changed:
+    older records may hold the purchase price in the MRP field and only the pharmacist can tell.
+    Reasons: MRP missing, MRP equal to the purchase price, MRP lower than the purchase price,
+    purchase price missing (profit for it is unknown).
+    """
+    P = models.Product
+    rows = (
+        db.query(P.id, P.product_name, P.batch_number, P.quantity, P.unit_price, P.purchase_price, P.expiry_date)
+        .filter(P.user_id == user_id, P.is_deleted == False)
+        .filter(
+            or_(
+                P.unit_price.is_(None),
+                P.unit_price <= 0,
+                P.purchase_price.is_(None),
+                P.purchase_price <= 0,
+                P.unit_price <= P.purchase_price,
+            )
+        )
+        .order_by(P.product_name)
+        .limit(limit)
+        .all()
+    )
+    items = []
+    counts = {"mrp_missing": 0, "mrp_equals_purchase": 0, "mrp_below_purchase": 0, "purchase_missing": 0}
+    for pid, name, batch, qty, mrp, cost, expiry in rows:
+        mrp_v = float(mrp or 0.0)
+        cost_v = float(cost or 0.0)
+        if mrp_v <= 0:
+            reason, text = "mrp_missing", "MRP missing"
+        elif cost_v > 0 and abs(mrp_v - cost_v) < 0.005:
+            reason, text = "mrp_equals_purchase", "MRP same as purchase price (purchase price may have been saved as MRP)"
+        elif cost_v > 0 and mrp_v < cost_v:
+            reason, text = "mrp_below_purchase", "MRP lower than purchase price"
+        else:
+            reason, text = "purchase_missing", "Purchase price missing (profit unknown)"
+        counts[reason] += 1
+        items.append({
+            "product_id": pid,
+            "product_name": name,
+            "batch_number": batch,
+            "quantity": qty,
+            "mrp": round(mrp_v, 2),
+            "purchase_price": round(cost_v, 2),
+            "expiry_date": expiry.isoformat() if expiry else None,
+            "reason": reason,
+            "reason_text": text,
+        })
+    return {"total": len(items), "counts": counts, "items": items}

@@ -22,10 +22,11 @@ HEADER_ALIASES: Dict[str, List[str]] = {
     ],
     "price": [
         "price", "mrp", "sale_price", "sale price", "selling_price", "selling price",
-        "unit_price", "unit price", "rate", "s.rate", "sales rate", "s_rate", "m.r.p"
+        "unit_price", "unit price", "s.rate", "sales rate", "s_rate", "m.r.p"
     ],
+    # A plain "Rate" column on Indian purchase bills is the purchase rate, never the MRP.
     "purchase_price": [
-        "purchase_price", "purchase price", "purchase_rate", "purchase rate",
+        "purchase_price", "purchase price", "purchase_rate", "purchase rate", "rate",
         "p.rate", "p_rate", "cost_price", "cost price", "buying_price", "buying price",
         "cost", "p.price", "buy rate"
     ],
@@ -257,18 +258,22 @@ def validate_and_normalize_row(
     if price_val is None or price_val <= 0:
         return None, [], f"Row {row_index}: Invalid or missing price for product '{product_name}'."
 
-    # 3. Purchase Price (OPTIONAL, default to 80% of selling price)
+    # 3. Purchase Price (OPTIONAL). Never invented from the MRP: missing stays 0 = cost unknown.
     purchase_col = mapping.get("purchase_price")
     purchase_price = 0.0
     if purchase_col and purchase_col in row and not pd.isna(row[purchase_col]):
         try:
             purchase_price = float(re.sub(r'[^0-9.]', '', str(row[purchase_col])))
         except Exception:
-            purchase_price = round(price_val * 0.8, 2)
-            warnings.append(f"Invalid purchase price for '{product_name}'; calculated as 80% of selling price (₹{purchase_price}).")
+            purchase_price = 0.0
+            warnings.append(f"Invalid purchase price for '{product_name}'; left empty (profit for it will show as unknown).")
     else:
-        purchase_price = round(price_val * 0.8, 2)
-        warnings.append(f"Missing purchase price for '{product_name}'; calculated as ₹{purchase_price}.")
+        warnings.append(f"Missing purchase price for '{product_name}'; left empty (profit for it will show as unknown).")
+    if purchase_price > 0 and price_val < purchase_price:
+        return None, [], (
+            f"Row {row_index}: MRP Rs.{price_val:.2f} for '{product_name}' is lower than the purchase price "
+            f"Rs.{purchase_price:.2f}. Check both columns; this row was not imported."
+        )
 
     # 4. HSN Code (OPTIONAL, default "3004")
     hsn_col = mapping.get("hsn_code")

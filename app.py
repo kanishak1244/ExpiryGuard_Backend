@@ -44,6 +44,8 @@ from routes import (
     setting_routes,
     document_routes,
     document_archive_routes,
+    inventory_entry_routes,
+    restored_routes,
     gst_routes,
     ca_routes,
 )
@@ -188,6 +190,8 @@ app.include_router(staff_routes.router)
 app.include_router(setting_routes.router)
 app.include_router(document_routes.router)
 app.include_router(document_archive_routes.router)
+app.include_router(inventory_entry_routes.router)
+app.include_router(restored_routes.router)
 app.include_router(gst_routes.router)
 app.include_router(ca_routes.router)
 

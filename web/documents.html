@@ -297,7 +297,7 @@
                   <th>Batch #</th>
                   <th>Qty</th>
                   <th>Purchase Price (₹)</th>
-                  <th>MRP / Selling Price (₹)</th>
+                  <th>MRP (₹, required)</th>
                   <th>Expiry Date</th>
                   <th>Action</th>
                 </tr>
@@ -784,8 +784,8 @@
             <td><input type="number" step="0.5" class="form-input item-gst" value="${gst}" style="padding: 4px; width: 65px;"></td>
             <td><input type="text" class="form-input item-batch" value="${item.batch_number || ''}" style="padding: 4px; width: 85px;"></td>
             <td><input type="number" class="form-input item-qty" value="${item.quantity || 1}" style="padding: 4px; width: 55px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-pprice" value="${item.purchase_price || item.unit_price || 0}" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-sprice" value="${item.unit_price || item.mrp || 0}" style="padding: 4px; width: 75px;"></td>
+            <td><input type="number" step="0.01" class="form-input item-pprice" value="${item.purchase_price || item.ptr || item.unit_price || ''}" placeholder="Purchase" style="padding: 4px; width: 75px;"></td>
+            <td><input type="number" step="0.01" class="form-input item-sprice" value="${item.mrp || ''}" placeholder="MRP" required style="padding: 4px; width: 75px;"></td>
             <td><input type="date" class="form-input item-exp" value="${item.expiry_date || ''}" style="padding: 4px; width: 110px;"></td>
             <td><button class="btn btn-secondary" style="padding: 2px 6px; color: var(--error-red);" onclick="this.closest('tr').remove()">🗑️</button></td>
           </tr>
@@ -826,6 +826,8 @@
 
       const rows = document.querySelectorAll('#modal-items-tbody tr');
       const items = [];
+      const missingMrp = [];
+      const belowCostRows = [];
 
       rows.forEach(r => {
         const pName = r.querySelector('.item-name')?.value.trim();
@@ -838,18 +840,41 @@
         const exp = r.querySelector('.item-exp')?.value;
 
         if (pName && exp) {
+          // MRP is mandatory and is never copied from the purchase price.
+          if (!(sPrice > 0)) missingMrp.push(pName);
+          const belowCost = pPrice > 0 && sPrice > 0 && sPrice < pPrice;
+          if (belowCost) belowCostRows.push(`${pName}: MRP ₹${sPrice} < purchase ₹${pPrice}`);
           items.push({
             product_name: pName,
             batch_number: batch,
             quantity: qty,
             purchase_price: pPrice,
+            mrp: sPrice,
             unit_price: sPrice,
+            confirm_mrp_below_cost: belowCost,
             hsn_code: hsn,
             gst_rate: gst,
             expiry_date: exp
           });
         }
       });
+
+      const resetSave = () => {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Verified Stock →';
+        }
+      };
+      if (missingMrp.length > 0) {
+        alert(`Enter the MRP printed on the pack for: ${missingMrp.join(', ')}`);
+        resetSave();
+        return;
+      }
+      if (belowCostRows.length > 0 &&
+          !confirm(`MRP lower than purchase price:\n${belowCostRows.join('\n')}\n\nCheck the MRP printed on the pack. Save anyway?`)) {
+        resetSave();
+        return;
+      }
 
       if (items.length === 0) {
         alert("Please enter at least one valid medicine item with name & expiry date.");

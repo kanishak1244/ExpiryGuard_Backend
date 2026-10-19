@@ -181,7 +181,7 @@ function createAddInventoryModalDOM() {
             </div>
             <div class="form-group">
               <label class="form-label">Default MRP (₹)</label>
-              <input type="number" step="0.01" id="custom-med-mrp" class="form-input" value="30.00">
+              <input type="number" step="0.01" id="custom-med-mrp" class="form-input" value="" placeholder="Optional reference">
             </div>
           </div>
           <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
@@ -254,11 +254,11 @@ function createAddInventoryModalDOM() {
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Purchase Price per Strip (₹) *</label>
-                <input type="number" step="0.01" id="price-purchase" class="form-input" required value="15.00" oninput="calcPricingPerPill()">
+                <input type="number" step="0.01" id="price-purchase" class="form-input" required value="" placeholder="What you pay the supplier" oninput="calcPricingPerPill()">
               </div>
               <div class="form-group">
-                <label class="form-label">MRP / Retail Price per Strip (₹) *</label>
-                <input type="number" step="0.01" id="price-selling" class="form-input" required value="30.00" oninput="calcPricingPerPill()">
+                <label class="form-label">MRP per Strip (₹) * (as printed on the pack)</label>
+                <input type="number" step="0.01" id="price-selling" class="form-input" required value="" placeholder="MRP printed on the pack" oninput="calcPricingPerPill()">
               </div>
               <div class="form-group">
                 <label class="form-label">Calculated Loose Tablet Price</label>
@@ -613,8 +613,13 @@ function selectCatalogMedicine(med) {
   document.getElementById('batch-selected-form').textContent = med.category || 'Tablet';
 
   document.getElementById('qty-tablets-strip').value = med.tablets_per_strip || med.units_per_pack || 10;
-  document.getElementById('price-selling').value = med.default_price || 30.00;
-  document.getElementById('price-purchase').value = roundTwo(med.default_price ? med.default_price * 0.6 : 18.00);
+  // MRP and purchase price are entered from the pack / bill, never pre-filled with guesses.
+  const sellingInput = document.getElementById('price-selling');
+  sellingInput.value = '';
+  sellingInput.placeholder = med.default_price
+    ? `Catalogue ₹${Number(med.default_price).toFixed(2)} (check the pack)`
+    : 'MRP printed on the pack';
+  document.getElementById('price-purchase').value = '';
   document.getElementById('price-gst-rate').value = (med.gst_rate || 12.0).toFixed(1);
 
   calcTotalQuantity();
@@ -639,7 +644,7 @@ async function handleCustomMedicineSubmit(e) {
     category: document.getElementById('custom-med-category').value,
     composition: document.getElementById('custom-med-comp').value,
     tablets_per_strip: parseInt(document.getElementById('custom-med-units').value) || 10,
-    default_price: parseFloat(document.getElementById('custom-med-mrp').value) || 30.00,
+    default_price: parseFloat(document.getElementById('custom-med-mrp').value) || 0.0,
     hsn_code: "3004",
     gst_rate: 12.0
   };
@@ -858,6 +863,18 @@ async function handleBatchFormQueue(e) {
   const batchNum = document.getElementById('inv-flow-batch-num').value.trim();
   const pName = selectedMedicineMeta.product_name;
 
+  // MRP is mandatory and separate from the purchase price.
+  const mrpVal = parseFloat(document.getElementById('price-selling').value) || 0.0;
+  const purchaseVal = parseFloat(document.getElementById('price-purchase').value) || 0.0;
+  if (!(mrpVal > 0)) {
+    alert('Enter the MRP printed on the pack.');
+    return;
+  }
+  const belowCost = purchaseVal > 0 && mrpVal < purchaseVal;
+  if (belowCost && !confirm(`MRP ₹${mrpVal.toFixed(2)} is lower than the purchase price ₹${purchaseVal.toFixed(2)}. Check the pack. Save anyway?`)) {
+    return;
+  }
+
   pendingBatchPayload = {
     product_name: pName,
     brand: selectedMedicineMeta.brand || '',
@@ -866,8 +883,10 @@ async function handleBatchFormQueue(e) {
     gst_rate: parseFloat(document.getElementById('price-gst-rate').value) || 12.0,
     batch_number: batchNum,
     quantity: parseInt(document.getElementById('qty-total-strips').value) || 1,
-    purchase_price: parseFloat(document.getElementById('price-purchase').value) || 0.0,
-    unit_price: parseFloat(document.getElementById('price-selling').value) || 0.0,
+    purchase_price: purchaseVal,
+    mrp: mrpVal,
+    unit_price: mrpVal,
+    confirm_mrp_below_cost: belowCost,
     units_per_pack: parseInt(document.getElementById('qty-tablets-strip').value) || 10,
     manufacturing_date: document.getElementById('inv-flow-mfg-date').value || null,
     expiry_date: document.getElementById('inv-flow-exp-date').value,
@@ -984,7 +1003,7 @@ window.openAddInventoryForMedicine = function(medName, brand, suggestedQty, mrp)
     category: 'allopathy',
     composition: '',
     tablets_per_strip: 10,
-    default_price: mrp || 30.0,
+    default_price: mrp || 0.0,
     hsn_code: '3004',
     gst_rate: 12.0
   };

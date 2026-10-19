@@ -118,13 +118,18 @@ class ProductBase(BaseModel):
     batch_number: Optional[str] = None
     quantity: int = Field(default=0)
 
-    # Retail selling price (support both unit_price and price aliases)
+    # MRP per strip/pack. Stored in products.unit_price, which is the MRP and the selling basis for billing.
+    # unit_price / price / selling_price are accepted aliases (older app versions); `mrp` wins when sent.
     unit_price: float = Field(default=0, ge=0)
     price: Optional[float] = Field(default=None, ge=0)
     selling_price: Optional[float] = Field(default=None, ge=0)
+    mrp: Optional[float] = Field(default=None, ge=0)
 
-    # Supplier purchase price.
+    # Supplier purchase price (cost). Never used as MRP.
     purchase_price: float = Field(default=0, ge=0)
+
+    # Set by the app after the user confirms an MRP that is lower than (or equal to) the purchase price.
+    confirm_mrp_below_cost: bool = False
 
     total_price: float = Field(default=0, ge=0)
     manufacturing_date: Optional[Any] = None
@@ -282,7 +287,10 @@ class InventoryAddRequest(BaseModel):
     batch_number: str
     quantity: int = Field(gt=0)
     purchase_price: float = Field(ge=0.0)
-    unit_price: float = Field(ge=0.0)
+    # MRP per strip/pack (stored as products.unit_price). `mrp` preferred; unit_price kept for older clients.
+    unit_price: float = Field(default=0.0, ge=0.0)
+    mrp: Optional[float] = Field(default=None, ge=0.0)
+    confirm_mrp_below_cost: bool = False
     units_per_pack: Optional[int] = None
     expiry_date: str
     manufacturing_date: Optional[str] = None
@@ -738,7 +746,12 @@ class BulkPurchaseItemRequest(BaseModel):
 
     # Retail price charged to the customer.
     # Keep 0 when it is unknown; never guess it from an invoice.
-    selling_price: float = Field(ge=0.0, default=0.0)# ---------------- POS / COUNTER SALES SCHEMAS ---------------- #
+    selling_price: float = Field(ge=0.0, default=0.0)
+    # MRP per strip/pack (stored as products.unit_price); preferred over selling_price.
+    mrp: Optional[float] = Field(default=None, ge=0.0)
+    confirm_mrp_below_cost: bool = False
+    hsn_code: Optional[str] = None
+    gst_rate: Optional[float] = Field(default=None, ge=0.0, le=28.0)
     manufacturing_date: Optional[date] = None
     expiry_date: date
 
@@ -996,12 +1009,15 @@ class DocumentItemVerify(BaseModel):
     category: Optional[str] = "allopathy"
     batch_number: Optional[str] = None
     quantity: int = Field(gt=0)
+    # MRP per strip/pack (stored as products.unit_price). `mrp` is preferred; unit_price kept for older clients.
     unit_price: float = Field(default=0.0, ge=0.0)
+    mrp: Optional[float] = Field(default=None, ge=0.0)
     purchase_price: float = Field(default=0.0, ge=0.0)
     hsn_code: Optional[str] = "3004"
     gst_rate: Optional[float] = 12.0
     manufacturing_date: Optional[str] = None
     expiry_date: str
+    confirm_mrp_below_cost: bool = False
 
 
 class DocumentConfirmRequest(BaseModel):
@@ -1094,6 +1110,8 @@ class PurchaseInvoiceCreate(BaseModel):
     tax_amount: float
     payment_status: str  # PAID, UNPAID, PARTIAL
     items: List[PurchaseItemCreate]
+    # Set after the user confirms that an MRP lower than the purchase price is correct.
+    confirm_mrp_below_cost: bool = False
 
 class PurchaseInvoiceResponse(BaseModel):
     id: int

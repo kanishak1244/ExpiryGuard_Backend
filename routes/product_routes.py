@@ -146,6 +146,15 @@ def get_quick_batch_probe(
     return crud.quick_batch_probe(db=db, user_id=current_user.id, candidates=[c for c in candidates.split(",") if c.strip()], text=text)
 
 
+@router.get("/inventory/price-review")
+def get_price_review(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Read-only list of batches whose MRP or purchase price needs the pharmacist's review."""
+    return crud.get_price_review(db=db, user_id=current_user.id)
+
+
 @router.get("/inventory/intelligence", response_model=schemas.InventoryIntelligenceResponse)
 def get_inventory_intelligence(
     category: Optional[str] = None,
