@@ -30,12 +30,19 @@ router = APIRouter(tags=["Customer Directory & Khata Ledger"])
 def get_customers(
     search: Optional[str] = None,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(1000, ge=1, le=1000),
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Retrieve list of customers with optional search filtering."""
-    return crud.get_customers(db, current_user.id, search=search, skip=skip, limit=limit)
+    customers = crud.get_customers(db, current_user.id)
+    if search and search.strip():
+        needle = search.strip().lower()
+        customers = [
+            c for c in customers
+            if needle in (c.get("name") or "").lower() or needle in (c.get("phone") or "").lower()
+        ]
+    return customers[skip:skip + limit]
 
 
 @router.post("/customers")

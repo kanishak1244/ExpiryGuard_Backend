@@ -151,20 +151,24 @@ def generate_invoice_pdf(sale_data: dict, shop_data: dict) -> bytes:
 
     # 1. Shop Header & GSTIN
     shop_name = shop_data.get("shop_name") or "DawaiFlow Pharmacy"
-    gstin = shop_data.get("gstin") or shop_data.get("gst_number") or "07AABCE1234F1Z5"
-    address = shop_data.get("address") or "Main Market, New Delhi - 110001"
-    phone = shop_data.get("phone") or "+91-9876543210"
+    # Never invent shop details on a tax invoice: print only what the pharmacy has saved.
+    gstin = shop_data.get("gstin") or shop_data.get("gst_number")
+    address = shop_data.get("address")
+    phone = shop_data.get("phone")
 
     story.append(Paragraph(f"<b>{shop_name.upper()}</b>", title_style))
-    story.append(Paragraph(f"{address} | Ph: {phone}", subtitle_style))
-    story.append(Paragraph(f"<b>GSTIN: {gstin}</b>", subtitle_style))
+    contact_line = " | ".join(part for part in (address, f"Ph: {phone}" if phone else None) if part)
+    if contact_line:
+        story.append(Paragraph(contact_line, subtitle_style))
+    if gstin:
+        story.append(Paragraph(f"<b>GSTIN: {gstin}</b>", subtitle_style))
     story.append(Spacer(1, 6))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2e7d32"), spaceBefore=2, spaceAfter=6))
     story.append(Paragraph("<b>TAX INVOICE / RETAIL BILL</b>", ParagraphStyle('CenterBold', parent=bold_style, alignment=1, fontSize=11)))
     story.append(Spacer(1, 6))
 
     # 2. Bill & Customer Metadata Table
-    bill_no = sale_data.get("bill_number") or "BILL-1001"
+    bill_no = sale_data.get("bill_number") or "-"
     date_str = sale_data.get("created_at") or datetime.now().strftime("%d-%m-%Y %H:%M")
     if isinstance(date_str, datetime):
         date_str = date_str.strftime("%d-%m-%Y %H:%M")
@@ -231,7 +235,7 @@ def generate_invoice_pdf(sale_data: dict, shop_data: dict) -> bytes:
         rate = float(item.get("unit_price") or 0.0)
         taxable = float(item.get("taxable_value") or (rate * qty - float(item.get("discount") or 0)))
         total_item = float(item.get("total_with_tax") or item.get("total_price") or taxable)
-        gst_pct = float(item.get("gst_percentage") or 12.0)
+        gst_pct = float(item.get("gst_percentage") if item.get("gst_percentage") is not None else 12.0)  # 0% stays 0%
 
         if is_interstate:
             igst_amt = float(item.get("igst_amount") or (total_item - taxable))
@@ -287,7 +291,7 @@ def generate_invoice_pdf(sale_data: dict, shop_data: dict) -> bytes:
         # Compute tax summary dynamically if not passed directly
         rate_groups = {}
         for item in items:
-            rate = float(item.get("gst_percentage") or 12.0)
+            rate = float(item.get("gst_percentage") if item.get("gst_percentage") is not None else 12.0)  # 0% stays 0%
             taxable = float(item.get("taxable_value") or 0.0)
             cgst = float(item.get("cgst_amount") or 0.0)
             sgst = float(item.get("sgst_amount") or 0.0)

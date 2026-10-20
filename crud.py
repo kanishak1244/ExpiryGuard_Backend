@@ -4321,9 +4321,14 @@ def get_purchase_dashboard(db: Session, user_id: int):
         models.Supplier.user_id == user_id
     ).scalar() or 0
 
-    pending_supplier_payables = db.query(func.sum(models.Supplier.outstanding_payable)).filter(
-        models.Supplier.user_id == user_id
+    # Owed to suppliers = everything purchased minus everything paid (Supplier has no stored balance column).
+    total_purchased = db.query(func.sum(models.PurchaseInvoice.total_amount)).filter(
+        models.PurchaseInvoice.user_id == user_id
     ).scalar() or 0.0
+    total_paid = db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
+        models.SupplierPayment.user_id == user_id
+    ).scalar() or 0.0
+    pending_supplier_payables = max(0.0, float(total_purchased) - float(total_paid))
 
     return {
         "today_purchases": round(float(today_purchases), 2),
@@ -4333,10 +4338,11 @@ def get_purchase_dashboard(db: Session, user_id: int):
     }
 
 
-def get_purchase_invoices(db: Session, user_id: int, skip: int = 0, limit: int = 50):
-    return db.query(models.PurchaseInvoice).filter(
-        models.PurchaseInvoice.user_id == user_id
-    ).offset(skip).limit(limit).all()
+def get_purchase_invoices(db: Session, user_id: int, skip: int = 0, limit: int = 50, supplier_id: Optional[int] = None):
+    query = db.query(models.PurchaseInvoice).filter(models.PurchaseInvoice.user_id == user_id)
+    if supplier_id is not None:
+        query = query.filter(models.PurchaseInvoice.supplier_id == supplier_id)
+    return query.offset(skip).limit(limit).all()
 
 
 def get_purchase_invoice(db: Session, purchase_id: int, user_id: int):

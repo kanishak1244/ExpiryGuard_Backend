@@ -4,6 +4,7 @@ Handles invoice PDF rendering, ESC/POS thermal formatting, encrypted database ba
 """
 
 import os
+import json
 import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -33,6 +34,71 @@ logger = logging.getLogger("expiryguard.routes.documents")
 router = APIRouter(tags=["Documents, Printing & Imports"])
 
 
+_SAMPLE_GSTIN = "07AABCE1234F1Z5"
+
+
+def _invoice_pdf_inputs(sale, current_user):
+    """Plain dictionaries for the PDF writer (it reads dict keys, not database objects)."""
+    tax_summary = []
+    if getattr(sale, "tax_summary_json", None):
+        try:
+            tax_summary = json.loads(sale.tax_summary_json)
+        except Exception:
+            tax_summary = []
+    sale_dict = {
+        "bill_number": sale.bill_number,
+        "created_at": sale.created_at,
+        "customer_name": sale.customer_name,
+        "customer_phone": sale.customer_phone,
+        "payment_method": sale.payment_method,
+        "doctor_name": sale.doctor_name,
+        "doctor_reg_no": getattr(sale, "doctor_reg_no", None),
+        "is_interstate": sale.is_interstate,
+        "subtotal": sale.subtotal,
+        "discount_amount": sale.discount_amount,
+        "tax_amount": sale.tax_amount,
+        "total_amount": sale.total_amount,
+        "total_taxable_value": sale.total_taxable_value,
+        "total_cgst": sale.total_cgst,
+        "total_sgst": sale.total_sgst,
+        "total_igst": sale.total_igst,
+        "tax_summary": tax_summary,
+        "items": [
+            {
+                "product_name": item.product_name,
+                "hsn_code": getattr(item, "hsn_code", None) or "3004",
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "discount": item.discount,
+                "gst_percentage": item.gst_percentage,
+                "taxable_value": item.taxable_value,
+                "cgst_rate": item.cgst_rate,
+                "cgst_amount": item.cgst_amount,
+                "sgst_rate": item.sgst_rate,
+                "sgst_amount": item.sgst_amount,
+                "igst_rate": item.igst_rate,
+                "igst_amount": item.igst_amount,
+                "total_with_tax": item.total_with_tax,
+                "total_price": item.total_price,
+            }
+            for item in sale.items
+        ],
+    }
+    # Accounts registered without a GSTIN were saved with a sample GSTIN; never print that on an invoice.
+    gstin = getattr(current_user, "gstin", None) or getattr(current_user, "gst_number", None)
+    if gstin == _SAMPLE_GSTIN:
+        gstin = getattr(current_user, "gst_number", None)
+        if gstin == _SAMPLE_GSTIN:
+            gstin = None
+    shop_dict = {
+        "shop_name": current_user.shop_name,
+        "gstin": gstin,
+        "address": getattr(current_user, "address", None),
+        "phone": getattr(current_user, "phone", None),
+    }
+    return sale_dict, shop_dict
+
+
 @router.get("/billing/{sale_id}/pdf")
 @router.get("/sales/{sale_id}/pdf")
 def get_sale_invoice_pdf(
@@ -45,7 +111,7 @@ def get_sale_invoice_pdf(
     if not sale:
         raise HTTPException(status_code=404, detail="Sale invoice not found")
 
-    pdf_bytes = generate_invoice_pdf(sale, current_user)
+    pdf_bytes = generate_invoice_pdf(*_invoice_pdf_inputs(sale, current_user))
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
