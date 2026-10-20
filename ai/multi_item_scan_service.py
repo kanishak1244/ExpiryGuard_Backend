@@ -139,7 +139,7 @@ def validate_multi_item_data(data: dict) -> bool:
     return False
 
 
-def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: bytes | None = None, mime_type: str = "image/jpeg") -> dict:
+def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: bytes | None = None, mime_type: str = "image/jpeg", user_id: int | None = None) -> dict:
     """
     Scans one image containing 1-7 medicines using OpenCV multi-barcode + gemini-3.6-flash.
     Supports direct in-memory raw_bytes processing to avoid disk I/O latency.
@@ -217,6 +217,9 @@ def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: byt
                     ),
                 )
                 gemini_latency = time.time() - gemini_start
+                from ai import usage_log
+                usage_log.record_response(response, feature="scan_multi_item", outcome="success", shop_id=user_id,
+                                          model=target_model, latency_ms=int(gemini_latency * 1000))
                 break
             except Exception as exc:
                 last_error = str(exc)
@@ -244,7 +247,7 @@ def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: byt
             "items": [],
             "detected_barcodes": detected_barcodes,
             "error": last_error or "Failed to extract medicine information from image.",
-            "primary_engine": "Dawaiflow AI",
+            "primary_engine": "DawaiFlow AI",
             "gemini_latency": 0.0,
             "ocr_latency": 0.0,
             "total_latency": total_latency,
@@ -311,7 +314,7 @@ def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: byt
             "items": extracted_items,
             "detected_barcodes": detected_barcodes,
             "error": None,
-            "primary_engine": "Dawaiflow AI",
+            "primary_engine": "DawaiFlow AI",
             "gemini_latency": gemini_latency,
             "ocr_latency": 0.0,
             "total_latency": total_latency,
@@ -333,7 +336,7 @@ def scan_multi_item(image_path: str | Path | bytes | None = None, raw_bytes: byt
             "items": [],
             "detected_barcodes": detected_barcodes,
             "error": f"JSON parsing error: {exc}",
-            "primary_engine": "Dawaiflow AI",
+            "primary_engine": "DawaiFlow AI",
             "gemini_latency": gemini_latency,
             "ocr_latency": 0.0,
             "total_latency": total_latency,

@@ -223,7 +223,7 @@ def validate_label_data(data: dict) -> bool:
     return False
 
 
-def scan_label(image_input: Union[str, Path, bytes], raw_bytes: Optional[bytes] = None) -> dict:
+def scan_label(image_input: Union[str, Path, bytes], raw_bytes: Optional[bytes] = None, user_id: Optional[int] = None) -> dict:
     """
     Scan a product label using Gemini Vision.
     Implements barcode lookup, image optimization, schema validation, and retry logic.
@@ -286,6 +286,9 @@ def scan_label(image_input: Union[str, Path, bytes], raw_bytes: Optional[bytes] 
             ),
         )
 
+        from ai import usage_log
+        usage_log.record_response(response, feature="scan_label", outcome="success", shop_id=user_id,
+                                  model=target_model, latency_ms=int((time.time() - start_time) * 1000))
         raw_text = response.text or ""
         # Strip potential markdown wrapper fences
         if raw_text.strip().startswith("```"):
@@ -331,5 +334,5 @@ def scan_label(image_input: Union[str, Path, bytes], raw_bytes: Optional[bytes] 
             "success": False,
             "needs_manual_review": True,
             "data": None,
-            "error": f"Dawaiflow AI couldn't extract medicine details: {e}",
+            "error": f"DawaiFlow AI could not extract medicine details: {e}",  # internal: the route hides it from the client
         }

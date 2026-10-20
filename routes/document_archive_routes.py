@@ -166,7 +166,7 @@ def trigger_document_ocr(
         )
 
     logger.info("[OCR:ENDPOINT] Document #%s OCR started", document_id)
-    ocr_res = scan_invoice(str(full_path))
+    ocr_res = scan_invoice(str(full_path), user_id=current_user.id)
     supplier_match_info = None
     extracted_name = None
 

@@ -1111,6 +1111,44 @@ class PrioritySale(Base):
     product = relationship("Product")
 
 
+# ==========================================
+# AI USAGE LOG (Gemini cost tracking; numbers and IDs only, never content)
+# ==========================================
 
+class AiUsageLog(Base):
+    """
+    One row per Gemini call (or cache hit). Stores token counts and the computed cost only: no images, bill
+    contents, OCR text, medicine names, customer data, keys or responses. Standalone and additive: it has no
+    foreign keys and nothing in billing, stock or auth reads or writes it.
+    """
+    __tablename__ = "ai_usage_log"
+    __table_args__ = (
+        Index("idx_ai_usage_shop_time", "shop_id", "created_at"),
+        Index("idx_ai_usage_feature_time", "feature", "created_at"),
+        Index("idx_ai_usage_bill", "bill_id"),
+    )
 
-
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String(40), unique=True, nullable=False)  # idempotency key (phone retries are safe)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    shop_id = Column(Integer, nullable=True)                    # users.id of the pharmacy (no foreign key)
+    feature = Column(String(32), nullable=False)                # invoice_read, invoice_second_pass, ...
+    model = Column(String(64), nullable=True)
+    source = Column(String(8), nullable=False, default="backend")  # backend | phone
+    outcome = Column(String(16), nullable=False)                # success | error | timeout | cache_hit
+    call_no = Column(Integer, nullable=True)                    # 1 / 2 for the two invoice readings
+    prompt_tokens = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)              # candidatesTokenCount
+    thought_tokens = Column(Integer, nullable=True)             # thoughtsTokenCount (billed as output)
+    total_tokens = Column(Integer, nullable=True)
+    cost_inr = Column(Float, nullable=True)                     # NULL when usage was unavailable
+    cost_usd = Column(Float, nullable=True)
+    price_in_per_m = Column(Float, nullable=True)               # prices / rate used, so history stays correct
+    price_out_per_m = Column(Float, nullable=True)
+    usd_inr = Column(Float, nullable=True)
+    bill_id = Column(String(40), nullable=True)                 # ties the two invoice readings together
+    rows = Column(Integer, nullable=True)
+    pages = Column(Integer, nullable=True)
+    strips = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+

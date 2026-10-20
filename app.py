@@ -39,6 +39,7 @@ from routes import (
     purchase_routes,
     customer_routes,
     ai_routes,
+    ai_usage_routes,
     report_routes,
     staff_routes,
     setting_routes,
@@ -185,6 +186,7 @@ app.include_router(sale_routes.router)
 app.include_router(purchase_routes.router)
 app.include_router(customer_routes.router)
 app.include_router(ai_routes.router)
+app.include_router(ai_usage_routes.router)
 app.include_router(report_routes.router)
 app.include_router(staff_routes.router)
 app.include_router(setting_routes.router)

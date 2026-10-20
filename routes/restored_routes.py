@@ -1221,6 +1221,7 @@ def process_bulk_purchase(
     # checked before anything is saved.
     line_mrp = []
     for item in payload.items:
+        crud.validate_scanned_line_for_save(item.product_name, item.batch_number, item.hsn_code)
         explicit = item.mrp is not None and item.mrp > 0
         line_mrp.append(
             crud.validate_mrp(

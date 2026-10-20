@@ -37,48 +37,54 @@ MAX_FILE_SIZE_10MB = 10 * 1024 * 1024
 
 
 def _format_ai_error_exception(err_msg: str) -> HTTPException:
+    """
+    Maps an AI failure to an HTTP error. The client only ever sees plain "DawaiFlow AI" wording: the raw text
+    (which can name the AI vendor, model, quota or key problems) goes to the server log, never to the user.
+    Status codes are unchanged so older app versions keep working.
+    """
     err_clean = re.sub(r'AI_KEY=\S+|Bearer \S+|AQ\.[A-Za-z0-9_\-]+', '[REDACTED]', str(err_msg or ""))
     err_lower = err_clean.lower()
+    logger.warning("[AI SCAN] AI error (details hidden from client): %s", err_clean[:500])
 
     if "429" in err_clean or "quota" in err_lower or "resource_exhausted" in err_lower:
         return HTTPException(
             status_code=429,
-            detail=f"Gemini API error: 429 — Rate limit or quota exceeded ({err_clean})"
+            detail="DawaiFlow AI is busy right now. Please wait a minute and retry, or enter manually."
         )
     elif "401" in err_clean or "unauthorized" in err_lower or "invalid_api_key" in err_lower or "expired token" in err_lower or "invalid token" in err_lower:
         return HTTPException(
             status_code=401,
-            detail=f"Authentication error: 401 — Unauthorized ({err_clean})"
+            detail="DawaiFlow AI is not available right now. Please enter manually or try again later."
         )
     elif "403" in err_clean or "permission" in err_lower or "forbidden" in err_lower:
         return HTTPException(
             status_code=403,
-            detail=f"API permission error: 403 — Permission denied ({err_clean})"
+            detail="DawaiFlow AI is not available right now. Please enter manually or try again later."
         )
     elif "408" in err_clean or "timeout" in err_lower:
         return HTTPException(
             status_code=408,
-            detail=f"Request timeout: 408 — Request timed out while contacting DawaiFlow server ({err_clean})"
+            detail="DawaiFlow AI took too long. Please retry or enter manually."
         )
     elif "503" in err_clean or "unavailable" in err_lower:
         return HTTPException(
             status_code=503,
-            detail=f"Backend temporarily unavailable: 503 ({err_clean})"
+            detail="DawaiFlow AI is temporarily unavailable. Please retry or enter manually."
         )
     elif "504" in err_clean:
         return HTTPException(
             status_code=504,
-            detail=f"Backend timeout: 504 ({err_clean})"
+            detail="DawaiFlow AI took too long. Please retry or enter manually."
         )
     elif "json" in err_lower or "schema" in err_lower or "parse" in err_lower:
         return HTTPException(
             status_code=422,
-            detail=f"AI response received, but medicine information could not be parsed ({err_clean})"
+            detail="DawaiFlow AI could not read this clearly. Please retry or enter manually."
         )
     else:
         return HTTPException(
             status_code=502,
-            detail=f"AI service error: 502 — {err_clean}"
+            detail="DawaiFlow AI could not read this. Please retry or enter manually."
         )
 
 
@@ -138,7 +144,7 @@ def scan_single_label_endpoint(
         raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
 
     _validate_file_magic(file_bytes, ext)
-    res = scan_label(file_bytes)
+    res = scan_label(file_bytes, user_id=current_user.id)
     if not res.get("success"):
         duration_ms = int((time.time() - t_start) * 1000)
         err_str = res.get("error") or "Failed to scan medicine label."
@@ -269,7 +275,7 @@ def scan_multi_item_endpoint(
             raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
 
         _validate_file_magic(file_bytes, ext)
-        res = scan_multi_item(file_bytes)
+        res = scan_multi_item(file_bytes, user_id=current_user.id)
 
         if not res.get("success"):
             duration_ms = int((time.time() - t_start) * 1000)
@@ -366,12 +372,20 @@ def scan_invoice_endpoint(
         raise HTTPException(status_code=400, detail="Uploaded invoice files were empty or invalid.")
 
     try:
-        scan_res = scan_invoice(image_bytes_list)
+        scan_res = scan_invoice(image_bytes_list, user_id=current_user.id)
         if not scan_res.get("success"):
-            raise HTTPException(
-                status_code=502,
-                detail=scan_res.get("error") or "Failed to scan purchase invoice."
-            )
+            # The bill could not be read reliably (or automatic reading is off / capped): tell the app clearly and
+            # let the user enter it manually. Same shape as a normal result with no rows, so older apps show
+            # their "add items manually" prompt.
+            return {
+                "success": False,
+                "items": [],
+                "items_count": 0,
+                "needs_review": True,
+                "needs_manual_entry": True,
+                "reason": scan_res.get("reason"),
+                "error": scan_res.get("error") or "The invoice could not be read. Please enter it manually.",
+            }
 
         invoice_data = scan_res.get("data", {})
         
@@ -413,10 +427,12 @@ def scan_invoice_endpoint(
             "items": items,
             "items_count": len(items),
             "needs_review": has_review,
+            "needs_manual_entry": False,
+            "validation": invoice_data.get("validation"),
             "error": None
         }
     except HTTPException:
         raise
     except Exception as err:
         logger.error(f"[SCAN_INVOICE_ENDPOINT_ERROR] {err}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Invoice OCR error: {err}")
+        raise HTTPException(status_code=500, detail="DawaiFlow AI could not read this bill. Please retry or enter manually.")

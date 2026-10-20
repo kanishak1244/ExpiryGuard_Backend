@@ -413,6 +413,8 @@ Return a valid JSON array of objects with the following schema:
                 temperature=0.1
             )
         )
+        from ai import usage_log
+        usage_log.record_response(response, feature="migration_pdf", outcome="success", model=GEMINI_PRIMARY_MODEL)
         if response and response.text:
             data = json.loads(response.text)
             if isinstance(data, list):

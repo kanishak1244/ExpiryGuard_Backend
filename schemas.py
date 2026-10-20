@@ -795,7 +795,7 @@ class MultiScanItemResponse(BaseModel):
     possible_matches: List[Dict[str, Any]] = []
     batch_confidence: Optional[float] = 0.0
     engine: Optional[str] = "GEMINI_AI"
-    engine_label: Optional[str] = "Dawaiflow AI"
+    engine_label: Optional[str] = "DawaiFlow AI"
     engine_performance: Optional[str] = None
 
 
@@ -806,7 +806,7 @@ class MultiScanResponse(BaseModel):
     needs_review: bool
     detected_barcodes: List[str] = []
     error: Optional[str] = None
-    primary_engine: Optional[str] = "Dawaiflow AI"
+    primary_engine: Optional[str] = "DawaiFlow AI"
     gemini_latency: Optional[float] = 0.0
     ocr_latency: Optional[float] = 0.0
     total_latency: Optional[float] = 0.0

@@ -707,6 +707,28 @@ def validate_mrp(
     return round(float(mrp), 2)
 
 
+def validate_scanned_line_for_save(name: str, batch: Optional[str], hsn: Optional[str]) -> None:
+    """
+    Server-side check for a line coming from an invoice review screen, so wrong values cannot be saved even if a
+    client skips its own checks: the batch must be present and must not look like a date, price or the HSN code;
+    the HSN, if given, must be digits only of length 4, 6 or 8 (a date in the HSN column is an error).
+    """
+    from ai import invoice_validation as _val
+    label = (name or "this medicine").strip() or "this medicine"
+    bad = _val.validate_batch(batch, hsn)
+    if bad:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"BATCH_INVALID: Batch for '{label}': {bad}. Enter the batch printed on the bill.",
+        )
+    bad = _val.validate_hsn(hsn)
+    if bad:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"HSN_INVALID: HSN for '{label}': {bad}. Enter the HSN printed on the bill or leave it empty.",
+        )
+
+
 def _product_mrp_input(product) -> Tuple[Optional[float], bool]:
     """MRP sent by the client: the explicit `mrp` field, else the legacy aliases price/selling_price/unit_price."""
     explicit = getattr(product, "mrp", None)
@@ -3690,9 +3712,11 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
     doc.item_count = len(confirm_req.items)
     doc.ocr_status = "Verified"
 
-    # Every line needs its own MRP before anything is saved (whole invoice is rejected otherwise).
+    # Every line needs its own MRP, a real batch and a valid HSN before anything is saved (whole invoice is
+    # rejected otherwise).
     line_mrps = []
     for item in confirm_req.items:
+        validate_scanned_line_for_save(item.product_name, item.batch_number, item.hsn_code)
         explicit = item.mrp is not None and item.mrp > 0
         line_mrps.append(
             validate_mrp(
@@ -5793,12 +5817,13 @@ def get_ai_chat_response(db: Session, user_id: int, query: str) -> dict:
     medical_keywords = ["dosage", "treat", "prescription", "cure", "symptom", "side effect", "disease", "diagnose"]
     if any(k in q for k in medical_keywords):
         return {
-            "answer": "🛡️ Dawaiflow AI Assistant is strictly built for pharmacy business management (Inventory, Sales, Billing, Khata & Expiry). I cannot provide clinical or medical treatment recommendations. Please consult a registered medical practitioner.",
+            "answer": "🛡️ DawaiFlow AI Assistant is strictly built for pharmacy business management (Inventory, Sales, Billing, Khata & Expiry). I cannot provide clinical or medical treatment recommendations. Please consult a registered medical practitioner.",
             "source": "AI Safety Rule"
         }
 
     # Dynamic imports to prevent circular imports
     from ai.gemini_service import client, GEMINI_PRIMARY_MODEL, log_ai_metrics
+    from ai import usage_log
     from google.genai import types
     import logging
     import time
@@ -5816,6 +5841,8 @@ def get_ai_chat_response(db: Session, user_id: int, query: str) -> dict:
                 temperature=0.0
             )
         )
+        usage_log.record_response(classify_res, feature="ai_chat_classify", outcome="success", shop_id=user_id,
+                                  model=GEMINI_PRIMARY_MODEL)
         intent_raw = classify_res.text.strip().lower()
         if "sales" in intent_raw:
             intent = "sales"
@@ -5919,6 +5946,8 @@ CRITICAL RULES:
                 temperature=0.2
             )
         )
+        usage_log.record_response(response, feature="ai_chat_answer", outcome="success", shop_id=user_id,
+                                  model=GEMINI_PRIMARY_MODEL, latency_ms=int((time.time() - start_time) * 1000))
         answer = response.text.strip()
         latency = time.time() - start_time
         in_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0

@@ -49,7 +49,7 @@ function createAddInventoryModalDOM() {
             <div style="font-size: 34px; margin-bottom: 6px; line-height: 1;">📄</div>
             <div>
               <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: var(--dark-text);">Scan / Upload Bill</h3>
-              <p style="font-size: 12px; color: var(--muted-text); margin: 0; line-height: 1.4;">Upload supplier invoice image or PDF. Dawaiflow AI extracts medicines, batches & prices.</p>
+              <p style="font-size: 12px; color: var(--muted-text); margin: 0; line-height: 1.4;">Upload supplier invoice image or PDF. DawaiFlow AI extracts medicines, batches & prices.</p>
             </div>
             <button class="btn btn-secondary btn-sm" style="margin-top: 10px; font-size: 12px; font-weight: 600;" onclick="event.stopPropagation(); triggerScanBillOption();">📄 Select Invoice File</button>
           </div>
