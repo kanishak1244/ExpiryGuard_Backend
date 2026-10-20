@@ -4629,11 +4629,59 @@ def get_supplier_payments(db: Session, supplier_id: int, user_id: int, skip: int
     ).offset(skip).limit(limit).all()
 
 
+def ist_today_start_utc() -> "datetime":
+    """Start of the current Indian (IST, UTC+5:30) calendar day, as naive UTC (sales are stored as naive UTC)."""
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = datetime.utcnow() + ist_offset
+    return datetime.combine(now_ist.date(), datetime.min.time()) - ist_offset
+
+
+def compute_profit_for_period(db: Session, user_id: int, start_utc, end_utc=None) -> dict:
+    """
+    Profit = taxable sale value (after discount, GST excluded) minus the cost of what was actually sold,
+    net of returned quantity. Cost is the batch's real purchase price (per strip; a loose line uses the price
+    divided by tablets per strip). A line with no known cost (> 0) is left out and counted separately, never
+    estimated, so the figure is honest and the UI can say how many lines it covers.
+    """
+    q = (
+        db.query(models.SaleItem, models.Product)
+        .join(models.Sale, models.SaleItem.sale_id == models.Sale.id)
+        .outerjoin(models.Product, models.SaleItem.product_id == models.Product.id)
+        .filter(models.Sale.user_id == user_id, models.Sale.created_at >= start_utc)
+    )
+    if end_utc is not None:
+        q = q.filter(models.Sale.created_at < end_utc)
+
+    profit = 0.0
+    counted = 0
+    total = 0
+    for item, product in q.all():
+        qty = int(item.quantity or 0)
+        net_qty = max(0, qty - int(item.returned_quantity or 0))
+        if qty <= 0 or net_qty <= 0:
+            continue  # fully returned lines earn nothing
+        total += 1
+        cost_per_pack = float(product.purchase_price or 0.0) if product is not None else 0.0
+        if cost_per_pack <= 0:
+            continue
+        if (item.unit_type or "strip").lower() == "loose":
+            per_strip = int(item.tablets_per_strip or (product.tablets_per_strip if product is not None else 0) or 0)
+            if per_strip <= 0:
+                continue
+            unit_cost = cost_per_pack / per_strip
+        else:
+            unit_cost = cost_per_pack
+        revenue = float(item.taxable_value or 0.0) * (net_qty / qty)
+        profit += revenue - unit_cost * net_qty
+        counted += 1
+    return {"profit": round(profit, 2), "lines_counted": counted, "lines_total": total}
+
+
 def get_dashboard_stats(db: Session, user_id: int):
     """Computes real-time KPI metrics for the mobile business dashboard with optimized SQL queries."""
     import datetime
     today = datetime.date.today()
-    start_of_today = datetime.datetime.combine(today, datetime.time.min)
+    start_of_today = ist_today_start_utc()  # the pharmacy's day is the Indian day, not the server's UTC day
     start_of_month = datetime.datetime.combine(today.replace(day=1), datetime.time.min)
 
     # 1. Total Receivables (Khata credit balance)
@@ -4712,12 +4760,16 @@ def get_dashboard_stats(db: Session, user_id: int):
     ).scalar() or 0.0
 
     net_profit = max(0.0, float(month_revenue) - float(cogs_result))
+    today_profit = compute_profit_for_period(db, user_id, start_of_today)
 
     return {
         "today_revenue": round(float(today_revenue), 2),
         "today_sales_count": int(today_sales_count),
         "month_revenue": round(float(month_revenue), 2),
         "net_profit": round(float(net_profit), 2),
+        "today_profit": today_profit["profit"],
+        "profit_lines_counted": today_profit["lines_counted"],
+        "profit_lines_total": today_profit["lines_total"],
         "low_stock_count": int(low_stock_count),
         "expired_count": int(expired_count),
         "expiring_soon_count": int(expiring_soon_count),

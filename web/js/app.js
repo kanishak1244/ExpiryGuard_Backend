@@ -335,6 +335,11 @@ function initDashboard() {
         const profitVal = summary.today_profit !== undefined ? summary.today_profit : (summary.profit_today || 0);
         profitEl.textContent = `₹${Number(profitVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
+      // Profit only covers items whose purchase cost is known; say how many.
+      const profitNoteEl = document.getElementById('kpi-profit-note');
+      if (profitNoteEl && Number(summary.profit_lines_total) > 0) {
+        profitNoteEl.textContent = `Based on ${Number(summary.profit_lines_counted || 0)} of ${Number(summary.profit_lines_total)} items`;
+      }
 
       const expEl = document.getElementById('kpi-expiring');
       if (expEl) expEl.textContent = Number(summary.expiring_soon_count || 0).toLocaleString('en-IN');
