@@ -649,6 +649,7 @@ function renderInventoryRows(items) {
       <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12.5px;" onclick="openAddInventoryModal()">+ Add Inventory</button>
     </td></tr>`;
     updateSelectionUI();
+    medOnRowsRendered([]);
     return;
   }
 
@@ -663,7 +664,7 @@ function renderInventoryRows(items) {
     const isChecked = selectedStockIds.has(p.id);
 
     return `
-      <tr>
+      <tr class="inv-row" data-id="${p.id}">
         <td style="text-align: center;">
           <input type="checkbox" class="stock-row-checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} onchange="onStockSelectionChange(${p.id}, this.checked)">
         </td>
@@ -682,7 +683,6 @@ function renderInventoryRows(items) {
         <td>${statusBadge}</td>
         <td>
           <div style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="viewProductDetails(${p.id})">Stock Card</button>
             <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: #DC2626; border-color: #FCA5A5;" onclick="deleteSingleInventoryStock(${p.id}, '${window.escapeHtml(p.product_name)}')">🗑️ Delete</button>
           </div>
         </td>
@@ -691,7 +691,247 @@ function renderInventoryRows(items) {
   }).join('');
 
   updateSelectionUI();
+  medOnRowsRendered(items);
 }
+
+// ==========================================================================
+// MEDICINE DETAILS PANEL (Live Inventory, read-only)
+// Shows what is already stored for the highlighted row; missing values show "-", never 0.00.
+// The row's own data is used instantly; the other batches of the same medicine are fetched once per medicine
+// (debounced, cached) so arrow-key scrolling never sends a request per key press.
+// ==========================================================================
+const medDetail = {
+  rows: new Map(),          // id -> item of the rendered page
+  order: [],                // ids in display order
+  selectedId: null,
+  batchCache: new Map(),    // normalised name -> array of batch rows (all pages)
+  inflight: new Map(),      // normalised name -> promise
+  fetchTimer: null,
+  fetchSeq: 0,
+  wired: false,
+};
+
+function medIsOwnerView() {
+  // Purchase rate and margin are owner-only. Unknown profile => hide (safe default).
+  try {
+    const p = JSON.parse(localStorage.getItem('expiryguard_cached_user_profile') || 'null');
+    return !!(p && (p.is_owner === true || p.role === 'OWNER'));
+  } catch (e) { return false; }
+}
+
+function medNum(v) {
+  const n = Number(v);
+  return (v === null || v === undefined || v === '' || !isFinite(n)) ? null : n;
+}
+function medMoney(v) {
+  const n = medNum(v);
+  return (n !== null && n > 0) ? `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+}
+function medText(v) {
+  const t = (v === null || v === undefined) ? '' : String(v).trim();
+  return t ? window.escapeHtml(t) : '-';
+}
+function medKey(name) { return String(name || '').trim().toLowerCase(); }
+function medIsExpired(p) {
+  const d = medNum(p.days_remaining);
+  return String(p.status || '').toLowerCase() === 'expired' || (d !== null && d <= 0);
+}
+function medSortBatches(list) {
+  return [...list].sort((a, b) => {
+    const ea = a.expiry_date ? String(a.expiry_date) : '9999-12-31';
+    const eb = b.expiry_date ? String(b.expiry_date) : '9999-12-31';
+    return ea.localeCompare(eb);
+  });
+}
+
+function medBatchesFor(p) {
+  const key = medKey(p.product_name);
+  if (medDetail.batchCache.has(key)) return { list: medDetail.batchCache.get(key), complete: true };
+  // Until the full list arrives, use the batches already on this page.
+  const local = [...medDetail.rows.values()].filter(r => medKey(r.product_name) === key);
+  return { list: local.length ? local : [p], complete: false };
+}
+
+function medRenderPanel(p, state) {
+  const panel = document.getElementById('medicine-details-panel');
+  if (!panel) return;
+  if (!p) {
+    panel.innerHTML = '<div class="med-detail-empty">Select a medicine above (click, hover, or use the Up / Down arrow keys) to see its details.</div>';
+    return;
+  }
+  const owner = medIsOwnerView();
+  const mrp = medNum(p.unit_price);
+  const rate = medNum(p.purchase_price);
+  const gstRaw = medNum(p.gst_percentage !== undefined && p.gst_percentage !== null ? p.gst_percentage : p.gst_rate);
+  const half = gstRaw !== null ? gstRaw / 2 : null;
+  const pct = (n) => (n === null ? '-' : `${Number(n.toFixed(2))}%`);
+  const margin = (owner && mrp !== null && mrp > 0 && rate !== null && rate > 0)
+    ? `${(((mrp - rate) / mrp) * 100).toFixed(1)}%` : '-';
+  const looseStored = medNum(p.loose_tablet_price);
+  const tps = medNum(p.tablets_per_strip);
+  const upp = medNum(p.units_per_pack);
+  const pack = (p.pack_size_label && String(p.pack_size_label).trim())
+    ? medText(p.pack_size_label)
+    : (tps && tps > 0 ? `${tps} per strip` : (upp && upp > 0 ? `${upp} per pack` : '-'));
+
+  const { list, complete } = medBatchesFor(p);
+  const batches = medSortBatches(list);
+  const totalQty = batches.reduce((s, b) => s + (medNum(b.quantity) || 0), 0);
+  const expiredQty = batches.filter(medIsExpired).reduce((s, b) => s + (medNum(b.quantity) || 0), 0);
+
+  const row = (label, value) => `<div class="med-detail-row"><span>${label}</span><span>${value}</span></div>`;
+  const batchRows = batches.map(b => {
+    const expired = medIsExpired(b);
+    const cls = `${b.id === p.id ? 'med-batch-current' : ''} ${expired ? 'med-batch-expired' : ''}`.trim();
+    return `<tr class="${cls}">
+      <td>${medText(b.batch_number)}</td>
+      <td>${medText(b.expiry_date)}${expired ? ' <span class="badge badge-danger">Expired</span>' : ''}</td>
+      <td>${medNum(b.quantity) === null ? '-' : medNum(b.quantity)}</td>
+      <td>${medMoney(b.unit_price)}</td></tr>`;
+  }).join('');
+
+  let stateLine = '';
+  if (state === 'loading') stateLine = '<div class="med-detail-note">Loading all batches of this medicine…</div>';
+  else if (state === 'error') stateLine = '<div class="med-detail-error">Could not load the other batches. <button type="button" class="btn btn-secondary" style="padding:2px 8px;font-size:12px;" onclick="medRetryBatches()">Retry</button></div>';
+  else if (!complete) stateLine = '<div class="med-detail-note">Showing batches on this page.</div>';
+
+  panel.innerHTML = `
+    <div class="med-detail-head">
+      <span class="med-detail-title">${medText(p.product_name)}</span>
+      <span class="med-detail-sub">${medText(p.category)}${p.batch_number ? ' · batch ' + medText(p.batch_number) : ''}</span>
+    </div>
+    <div class="med-detail-grid">
+      <div class="med-detail-card"><h4>Purchase</h4>
+        ${row('MRP (per pack)', medMoney(mrp))}
+        ${owner ? row('Purchase rate (this batch)', medMoney(rate)) : row('Purchase rate', 'Owner only')}
+      </div>
+      <div class="med-detail-card"><h4>Sale</h4>
+        ${row('Selling rate (MRP)', medMoney(mrp))}
+        ${looseStored !== null && looseStored > 0 ? row('Loose, per tablet', medMoney(looseStored)) : ''}
+        ${owner ? row('Margin on MRP', margin) : row('Margin', 'Owner only')}
+      </div>
+      <div class="med-detail-card"><h4>Tax</h4>
+        ${row('HSN', medText(p.hsn_code))}
+        ${row('GST', pct(gstRaw))}
+        ${row('CGST + SGST', half === null ? '-' : `${pct(half)} + ${pct(half)}`)}
+      </div>
+      <div class="med-detail-card"><h4>Other</h4>
+        ${row('Company', medText(p.brand))}
+        ${row('Pack', pack)}
+        ${row('Composition', medText(p.composition))}
+      </div>
+      <div class="med-detail-card"><h4>Stock</h4>
+        ${row('Total quantity', totalQty)}
+        ${expiredQty > 0 ? row('Of which expired', expiredQty) : ''}
+        ${row('Batches', batches.length)}
+      </div>
+    </div>
+    <div class="med-detail-batches">
+      <table><thead><tr><th>Batch</th><th>Expiry</th><th>Qty</th><th>MRP</th></tr></thead><tbody>${batchRows}</tbody></table>
+      ${stateLine}
+    </div>`;
+}
+
+function medFetchBatches(p) {
+  const key = medKey(p.product_name);
+  if (!key || medDetail.batchCache.has(key)) return Promise.resolve();
+  if (medDetail.inflight.has(key)) return medDetail.inflight.get(key);
+  const req = (async () => {
+    const res = await api.getProducts({ page: 1, limit: 50, filter: '', search: p.product_name });
+    const items = Array.isArray(res) ? res : ((res && res.items) || []);
+    let same = items.filter(r => medKey(r.product_name) === key);
+    if (!same.some(r => r.id === p.id)) same = [...same, p];
+    medDetail.batchCache.set(key, same);
+  })();
+  medDetail.inflight.set(key, req);
+  req.then(() => medDetail.inflight.delete(key), () => medDetail.inflight.delete(key));
+  return req;
+}
+
+function medScheduleFetch(p) {
+  clearTimeout(medDetail.fetchTimer);
+  const key = medKey(p.product_name);
+  if (medDetail.batchCache.has(key)) return;
+  const seq = ++medDetail.fetchSeq;
+  medDetail.fetchTimer = setTimeout(async () => {
+    if (seq !== medDetail.fetchSeq || medDetail.selectedId !== p.id) return;
+    medRenderPanel(p, 'loading');
+    try {
+      await medFetchBatches(p);
+      if (seq === medDetail.fetchSeq && medDetail.selectedId === p.id) medRenderPanel(p, 'ready');
+    } catch (e) {
+      if (seq === medDetail.fetchSeq && medDetail.selectedId === p.id) medRenderPanel(p, 'error');
+    }
+  }, 250);
+}
+
+window.medRetryBatches = function() {
+  const p = medDetail.rows.get(medDetail.selectedId);
+  if (p) medScheduleFetch(p);
+};
+
+function medSelect(id, opts) {
+  if (id === medDetail.selectedId) return;
+  const p = medDetail.rows.get(id);
+  if (!p) return;
+  const prev = document.querySelector('#inventory-table-body tr.inv-row-selected');
+  if (prev) prev.classList.remove('inv-row-selected');
+  const tr = document.querySelector(`#inventory-table-body tr.inv-row[data-id="${id}"]`);
+  if (tr) {
+    tr.classList.add('inv-row-selected');
+    if (opts && opts.scroll) tr.scrollIntoView({ block: 'nearest' });
+  }
+  medDetail.selectedId = id;
+  medRenderPanel(p, 'ready');
+  medScheduleFetch(p);
+}
+
+function medWire() {
+  if (medDetail.wired) return;
+  const tbody = document.getElementById('inventory-table-body');
+  if (!tbody) return;
+  medDetail.wired = true;
+  const wrap = tbody.closest('.table-responsive');
+  if (wrap) wrap.setAttribute('tabindex', '0');
+
+  const rowId = (ev) => {
+    const tr = ev.target.closest && ev.target.closest('tr.inv-row');
+    return tr ? Number(tr.getAttribute('data-id')) : null;
+  };
+  tbody.addEventListener('click', (ev) => {
+    if (ev.target.closest('button, input, a, select')) return;
+    const id = rowId(ev);
+    if (id !== null) { medSelect(id); if (wrap) wrap.focus({ preventScroll: true }); }
+  });
+  tbody.addEventListener('mouseover', (ev) => {
+    const id = rowId(ev);
+    if (id !== null) medSelect(id);
+  });
+  (wrap || tbody).addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    const t = ev.target;
+    if (t && t.tagName && /^(TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (t && t.tagName === 'INPUT' && t.type !== 'checkbox') return;
+    if (!medDetail.order.length) return;
+    ev.preventDefault();
+    const i = medDetail.order.indexOf(medDetail.selectedId);
+    let nextIndex;
+    if (i === -1) nextIndex = 0;
+    else nextIndex = ev.key === 'ArrowDown' ? Math.min(medDetail.order.length - 1, i + 1) : Math.max(0, i - 1);
+    medSelect(medDetail.order[nextIndex], { scroll: true });
+  });
+}
+
+function medOnRowsRendered(items) {
+  medDetail.rows = new Map((items || []).map(p => [p.id, p]));
+  medDetail.order = (items || []).map(p => p.id);
+  medWire();
+  const keep = medDetail.rows.has(medDetail.selectedId) ? medDetail.selectedId : null;
+  medDetail.selectedId = null;
+  if (keep !== null) medSelect(keep);
+  else medRenderPanel(null);
+}
+window.medInvalidateBatchCache = function() { medDetail.batchCache.clear(); };
 
 window.deleteSingleInventoryStock = async function(stockId, medName) {
   if (!confirm(`Are you sure you want to delete '${medName}' from active inventory? It will be moved to Recently Deleted (60-day recovery guarantee).`)) {
@@ -705,6 +945,7 @@ window.deleteSingleInventoryStock = async function(stockId, medName) {
     }
     localStorage.removeItem('expiryguard_cached_inventory');
     localStorage.removeItem('expiryguard_cached_billing_products');
+    if (typeof window.medInvalidateBatchCache === 'function') window.medInvalidateBatchCache();
     if (typeof fetchInventoryPage === 'function') fetchInventoryPage();
     if (typeof initInventory === 'function') initInventory();
   } catch (err) {
