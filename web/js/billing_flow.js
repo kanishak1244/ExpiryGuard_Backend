@@ -3,6 +3,10 @@
 let activeBillState = {
   customer: { id: 'walkin', name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
   pendingCustomerName: '',
+  patientPhone: '',
+  patientName: '',
+  doctorName: '',
+  doctorRegNo: '',
   invoiceNumber: '',
   invoiceDate: new Date().toISOString().split('T')[0],
   paymentMode: 'CASH',
@@ -36,6 +40,10 @@ function generateBillInvoiceNumber() {
 async function initBillingEngine() {
   if (!activeBillState.invoiceNumber) {
     activeBillState.invoiceNumber = generateBillInvoiceNumber();
+  }
+  { // show the bill number and date in the header
+    const inv = document.getElementById('bill-invoice-number-input'); if (inv && !inv.value) inv.value = activeBillState.invoiceNumber;
+    const dt = document.getElementById('bill-invoice-date-input'); if (dt && !dt.value) dt.value = activeBillState.invoiceDate;
   }
   
   // Load from AppDataPreloader or localStorage cache for instant 0ms billing load
@@ -447,6 +455,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
       mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 0,
       pricePerUnit: p.price_per_unit || p.loose_tablet_price,
       unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
+      packSize: p.pack_size_label || '',
       // 0% is a real GST rate: only a missing value is "unknown"
       gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? null
     };
@@ -674,7 +683,8 @@ function selectMedicineForBill(index, overrides = {}) {
     stock: Number(r.stock) || 0,
     mrp: Number(r.mrp) || 0,
     pricePerUnit: r.pricePerUnit || null,
-    unitsPerPack: r.unitsPerPack || null
+    unitsPerPack: r.unitsPerPack || null,
+    packSize: r.packSize || ''
   });
 
   // Every batch of this medicine we know about (the search results and the inventory cache).
@@ -698,7 +708,8 @@ function selectMedicineForBill(index, overrides = {}) {
           stock: Number(p.quantity) || 0,
           mrp: Number(p.unit_price) || 0,
           pricePerUnit: p.price_per_unit || p.loose_tablet_price || null,
-          unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null
+          unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
+          packSize: p.pack_size_label || ''
         });
       }
     });
@@ -753,6 +764,7 @@ function selectMedicineForBill(index, overrides = {}) {
     unitType: requestedUnit,
     packPrice: packPrice,
     unitsPerPack: unitsPerPack,
+    packSize: primaryBatch.packSize || '',
     loosePrice: loosePrice,
     rate: requestedUnit === 'loose' ? loosePrice : packPrice,
     quantity: requestedQty,
@@ -807,8 +819,11 @@ function billLineKey(e, idx) {
 window.billLineKey = billLineKey;
 
 function billRowAmount(item) {
-  const taxable = Number(item.quantity || 1) * Number(item.rate || 0) * (1 - (Number(item.discountPercent || 0) / 100));
-  return taxable + taxable * (Number(item.gstRate) / 100);
+  // line total before any bill-level discount (the bill discount is shown in the footer)
+  const qty = Math.floor(Number(item.quantity)) || 1;
+  const gross = billR2(qty * Number(item.rate || 0));
+  const taxable = billR2(gross - billR2(Math.round(gross * (Number(item.discountPercent) || 0)) / 100));
+  return billR2(taxable + billR2(taxable * (billR2(billGstOf(item) / 2) / 100)) * 2);
 }
 function billRowWarning(item) {
   const st = billBatchState({ expiryDate: item.expiryDate, stock: item.availableStock });
@@ -840,13 +855,13 @@ function renderBillItemsTable() {
   if (activeBillState.items.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align: center; padding: 30px 20px; color: var(--color-text-muted);">
-          <div style="font-size: 26px; margin-bottom: 6px; opacity: 0.8;">💊</div>
+        <td colspan="12" style="text-align: center; padding: 30px 20px; color: var(--color-text-muted);">
           <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary);">No medicines added yet</div>
           <div style="font-size: 13px; margin-top: 4px;">Press <kbd>/</kbd> and type a medicine name or code. <kbd>Enter</kbd> adds the earliest valid batch.</div>
         </td>
       </tr>
     `;
+    billTabsRender();
     return;
   }
 
@@ -857,60 +872,66 @@ function renderBillItemsTable() {
     }];
     const canLoose = !!(item.loosePrice && Number(item.loosePrice) > 0);
     const sub = [item.brand, item.composition].filter(Boolean).map(escapeHtml).join(' • ');
+    const expState = billBatchState({ expiryDate: item.expiryDate, stock: item.availableStock });
+    const expColor = expState === 'expired' ? '#DC2626' : (expState === 'near' ? '#B45309' : 'inherit');
 
     return `
-      <tr data-row="${idx}" style="border-bottom: 1px solid var(--color-border);" onclick="billingPreviewLine(${idx})" onfocusin="billingPreviewLine(${idx})">
-        <td style="font-weight: 700; color: var(--color-text-muted); width: 30px; text-align: center;">${idx + 1}</td>
+      <tr data-row="${idx}" onclick="billingPreviewLine(${idx})" onfocusin="billingPreviewLine(${idx})">
+        <td style="font-weight: 700; color: var(--color-text-muted); text-align: center;">${idx + 1}</td>
 
-        <td style="min-width: 200px;">
+        <td>
           <div style="font-weight: 600; font-size: 13.5px; color: var(--color-text-primary);">${escapeHtml(item.name)}</div>
           <div style="font-size: 11px; color: var(--color-text-muted);">${sub}${sub ? ' • ' : ''}HSN: ${escapeHtml(item.hsnCode || '-')}</div>
           <div id="bill-row-warn-${idx}" style="font-size: 11.5px;">${billRowWarning(item)}</div>
         </td>
 
-        <td style="min-width: 150px;">
+        <td style="color: var(--color-text-muted);">${escapeHtml(item.packSize || '-')}</td>
+
+        <td>
           <select class="form-input" style="padding: 4px 6px; font-size: 12px; height: auto;" onchange="handleItemBatchChange(${idx}, this.value)" title="Earliest valid expiry is chosen first (FEFO). Expired or empty batches cannot be selected.">
             ${batches.map(b => {
               const st = billBatchState(b);
               const blocked = st === 'expired' || st === 'out';
               const tag = st === 'expired' ? ' — EXPIRED' : (st === 'out' ? ' — OUT OF STOCK' : (st === 'near' ? ' — ⚠ near expiry' : ''));
               return `<option value="${escapeHtml(b.batchNumber)}" ${b.batchNumber === item.selectedBatch ? 'selected' : ''} ${blocked ? 'disabled' : ''}>
-                ${escapeHtml(b.batchNumber || '-')} (Exp: ${escapeHtml(b.expiryDate || '-')}) [Stock: ${Number(b.stock) || 0}]${tag}
+                ${escapeHtml(b.batchNumber || '-')} [Stock: ${Number(b.stock) || 0}]${tag}
               </option>`;
             }).join('')}
           </select>
         </td>
 
-        <td style="min-width: 110px; text-align: center;">
+        <td style="color: ${expColor}; font-weight: ${expState === 'ok' ? 400 : 700}; white-space: nowrap;">${escapeHtml(item.expiryDate || '-')}</td>
+
+        <td style="text-align: center;">
           <select class="form-input" style="padding: 4px 6px; font-size: 12px; height: auto;" onchange="handleItemUnitTypeChange(${idx}, this.value)">
             <option value="strip" ${item.unitType !== 'loose' ? 'selected' : ''}>📦 Full Strip</option>
             <option value="loose" ${item.unitType === 'loose' ? 'selected' : ''} ${canLoose ? '' : 'disabled'}>💊 Loose / Open</option>
           </select>
         </td>
 
-        <td style="width: 80px;">
+        <td>
           <input type="number" min="1" step="1" class="form-input item-qty-input" value="${item.quantity}"
                  style="padding: 4px 6px; font-size: 13px; font-weight: 600; text-align: center; height: auto;"
                  oninput="handleItemFieldChange(${idx}, 'quantity', this.value)" onkeydown="billLineKey(event, ${idx})">
         </td>
 
-        <td style="width: 90px; text-align: right; font-weight: 600;" title="Selling price is the MRP. It cannot be raised above MRP; use Disc % to give a discount.">
+        <td style="text-align: right; font-weight: 600;" title="Selling price is the MRP. It cannot be raised above MRP; use Disc % to give a discount.">
           ₹${Number(item.rate).toFixed(2)}
         </td>
 
-        <td style="width: 70px;">
+        <td>
           <input type="number" min="0" max="100" step="0.01" class="form-input item-disc-input" value="${item.discountPercent}"
                  style="padding: 4px 6px; font-size: 13px; text-align: center; height: auto;"
                  oninput="handleItemFieldChange(${idx}, 'discountPercent', this.value)" onkeydown="billLineKey(event, ${idx})">
         </td>
 
-        <td style="width: 60px; text-align: center; color: var(--color-text-muted);">${Number(item.gstRate)}%</td>
+        <td style="text-align: center; color: var(--color-text-muted);">${Number(item.gstRate)}%</td>
 
-        <td style="width: 105px; text-align: right; font-weight: 700; font-size: 14px; color: var(--status-safe);">
+        <td style="text-align: right; font-weight: 700; font-size: 14px; color: var(--status-safe);">
           <span id="bill-row-amount-${idx}">₹${billRowAmount(item).toFixed(2)}</span>
         </td>
 
-        <td style="width: 45px; text-align: center;">
+        <td style="text-align: center;">
           <button type="button" class="btn btn-secondary" style="padding: 4px 8px; color: #DC2626; border-color: #FECACA;" onclick="removeBillItem(${idx})" title="Remove this line (Ctrl+Delete)">
             🗑️
           </button>
@@ -918,6 +939,7 @@ function renderBillItemsTable() {
       </tr>
     `;
   }).join('');
+  billTabsRender();
 }
 
 function handleItemUnitTypeChange(index, unitType) {
@@ -994,30 +1016,54 @@ function billGstOf(item) {
   return isFinite(g) ? g : 0;
 }
 
+function billR2(x) { return Math.round((Number(x) + Number.EPSILON) * 100) / 100; }
+
+// Same arithmetic, in the same order, as the server uses when it saves the bill (each line is rounded to the
+// paisa, the bill discount is shared over the lines, GST is rounded per line), so the amount on the screen is
+// the amount on the saved invoice.
+function billComputeLines() {
+  const items = activeBillState.items;
+  const lines = items.map(item => {
+    const qty = Math.floor(Number(item.quantity)) || 1;
+    const gross = billR2(qty * Number(item.rate || 0));
+    const lineDisc = billR2(Math.round(gross * (Number(item.discountPercent) || 0)) / 100);
+    return { item, gross, lineDisc, taxable: billR2(gross - lineDisc), gst: billGstOf(item) };
+  });
+  const lineDiscTotal = lines.reduce((a, l) => a + l.lineDisc, 0);
+  const grossSubtotal = lines.reduce((a, l) => a + l.gross, 0);
+  const taxableSubtotal = billR2(grossSubtotal - lineDiscTotal);
+  const billDiscount = Math.min(billR2(taxableSubtotal * (Number(activeBillState.billDiscountPercent) || 0) / 100), taxableSubtotal);
+  let allocated = 0;
+  lines.forEach((l, idx) => {
+    const last = idx === lines.length - 1;
+    const share = last ? billR2(billDiscount - allocated)
+      : (taxableSubtotal > 0 ? billR2(billDiscount * l.taxable / taxableSubtotal) : 0);
+    if (!last) allocated += share;
+    l.finalTaxable = billR2(l.taxable - share);
+    l.cgst = billR2(l.finalTaxable * (billR2(l.gst / 2) / 100));
+    l.sgst = l.cgst;
+    l.tax = billR2(l.cgst + l.sgst);
+    l.total = billR2(l.finalTaxable + l.tax);
+  });
+  return { lines, taxableSubtotal, billDiscount, lineDiscTotal };
+}
+
 function recalculateTotals() {
-  const rawSubtotal = activeBillState.items.reduce((sum, item) => {
-    const itemTaxable = Number(item.quantity || 1) * Number(item.rate || 0) * (1 - (Number(item.discountPercent || 0) / 100));
-    return sum + itemTaxable;
-  }, 0);
-
-  const billDiscount = rawSubtotal * (Number(activeBillState.billDiscountPercent || 0) / 100);
-  const netTaxable = Math.max(0, rawSubtotal - billDiscount);
-
-  const totalGst = activeBillState.items.reduce((sum, item) => {
-    const itemTaxable = Number(item.quantity || 1) * Number(item.rate || 0) * (1 - (Number(item.discountPercent || 0) / 100));
-    const ratio = rawSubtotal > 0 ? (netTaxable / rawSubtotal) : 1;
-    return sum + (itemTaxable * (billGstOf(item) / 100) * ratio);
-  }, 0);
-
-  const cgst = totalGst / 2;
-  const sgst = totalGst / 2;
-  const unroundedGrandTotal = netTaxable + totalGst;
+  const calc = billComputeLines();
+  const rawSubtotal = calc.taxableSubtotal;
+  const billDiscount = calc.billDiscount;
+  const netTaxable = calc.lines.reduce((a, l) => a + l.finalTaxable, 0);
+  const totalGst = calc.lines.reduce((a, l) => a + l.tax, 0);
+  const cgst = calc.lines.reduce((a, l) => a + l.cgst, 0);
+  const sgst = calc.lines.reduce((a, l) => a + l.sgst, 0);
+  const unroundedGrandTotal = calc.lines.reduce((a, l) => a + l.total, 0);
 
   let roundOff = 0;
   if (activeBillState.useManualRoundOff) {
     roundOff = Number(activeBillState.manualRoundOff || 0);
   } else {
-    roundOff = Math.round(unroundedGrandTotal) - unroundedGrandTotal;
+    // The server (and the mobile app) save the exact total with no rounding, so the screen shows that same amount.
+    roundOff = 0;
   }
 
   const grandTotal = Math.max(0, unroundedGrandTotal + roundOff);
@@ -1036,6 +1082,22 @@ function recalculateTotals() {
   if (elSgst) elSgst.textContent = `₹${sgst.toFixed(2)}`;
   if (elRoundOff) elRoundOff.textContent = `${roundOff >= 0 ? '+' : ''}₹${roundOff.toFixed(2)}`;
   if (elGrandTotal) elGrandTotal.textContent = `₹${grandTotal.toFixed(2)}`;
+
+  // Extra lines of the footer (display only)
+  const itemDisc = calc.lineDiscTotal;
+  const setText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  setText('bill-item-disc-val', `₹${itemDisc.toFixed(2)}`);
+  setText('bill-total-disc-val', `₹${(itemDisc + billDiscount).toFixed(2)}`);
+  const breakup = document.getElementById('bill-tax-breakup');
+  if (breakup) {
+    const byRate = {};
+    calc.lines.forEach(l => { byRate[l.gst] = (byRate[l.gst] || 0) + l.cgst; });
+    const rates = Object.keys(byRate).map(Number).sort((a, b) => a - b);
+    breakup.innerHTML = rates.length === 0
+      ? '<tr><td colspan="3" style="color: var(--color-text-muted);">No tax yet</td></tr>'
+      : rates.map(r => `<tr><td>CGST Output</td><td>${r / 2}%</td><td>₹${byRate[r].toFixed(2)}</td></tr>
+                         <tr><td>SGST Output</td><td>${r / 2}%</td><td>₹${byRate[r].toFixed(2)}</td></tr>`).join('');
+  }
 
   // Store calculated values in state
   activeBillState.calculated = {
@@ -1329,6 +1391,11 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
   // Validate customer for Pending/Credit payment modes
   let finalCustomerName = (activeBillState.customer ? activeBillState.customer.name : 'Walk-in Customer');
   let finalCustomerPhone = (activeBillState.customer && activeBillState.customer.phone !== 'Cash Sale' ? activeBillState.customer.phone : null);
+  // Patient and doctor details typed on the bill (a walk-in sale is recorded under the patient's name).
+  const patientNameTyped = String(activeBillState.patientName || '').trim();
+  const patientPhoneTyped = String(activeBillState.patientPhone || '').trim();
+  if ((finalCustomerName === 'Walk-in Customer' || !finalCustomerName) && patientNameTyped) finalCustomerName = patientNameTyped;
+  if (!finalCustomerPhone && patientPhoneTyped) finalCustomerPhone = patientPhoneTyped;
 
   const hasCreditAllocation = activeBillState.paymentMode === 'CREDIT' || activeBillState.paymentMode === 'PENDING' ||
     (activeBillState.splitPayments && activeBillState.splitPayments.some(p => p.payment_method === 'CREDIT'));
@@ -1384,6 +1451,8 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
     customer_name: finalCustomerName,
     customer_phone: finalCustomerPhone,
     notes: `Retail POS Sale - ${activeBillState.invoiceNumber}`,
+    ...(String(activeBillState.doctorName || '').trim() ? { doctor_name: String(activeBillState.doctorName).trim() } : {}),
+    ...(String(activeBillState.doctorRegNo || '').trim() ? { doctor_reg_no: String(activeBillState.doctorRegNo).trim() } : {}),
     is_interstate: false,
     discount_type: activeBillState.billDiscountPercent > 0 ? 'percent' : null,
     discount_value: Number(activeBillState.billDiscountPercent) || 0.0,
@@ -1476,6 +1545,98 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
   }
 }
 
+
+// ----------------------------------------------------
+// HEADER INPUTS AND OPEN BILLS (tabs)
+// ----------------------------------------------------
+function billSyncHeaderInputs() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  set('bill-patient-phone', activeBillState.patientPhone);
+  set('bill-patient-name', activeBillState.patientName);
+  set('bill-doctor-name', activeBillState.doctorName);
+  set('bill-doctor-reg', activeBillState.doctorRegNo);
+  set('pending-customer-name-input', activeBillState.pendingCustomerName);
+}
+
+// Several bills can be open at once (F8 = new bill). The active bill is always `activeBillState`; the others
+// are parked in billTabs[i].state while another tab is in front.
+let billTabs = [{ name: 'Sale Bill 1', state: null }];
+let billActiveTab = 0;
+let billTabCounter = 1;
+
+function billTabsRender() {
+  const host = document.getElementById('bill-tabs');
+  if (!host) return;
+  host.innerHTML = billTabs.map((t, i) => {
+    const st = i === billActiveTab ? activeBillState : t.state;
+    const n = st && st.items ? st.items.length : 0;
+    return `<div class="bill-tab ${i === billActiveTab ? 'active' : ''}" role="tab" aria-selected="${i === billActiveTab}" onclick="billTabSwitch(${i})">
+      <span>${escapeHtml(t.name)}${n ? ' <small>(' + n + ')</small>' : ''}</span>
+      ${billTabs.length > 1 ? `<button type="button" class="bill-tab-close" title="Close this bill" onclick="event.stopPropagation(); billTabClose(${i})">×</button>` : ''}
+    </div>`;
+  }).join('') + '<button type="button" class="bill-tab-new" title="Open another bill (F8)" onclick="billTabNew()">+ New <kbd>F8</kbd></button>';
+}
+
+function billRefreshFromState() {
+  const inv = document.getElementById('bill-invoice-number-input'); if (inv) inv.value = activeBillState.invoiceNumber || '';
+  const dt = document.getElementById('bill-invoice-date-input'); if (dt) dt.value = activeBillState.invoiceDate || '';
+  const disc = document.getElementById('bill-discount-percent-input'); if (disc) disc.value = String(activeBillState.billDiscountPercent || 0);
+  billSyncHeaderInputs();
+  renderCustomerDropdown();
+  handlePaymentModeChange(activeBillState.paymentMode || 'CASH');
+  renderBillItemsTable();
+  recalculateTotals();
+  updateResumedHeldBanner();
+  clearMedicineSearch(false);
+  billTabsRender();
+  billFocusSearch();
+}
+
+function billTabSwitch(i) {
+  if (i === billActiveTab || !billTabs[i] || !billTabs[i].state) return;
+  billTabs[billActiveTab].state = activeBillState;
+  billActiveTab = i;
+  activeBillState = billTabs[i].state;
+  billRefreshFromState();
+}
+
+function billTabNew() {
+  billTabs[billActiveTab].state = activeBillState;
+  billTabs.push({ name: 'Sale Bill ' + (++billTabCounter), state: null });
+  billActiveTab = billTabs.length - 1;
+  resetBillForm();          // creates the fresh bill and redraws everything
+  billTabsRender();
+}
+
+function billTabClose(i) {
+  if (billTabs.length <= 1) { confirmClearBill(); return; }
+  const st = i === billActiveTab ? activeBillState : billTabs[i].state;
+  const doClose = () => {
+    if (i === billActiveTab) {
+      billTabs.splice(i, 1);
+      billActiveTab = Math.max(0, i - 1);
+      activeBillState = billTabs[billActiveTab].state;
+      billRefreshFromState();
+    } else {
+      billTabs.splice(i, 1);
+      if (i < billActiveTab) billActiveTab--;
+      billTabsRender();
+    }
+  };
+  if (st && st.items && st.items.length && typeof window.showConfirmModal === 'function') {
+    window.showConfirmModal({
+      title: 'Close this bill?',
+      message: `${billTabs[i].name} has ${st.items.length} line(s) that are not saved.`,
+      confirmText: 'Close bill', cancelText: 'Keep it', icon: '🗂️', onConfirm: doClose
+    });
+  } else {
+    doClose();
+  }
+}
+window.billTabSwitch = billTabSwitch;
+window.billTabNew = billTabNew;
+window.billTabClose = billTabClose;
+
 // Clear the bill (asks first when there is something on it).
 function confirmClearBill() {
   if (!activeBillState.items || activeBillState.items.length === 0) { resetBillForm(); return; }
@@ -1512,6 +1673,11 @@ function resetBillForm() {
     idempotencyKey: 'df_sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
     customer: billingCustomersCache[0] || { id: 'walkin', name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
     pendingCustomerName: '',
+    patientPhone: '',
+    patientName: '',
+    doctorName: '',
+    doctorRegNo: '',
+    splitPayments: [],
     invoiceNumber: generateBillInvoiceNumber(),
     invoiceDate: new Date().toISOString().split('T')[0],
     paymentMode: 'CASH',
@@ -1531,6 +1697,7 @@ function resetBillForm() {
 
   const pendingNameInput = document.getElementById('pending-customer-name-input');
   if (pendingNameInput) pendingNameInput.value = '';
+  billSyncHeaderInputs();
 
   renderCustomerDropdown();
   handlePaymentModeChange('CASH');
@@ -1538,6 +1705,7 @@ function resetBillForm() {
   recalculateTotals();
   updateResumedHeldBanner();
   refreshHeldBillsCount();
+  billTabsRender();
 
   clearMedicineSearch(false);
   setBillingSearchMode('name');
@@ -1594,7 +1762,7 @@ async function holdCurrentBill() {
   // F6 parks the bill straight away under the current customer's name (no questions asked).
   const custName = (activeBillState.customer && activeBillState.customer.name !== 'Walk-in Customer')
     ? activeBillState.customer.name
-    : '';
+    : String(activeBillState.patientName || '').trim();
   const note = '';
 
   if (activeBillState.items.some(i => !i.productId)) {
@@ -1898,7 +2066,9 @@ function escapeHtml(str) {
 //   /  or F3        search medicine          Enter (in search)   add the earliest valid batch -> cursor in Qty
 //   Enter (in Qty)  next medicine            Up / Down (in Qty)  move between lines
 //   F2              customer                 Alt+1..4            Cash / UPI / Card / Credit
-//   F6              hold bill                F7                  held bills (recall)
+//   F6              hold bill (draft)        F7                  held bills (recall)
+//   F8              open another bill        F9                  save & new bill     Esc  clear bill (asks)
+//   Ctrl+Alt+Left/Right   switch between open bills
 //   F10 / Ctrl+Enter  save & print           Ctrl+Shift+Enter    save & new bill
 //   Ctrl+Delete     remove current line      Ctrl+Shift+X        clear bill (asks first)
 // ----------------------------------------------------
@@ -1922,6 +2092,18 @@ function billShortcuts(e) {
     handled();
     handlePaymentModeChange(['CASH', 'UPI', 'CARD', 'CREDIT'][Number(e.key) - 1]);
     return;
+  }
+  if (e.key === 'F8') { handled(); billTabNew(); return; }
+  if (e.key === 'F9') { handled(); commitBillTransaction(false, true); return; }
+  if (e.ctrlKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    handled();
+    billTabSwitch(Math.min(billTabs.length - 1, Math.max(0, billActiveTab + (e.key === 'ArrowRight' ? 1 : -1))));
+    return;
+  }
+  if (e.key === 'Escape' && activeBillState.items.length) {
+    const dd = document.getElementById('bill-search-results-dropdown');
+    const ddOpen = dd && dd.style.display === 'block';
+    if (!ddOpen && !(t && t.id === 'bill-medicine-search-input')) { handled(); confirmClearBill(); return; }
   }
   if (e.key === 'F6') { handled(); holdCurrentBill(); return; }
   if (e.key === 'F7') { handled(); openHeldBillsModal(); return; }

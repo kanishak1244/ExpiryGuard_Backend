@@ -1846,3 +1846,62 @@ kbd { background: var(--color-surface-bg, #F1F5F9); border: 1px solid var(--colo
 }
 html[data-theme="dark"] .nav-item:not(.active):hover { background-color: rgba(255, 255, 255, 0.08); color: #F8FAFC; }
 html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
+
+/* ===== Sale bill screen (Create New Bill): tabs, party header, full-height grid, footer, action bar ===== */
+@media (min-width: 1025px) {
+  #billing-page.bill-sale-screen .content-body.bill-screen { padding: 8px 14px 8px; gap: 6px; }
+  #billing-page .bill-tabs { display: flex; align-items: flex-end; gap: 4px; border-bottom: 1px solid var(--color-border); flex: none; }
+  #billing-page .bill-tab { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid var(--color-border); border-bottom: none; border-radius: 8px 8px 0 0; font-size: 12.5px; font-weight: 600; cursor: pointer; background: var(--color-surface-bg); color: var(--color-text-muted); }
+  #billing-page .bill-tab.active { background: var(--color-surface-card); color: var(--color-text-primary); box-shadow: inset 0 2px 0 #10B981; }
+  #billing-page .bill-tab small { font-weight: 500; opacity: .75; }
+  #billing-page .bill-tab-close { border: none; background: none; cursor: pointer; color: inherit; font-size: 15px; line-height: 1; padding: 0 2px; }
+  #billing-page .bill-tab-new { margin-left: 6px; border: none; background: none; color: #10B981; font-weight: 700; cursor: pointer; font-size: 12px; padding: 4px 6px; }
+
+  #billing-page .bill-head { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 4px 28px; flex: none; }
+  #billing-page .bill-head-left { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+  #billing-page .bill-head-left .bill-row-wide { grid-column: 1 / -1; }
+  #billing-page .bill-head-right { display: flex; flex-direction: column; gap: 4px; }
+  #billing-page .bill-row { display: flex; align-items: center; gap: 10px; margin: 0; }
+  #billing-page .bill-row > span { flex: 0 0 110px; font-size: 12px; color: var(--color-text-muted); font-weight: 600; }
+  #billing-page .bill-row .form-input { flex: 1; min-width: 0; padding: 3px 8px; font-size: 13px; height: 30px; }
+  #billing-page .bill-row .form-input:focus { box-shadow: 0 0 0 2px rgba(16, 185, 129, .55); background: rgba(16, 185, 129, .10); }
+  #billing-page .billing-search-box { margin: 0; }
+  #billing-page .billing-search-box .form-input:focus { box-shadow: 0 0 0 2px rgba(16, 185, 129, .55); }
+
+  /* grid: the only scrolling part */
+  #billing-page .bill-grid-panel { display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; margin: 0 !important; }
+  #billing-page .bill-grid-panel > .bill-grid { flex: 1 1 0; min-height: 0; overflow: auto; margin: 0 !important; border: none; border-radius: 0; }
+  #billing-page .bill-grid .data-table thead th { position: sticky; top: 0; z-index: 2; padding: 7px 8px; }
+  #billing-page .bill-grid .data-table tbody td { padding: 3px 8px; vertical-align: middle; }
+  #billing-page .bill-grid-foot { flex: none; padding: 3px 12px; font-size: 12px; color: var(--color-text-muted); border-top: 1px solid var(--color-border); }
+
+  /* footer: discount, tax, invoice value */
+  #billing-page .bill-foot { display: grid; grid-template-columns: 170px 150px 240px minmax(210px, 1fr) 240px; gap: 8px; align-items: stretch; flex: none; }
+  #billing-page .bill-box { border: 1px solid var(--color-border); border-radius: 8px; padding: 4px 10px 6px; margin: 0; background: var(--color-surface-card); min-width: 0; }
+  #billing-page .bill-box legend { font-size: 11px; font-weight: 700; letter-spacing: .03em; color: var(--color-text-muted); padding: 0 4px; text-transform: uppercase; }
+  #billing-page .bill-kv { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; padding: 1px 0; }
+  #billing-page .bill-kv > span { color: var(--color-text-muted); }
+  #billing-page .bill-kv > b { font-family: 'JetBrains Mono', monospace, sans-serif; font-weight: 600; }
+  #billing-page .bill-kv .form-input { width: 72px; height: 26px; padding: 2px 6px; text-align: right; font-weight: 600; }
+  #billing-page .bill-kv-small { font-size: 11.5px; }
+  #billing-page .bill-box-tax { padding: 0; overflow: auto; max-height: 96px; }
+  #billing-page .bill-tax-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  #billing-page .bill-tax-table th { text-align: left; padding: 3px 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; background: var(--color-surface-card); }
+  #billing-page .bill-tax-table td { padding: 2px 8px; }
+  #billing-page .bill-tax-table td:nth-child(n+2) { text-align: right; font-family: 'JetBrains Mono', monospace, sans-serif; }
+  #billing-page .bill-box-tax .bill-kv-small { padding: 2px 8px; }
+  #billing-page .bill-invoice-value { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; border: 1px solid rgba(16, 185, 129, .35); background: rgba(16, 185, 129, .08); border-radius: 8px; padding: 4px 14px; }
+  #billing-page .bill-invoice-value span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-muted); }
+  #billing-page .bill-invoice-value b { font-size: 30px; line-height: 1.1; font-weight: 800; color: #059669; font-family: 'JetBrains Mono', monospace, sans-serif; }
+
+  /* action bar */
+  #billing-page .bill-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex: none; }
+  #billing-page .bill-pay { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #billing-page .bill-pay-label { font-size: 12px; font-weight: 700; color: var(--color-text-muted); margin-right: 2px; }
+  #billing-page .bill-pay .btn { padding: 5px 12px; font-size: 12px; font-weight: 600; }
+  #billing-page .bill-buttons { display: flex; gap: 8px; }
+  #billing-page .bill-buttons .btn { padding: 8px 16px; font-size: 13px; font-weight: 700; }
+  #billing-page .bill-buttons .btn-primary { padding: 8px 24px; font-size: 14px; }
+  #billing-page .bill-buttons kbd { margin-right: 4px; font-size: 10.5px; }
+  #billing-page .med-detail { margin-top: 0; }
+}
