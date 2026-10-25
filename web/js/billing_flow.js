@@ -790,7 +790,20 @@ function billAddMedicine(med, overrides = {}) {
   window.__lastBillAdd = { key: addKey, at: Date.now() };
 
   // The same batch is already on the bill: never a second line (its stock would be counted twice); go to its quantity.
-  const sameAt = activeBillState.items.findIndex(o => String(o.productId) === String(newItem.productId) && String(o.selectedBatch || '') === String(newItem.selectedBatch || ''));
+  // (a Product cell that was typed over replaces THAT line: replaceIdx)
+  const replaceKey = window.billGrid ? billGrid.replaceKey : null;
+  const replaceIdx = replaceKey ? activeBillState.items.findIndex(o => o.id === replaceKey) : -1;
+  const sameAt = activeBillState.items.findIndex((o, j) => j !== replaceIdx && String(o.productId) === String(newItem.productId) && String(o.selectedBatch || '') === String(newItem.selectedBatch || ''));
+  if (replaceIdx >= 0) {
+    const cur = activeBillState.items[replaceIdx];
+    billGrid.replaceKey = null;
+    clearMedicineSearch(false);
+    if (String(cur.productId) === String(newItem.productId) && String(cur.selectedBatch || '') === String(newItem.selectedBatch || '')) {
+      renderBillItemsTable();                 // same medicine and batch chosen again: nothing changes
+      billFocusQty(replaceIdx);
+      return;
+    }
+  }
   if (sameAt >= 0) {
     clearMedicineSearch(false);
     billToast(`${med.name} (batch ${newItem.selectedBatch || '-'}) is already on line ${sameAt + 1}. Change its quantity.`, false);
@@ -799,10 +812,15 @@ function billAddMedicine(med, overrides = {}) {
   }
 
   clearMedicineSearch(false);
-  activeBillState.items.push(newItem);
+  if (replaceIdx >= 0) {
+    newItem.id = activeBillState.items[replaceIdx].id;     // the line keeps its identity
+    activeBillState.items[replaceIdx] = newItem;
+  } else {
+    activeBillState.items.push(newItem);
+  }
   renderBillItemsTable();
   recalculateTotals();
-  billingPreviewLine(activeBillState.items.length - 1);
+  billingPreviewLine(replaceIdx >= 0 ? replaceIdx : activeBillState.items.length - 1);
 
   // Keyboard flow: after choosing a medicine the cursor lands in its Qty (type a number, Enter = next medicine).
   // Voice billing already knows the quantity, so it goes straight back to the search box.
@@ -1776,7 +1794,9 @@ function clearResumedHeldBill() {
   showToastNotification('Bill unlinked from held record. Will be saved as a new bill.');
 }
 
+let isHoldingBill = false;   // a second press while the first is still saving must not park the bill twice
 async function holdCurrentBill() {
+  if (isHoldingBill) return;
   if (!activeBillState.items || activeBillState.items.length === 0) {
     billToast('Cannot hold an empty bill. Add at least one medicine first.', true);
     return;
@@ -1817,6 +1837,7 @@ async function holdCurrentBill() {
     items: payloadItems
   };
 
+  isHoldingBill = true;
   try {
     const res = await window.api.createHeldBill(payload);
     const billNumber = res.held_bill_number || 'HB-???';
@@ -1829,6 +1850,8 @@ async function holdCurrentBill() {
   } catch (err) {
     // CRITICAL: On error, active cart remains untouched!
     alert(`Failed to hold bill: ${err.message || err}`);
+  } finally {
+    isHoldingBill = false;
   }
 }
 
@@ -2103,6 +2126,18 @@ function billModalOpen() {
   });
 }
 
+// Save / Draft / Print keys. Held down they would repeat, and while a list is open the user is still choosing something:
+// neither may start a save. A value typed in a cell is checked first (a bad one keeps the cursor there).
+function billSaveKeyAllowed(e) {
+  if (e.repeat) return false;
+  if (window.billGrid && (billGrid.popup || (typeof productDropdownOpen === 'function' && productDropdownOpen()))) {
+    billToast('Finish choosing (Enter) or press Esc to close the list first, then save.', true);
+    return false;
+  }
+  if (typeof billGridCommitActive === 'function' && !billGridCommitActive()) return false;
+  return true;
+}
+
 function billShortcuts(e) {
   if (!document.getElementById('billing-page') || billModalOpen()) return;
   const t = e.target;
@@ -2117,7 +2152,7 @@ function billShortcuts(e) {
     return;
   }
   if (e.key === 'F8') { handled(); billTabNew(); return; }
-  if (e.key === 'F9') { handled(); commitBillTransaction(false, true); return; }
+  if (e.key === 'F9') { handled(); if (billSaveKeyAllowed(e)) commitBillTransaction(false, true); return; }
   if (e.ctrlKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     handled();
     billTabSwitch(Math.min(billTabs.length - 1, Math.max(0, billActiveTab + (e.key === 'ArrowRight' ? 1 : -1))));
@@ -2129,10 +2164,10 @@ function billShortcuts(e) {
     const ddOpen = dd && dd.style.display === 'block';
     if (!ddOpen && !(t && t.id === 'bill-medicine-search-input')) { handled(); confirmClearBill(); return; }
   }
-  if (e.key === 'F6') { handled(); holdCurrentBill(); return; }
+  if (e.key === 'F6') { handled(); if (billSaveKeyAllowed(e)) holdCurrentBill(); return; }
   if (e.key === 'F7') { handled(); openHeldBillsModal(); return; }
-  if (e.key === 'F10' || (e.ctrlKey && !e.shiftKey && e.key === 'Enter')) { handled(); commitBillTransaction(true, false); return; }
-  if (e.ctrlKey && e.shiftKey && e.key === 'Enter') { handled(); commitBillTransaction(false, true); return; }
+  if (e.key === 'F10' || (e.ctrlKey && !e.shiftKey && e.key === 'Enter')) { handled(); if (billSaveKeyAllowed(e)) commitBillTransaction(true, false); return; }
+  if (e.ctrlKey && e.shiftKey && e.key === 'Enter') { handled(); if (billSaveKeyAllowed(e)) commitBillTransaction(false, true); return; }
   if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x')) { handled(); confirmClearBill(); return; }
   if (e.ctrlKey && e.key === 'Delete') {
     const row = t && t.closest ? t.closest('tr[data-row]') : null;

@@ -6,12 +6,22 @@ const g = require('../../web/js/billing_grid_core.js');
 const D = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
 const batch = (n, days, stock = 10) => ({ batchNumber: n, expiryDate: D(days), stock, mrp: 10 });
 
-test('Tab walks Product > Batch > Unit > Qty > Disc, then to the next line, then the entry row', () => {
+test('Tab walks the editable cells Product > Batch > Unit > Qty > Rate > Disc, then to the next line, then the entry row', () => {
   assert.deepEqual(g.gridTab({ row: 0, col: 'product' }, false, 2), { row: 0, col: 'batch' });
-  assert.deepEqual(g.gridTab({ row: 0, col: 'qty' }, false, 2), { row: 0, col: 'disc' });
+  assert.deepEqual(g.gridTab({ row: 0, col: 'batch' }, false, 2), { row: 0, col: 'unit' });   // Expiry is skipped
+  assert.deepEqual(g.gridTab({ row: 0, col: 'qty' }, false, 2), { row: 0, col: 'rate' });
+  assert.deepEqual(g.gridTab({ row: 0, col: 'rate' }, false, 2), { row: 0, col: 'disc' });
   assert.deepEqual(g.gridTab({ row: 0, col: 'disc' }, false, 2), { row: 1, col: 'product' });
   assert.deepEqual(g.gridTab({ row: 1, col: 'disc' }, false, 2), { row: 2, col: 'product' });   // 2 = entry row
   assert.deepEqual(g.gridTab({ row: 2, col: 'batch' }, false, 2), { row: 2, col: 'product' });   // stays in the entry row
+});
+
+test('Tab from a read-only cell (Expiry, MRP) goes on to the next editable cell, Shift+Tab to the previous one', () => {
+  assert.deepEqual(g.gridTab({ row: 0, col: 'expiry' }, false, 2), { row: 0, col: 'unit' });
+  assert.deepEqual(g.gridTab({ row: 0, col: 'expiry' }, true, 2), { row: 0, col: 'batch' });
+  assert.deepEqual(g.gridTab({ row: 0, col: 'mrp' }, false, 2), { row: 0, col: 'rate' });
+  assert.deepEqual(g.gridTab({ row: 0, col: 'gst' }, false, 2), { row: 1, col: 'product' });
+  assert.deepEqual(g.gridTab({ row: 1, col: 'packing' }, true, 2), { row: 1, col: 'product' });
 });
 
 test('Shift+Tab goes backwards and never leaves the grid', () => {
@@ -21,26 +31,62 @@ test('Shift+Tab goes backwards and never leaves the grid', () => {
   assert.deepEqual(g.gridTab({ row: 2, col: 'product' }, true, 2), { row: 1, col: 'disc' });
 });
 
-test('Enter moves right; in the last cell of a line it goes to the next empty Product cell', () => {
+test('Enter moves to the next editable cell; in the last one it goes to the next empty Product cell', () => {
   assert.deepEqual(g.gridEnter({ row: 0, col: 'product' }, 3), { row: 0, col: 'batch' });
+  assert.deepEqual(g.gridEnter({ row: 0, col: 'expiry' }, 3), { row: 0, col: 'unit' });
   assert.deepEqual(g.gridEnter({ row: 0, col: 'disc' }, 3), { row: 3, col: 'product' });
+  assert.deepEqual(g.gridEnter({ row: 0, col: 'amount' }, 3), { row: 3, col: 'product' });
   assert.deepEqual(g.gridEnter({ row: 3, col: 'batch' }, 3), { row: 3, col: 'product' });
 });
 
-test('Up/Down keep the column; the entry row only has Product and Batch', () => {
+test('Up/Down keep the column from ANY cell, read-only ones included (no trap in Expiry); entry row has Product and Batch', () => {
+  assert.deepEqual(g.gridVertical({ row: 0, col: 'expiry' }, 1, 3), { row: 1, col: 'expiry' });
+  assert.deepEqual(g.gridVertical({ row: 1, col: 'expiry' }, -1, 3), { row: 0, col: 'expiry' });
   assert.deepEqual(g.gridVertical({ row: 0, col: 'qty' }, 1, 2), { row: 1, col: 'qty' });
   assert.deepEqual(g.gridVertical({ row: 1, col: 'qty' }, 1, 2), { row: 2, col: 'batch' });
+  assert.deepEqual(g.gridVertical({ row: 1, col: 'packing' }, 1, 2), { row: 2, col: 'product' });
   assert.deepEqual(g.gridVertical({ row: 0, col: 'qty' }, -1, 2), { row: 0, col: 'qty' });
   assert.deepEqual(g.gridVertical({ row: 2, col: 'batch' }, -1, 2), { row: 1, col: 'batch' });
 });
 
-test('Left/Right only move cells when the caret is at the edge of the text', () => {
+test('Left/Right walk every cell (read-only too) but only at the edge of the text', () => {
   const pos = { row: 0, col: 'qty' };
   assert.equal(g.gridHorizontal(pos, -1, 1, { start: 2, end: 2, length: 3 }), null);
   assert.equal(g.gridHorizontal(pos, 1, 1, { start: 1, end: 1, length: 3 }), null);
-  assert.deepEqual(g.gridHorizontal(pos, 1, 1, { start: 3, end: 3, length: 3 }), { row: 0, col: 'disc' });
+  assert.deepEqual(g.gridHorizontal(pos, 1, 1, { start: 3, end: 3, length: 3 }), { row: 0, col: 'mrp' });
   assert.deepEqual(g.gridHorizontal(pos, -1, 1, { start: 0, end: 0, length: 3 }), { row: 0, col: 'unit' });
-  assert.equal(g.gridHorizontal({ row: 0, col: 'disc' }, 1, 1, null), null);
+  assert.deepEqual(g.gridHorizontal({ row: 0, col: 'batch' }, 1, 1, null), { row: 0, col: 'expiry' });
+  assert.equal(g.gridHorizontal({ row: 0, col: 'amount' }, 1, 1, null), null);
+  assert.equal(g.gridHorizontal({ row: 0, col: 'product' }, -1, 1, null), null);
+});
+
+test('units offered: Strip always, Loose only when a per-tablet price exists; type-ahead picks by first letters', () => {
+  assert.deepEqual(g.gridUnitOptions({ loosePrice: null }).map(o => o.value), ['strip']);
+  assert.deepEqual(g.gridUnitOptions({ loosePrice: 0 }).map(o => o.value), ['strip']);
+  const both = g.gridUnitOptions({ loosePrice: 3.2 });
+  assert.deepEqual(both.map(o => o.value), ['strip', 'loose']);
+  assert.equal(g.gridMatchUnit(both, 'l'), 1);
+  assert.equal(g.gridMatchUnit(both, 'ST'), 0);
+  assert.equal(g.gridMatchUnit(both, 'x'), -1);
+  assert.equal(g.gridMatchUnit(both, ''), -1);
+});
+
+test('rate: MRP of the unit unless a lower selling price was entered; never above MRP', () => {
+  const strip = { unitType: 'strip', packPrice: 34, loosePrice: 3.4 };
+  assert.equal(g.gridBaseRate(strip), 34);
+  assert.equal(g.gridBaseRate({ ...strip, unitType: 'loose' }), 3.4);
+  assert.equal(g.gridEffectiveRate(strip), 34);
+  assert.equal(g.gridEffectiveRate({ ...strip, rateOverride: 30 }), 30);
+  assert.equal(g.gridEffectiveRate({ ...strip, rateOverride: 40 }), 34);       // an old override above a new MRP is ignored
+  assert.equal(g.gridEffectiveRate({ ...strip, rateOverride: null }), 34);
+});
+
+test('selling price check: positive, two decimals, not above MRP', () => {
+  assert.deepEqual(g.gridValidateRate('30', 34), { ok: true, value: 30 });
+  assert.deepEqual(g.gridValidateRate('33.5', 34), { ok: true, value: 33.5 });
+  assert.equal(g.gridValidateRate('34', 34).ok, true);
+  for (const bad of ['', '0', '-5', '34.01', '1e2', 'abc', '3.456', '12,5', ' ']) assert.equal(g.gridValidateRate(bad, 34).ok, false, bad);
+  assert.match(g.gridValidateRate('35', 34).error, /MRP/);
 });
 
 test('dropdown opens below the cell, flips above near the bottom, and stays on the screen', () => {

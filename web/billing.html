@@ -31,7 +31,7 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=12.0">
+  <link rel="stylesheet" href="css/styles.css?v=12.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -260,7 +260,8 @@
                   <th style="width: 118px;">Exp. Date</th>
                   <th style="width: 112px; text-align: center;">Unit</th>
                   <th style="width: 76px; text-align: center;">Qty</th>
-                  <th style="width: 86px; text-align: right;">M.R.P</th>
+                  <th style="width: 84px; text-align: right;" title="Maximum retail price of the batch (read only)">M.R.P</th>
+                  <th style="width: 88px; text-align: right;" title="Selling price per unit. Cannot be above the MRP.">Rate</th>
                   <th style="width: 70px; text-align: center;">Disc %</th>
                   <th style="width: 58px; text-align: center;">GST</th>
                   <th style="width: 104px; text-align: right;">₹ Amount</th>
@@ -308,10 +309,10 @@
         <div class="bill-actions">
           <div class="bill-pay">
             <span class="bill-pay-label">Payment <kbd>Alt+1-4</kbd></span>
-            <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')">💵 Cash</button>
-            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')">📱 UPI</button>
-            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CARD" onclick="handlePaymentModeChange('CARD')">💳 Card</button>
-            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')">📒 Credit</button>
+            <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')">💵 Cash <kbd>Alt+1</kbd></button>
+            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')">📱 UPI <kbd>Alt+2</kbd></button>
+            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CARD" onclick="handlePaymentModeChange('CARD')">💳 Card <kbd>Alt+3</kbd></button>
+            <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="CREDIT" onclick="handlePaymentModeChange('CREDIT')">📒 Credit <kbd>Alt+4</kbd></button>
             <button type="button" class="btn btn-secondary pay-mode-btn" id="pay-mode-split-btn" data-mode="SPLIT" onclick="openSplitPaymentModal()">✂️ Split</button>
             <!-- Split Payment Summary Badge -->
             <div id="split-payment-summary-strip" style="display: none; margin-top: 8px; padding: 6px 12px; background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: var(--radius-md); font-size: 12px; color: #3730A3; justify-content: space-between; align-items: center;">
@@ -431,7 +432,7 @@
   </div>
 
 
-  <script src="js/api.js?v=12.0" defer></script>
+  <script src="js/api.js?v=12.1" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
@@ -439,8 +440,8 @@
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
   <script src="js/billing_math.js?v=11.4" defer></script>
-  <script src="js/billing_grid_core.js?v=12.0" defer></script>
-  <script src="js/billing_flow.js?v=12.0" defer></script>
-  <script src="js/billing_grid.js?v=12.0" defer></script>
+  <script src="js/billing_grid_core.js?v=12.1" defer></script>
+  <script src="js/billing_flow.js?v=12.1" defer></script>
+  <script src="js/billing_grid.js?v=12.1" defer></script>
 </body>
 </html>

@@ -126,16 +126,17 @@ window.runBillingGridE2E = async function () {
     await addMed('paracet'); closeList();
     const seq = []; focusCell(0, 'product');
     for (let i = 0; i < 5; i++) { key('Tab'); seq.push(where()); }
-    expect(seq.join(',') === 'row0:batch,row0:unit,row0:qty,row0:disc,entry:product', seq.join(','));
-    const back = []; for (let i = 0; i < 3; i++) { key('Tab', { shiftKey: true }); back.push(where()); }
-    expect(back.join(',') === 'row0:disc,row0:qty,row0:unit', back.join(','));
+    expect(seq.join(',') === 'row0:batch,row0:unit,row0:qty,row0:rate,row0:disc', seq.join(','));
+    key('Tab'); expect(where() === 'entry:product', where());
+    focusCell(0, 'disc'); const back = []; for (let i = 0; i < 3; i++) { key('Tab', { shiftKey: true }); back.push(where()); }
+    expect(back.join(',') === 'row0:rate,row0:qty,row0:unit', back.join(','));
   });
 
   await test('Left/Right move cells only at the edge of the text; Up/Down move rows when no list is open', async () => {
     await addMed('bulk medicine 0007'); closeList(); await addMed('bulk medicine 0008'); closeList();
     focusCell(0, 'qty'); typeInto('12'); const el = document.activeElement; el.setSelectionRange(1, 1);
     key('ArrowRight'); expect(where() === 'row0:qty', 'moved while editing: ' + where());
-    el.setSelectionRange(2, 2); key('ArrowRight'); expect(where() === 'row0:disc', where());
+    el.setSelectionRange(2, 2); key('ArrowRight'); expect(where() === 'row0:mrp', where());
     key('ArrowLeft'); expect(where() === 'row0:qty', where());
     key('ArrowDown'); expect(where() === 'row1:qty', where()); key('ArrowUp'); expect(where() === 'row0:qty', where());
   });
@@ -165,7 +166,7 @@ window.runBillingGridE2E = async function () {
       typeInto(bad); key('Enter');
       expect(where() === 'row0:qty' && items()[0].quantity === 1, `"${bad}" accepted: ${where()} qty=${items()[0].quantity}`);
     }
-    typeInto('4'); key('Enter'); expect(items()[0].quantity === 4 && where() === 'row0:disc', 'valid quantity refused');
+    typeInto('4'); key('Enter'); expect(items()[0].quantity === 4 && where() === 'row0:rate', 'valid quantity refused');
   });
 
   await test('discount: over 100 / malformed refused; 10 accepted', async () => {
@@ -177,7 +178,7 @@ window.runBillingGridE2E = async function () {
 
   await test('amount, tax and bill total match the shared billing rules after every edit', async () => {
     await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');
-    focusCell(0, 'qty'); typeInto('3'); key('Enter'); typeInto('10'); key('Enter');
+    focusCell(0, 'qty'); typeInto('3'); key('Enter'); key('Enter'); typeInto('10'); key('Enter');
     expect($('bill-row-amount-0').textContent === '₹102.82', $('bill-row-amount-0').textContent);
     await addMed('bulk medicine 0060'); closeList(); focusCell(1, 'qty'); typeInto('7'); key('Enter');
     const c = billComputeLines(items(), activeBillState.billDiscountPercent);
@@ -270,7 +271,7 @@ window.runBillingGridE2E = async function () {
     key('Enter');                                                       // party (Walk-in) -> Product
     focusCell(0, 'product'); typeInto('bulk medicine 0130'); await until(() => (window._lastSearchResults || []).length > 0);
     key('Enter'); await until(() => where() === 'row0:batch'); key('Enter');   // product, batch
-    key('Enter'); typeInto('3'); key('Enter'); typeInto('5'); key('Enter');    // unit, qty 3, disc 5%
+    key('Enter'); key('Enter'); typeInto('3'); key('Enter'); key('Enter'); typeInto('5'); key('Enter');    // unit (open, confirm Strip), qty 3, rate (keep MRP), disc 5%
     expect(where() === 'entry:product', where());
     const screen = parseFloat($('bill-grand-total-val').textContent.replace(/[^0-9.]/g, ''));
     key('F9'); await until(() => items().length === 0, 6000); await wait(400);
@@ -278,6 +279,159 @@ window.runBillingGridE2E = async function () {
     expect(latest && (!savedBefore || latest.id !== savedBefore.id), 'no new sale');
     expect(near(Number(latest.total_amount), screen), `saved ${latest.total_amount} vs screen ${screen}`);
     return 'saved ' + latest.bill_number + ' ₹' + latest.total_amount;
+  });
+
+
+  // ---------- keyboard-fix round: unit, navigation, rate, shortcuts ----------
+  await test('Unit: Enter opens the list, Down + Enter chooses Loose, Up + Enter chooses Strip back (keyboard only)', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');   // PCM-FAR, MRP 34
+    expect(where() === 'row0:unit', where());
+    key('Enter'); expect(billGrid.popup && billGrid.popup.kind === 'unit', 'list did not open');
+    expect(billGrid.popup.options.map((o) => o.value).join() === 'strip,loose', 'units ' + billGrid.popup.options.map((o) => o.value));
+    key('ArrowDown'); key('Enter');
+    expect(items()[0].unitType === 'loose' && near(items()[0].rate, 3.4) && where() === 'row0:qty', `${items()[0].unitType} rate ${items()[0].rate} at ${where()}`);
+    focusCell(0, 'unit'); key(' '); key('ArrowUp'); key('Enter');
+    expect(items()[0].unitType === 'strip' && near(items()[0].rate, 34), 'not back to strip');
+  });
+
+  await test('Unit: Escape closes the list and keeps the committed unit; the cursor stays in the cell', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'unit'); key('Enter'); key('ArrowDown'); key('Escape');
+    expect(!billGrid.popup && items()[0].unitType === 'strip' && where() === 'row0:unit', where() + ' ' + items()[0].unitType);
+    expect(items().length === 1, 'Esc cleared the bill');
+  });
+
+  await test('Unit: Tab confirms the highlighted unit and moves on; typing "l" jumps to Loose', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'unit'); key('l');
+    expect(billGrid.popup && billGrid.popup.options[billGrid.popup.index].value === 'loose', 'type-ahead');
+    key('Tab'); expect(items()[0].unitType === 'loose' && where() === 'row0:qty', items()[0].unitType + ' at ' + where());
+  });
+
+  await test('Unit change recalculates the amount and re-checks stock in the new unit', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');
+    focusCell(0, 'qty'); typeInto('40'); key('Enter');                       // 40 strips = all the stock
+    focusCell(0, 'unit'); key('Enter'); key('ArrowDown'); key('Enter');      // loose: 400 tablets possible, qty 40 stays
+    expect(items()[0].quantity === 40 && near(items()[0].rate, 3.4), 'loose ' + items()[0].quantity);
+    expect($('bill-row-amount-0').textContent === '₹152.32', $('bill-row-amount-0').textContent);   // 40 x 3.40 + 12 %
+    focusCell(0, 'qty'); typeInto('401'); key('Enter'); expect(where() === 'row0:qty' && items()[0].quantity === 40, '401 loose accepted');
+    typeInto('400'); key('Enter'); expect(items()[0].quantity === 400, '400 loose refused');
+    focusCell(0, 'unit'); key('Enter'); key('ArrowUp'); key('Enter');       // back to strip: 400 > 40 in stock
+    expect(items()[0].unitType === 'strip' && items()[0].quantity === 40, 'quantity not limited to the stock: ' + items()[0].quantity);
+  });
+
+  await test('Expiry (read-only) cell: Up/Down/Left/Right/Tab all leave it; it is never a trap', async () => {
+    await addMed('bulk medicine 0301'); closeList(); await addMed('bulk medicine 0302'); closeList();
+    focusCell(0, 'expiry'); expect(where() === 'row0:expiry', where());
+    key('ArrowDown'); expect(where() === 'row1:expiry', where());
+    key('ArrowUp'); expect(where() === 'row0:expiry', where());
+    key('ArrowLeft'); expect(where() === 'row0:batch', where()); key('ArrowRight'); key('ArrowRight'); expect(where() === 'row0:unit', where());
+    focusCell(0, 'expiry'); key('Tab'); expect(where() === 'row0:unit', where());
+    focusCell(0, 'expiry'); key('Tab', { shiftKey: true }); expect(where() === 'row0:batch', where());
+    focusCell(0, 'expiry'); key('Enter'); expect(where() === 'row0:unit', where());
+  });
+
+  await test('after choosing a medicine, go to its Expiry cell, move Down, go to another Product cell and pick a different medicine', async () => {
+    await addMed('bulk medicine 0303'); closeList(); await addMed('bulk medicine 0304'); closeList();
+    focusCell(0, 'expiry'); key('ArrowDown'); expect(where() === 'row1:expiry', where());
+    key('ArrowLeft'); key('ArrowLeft'); key('ArrowLeft'); expect(where() === 'row1:product', where());
+    const id1 = items()[1].id;
+    typeInto('paracet'); await until(() => (window._lastSearchResults || []).length >= 2 && $('bill-search-results-dropdown').style.display === 'block');
+    expect(where() === 'row1:product', 'the arrows must not have moved the cursor: ' + where());
+    const rowBefore = where(); key('ArrowDown'); expect(where() === rowBefore, 'ArrowDown inside the list moved the grid row');
+    const hi = searchHighlightIndex; key('ArrowUp'); expect(searchHighlightIndex === hi - 1, 'highlight did not move');
+    key('ArrowDown');
+    const chosen = window._lastSearchResults[searchHighlightIndex];
+    key('Enter'); await until(() => items()[1].name !== 'BULK MEDICINE 0304');
+    expect(items().length === 2 && items()[1].id === id1, 'line identity or count changed');
+    // choosing a medicine by name gives its earliest valid batch (FEFO), whichever batch row was highlighted
+    expect(items()[1].name === chosen.name && items()[1].selectedBatch === 'PCM-NEAR', `${items()[1].name}/${items()[1].selectedBatch}`);
+    const nb = (items()[1].batches || []).find((b) => b.batchNumber === 'PCM-NEAR');
+    expect(nb && items()[1].expiryDate === nb.expiryDate && items()[1].quantity === 1, 'expiry/qty not filled');
+    expect(where() === 'row1:batch' && billGrid.popup && /PCM-/.test(popupText()), 'batch list: ' + where() + ' ' + popupText());
+    expect(items()[0].name === 'BULK MEDICINE 0303', 'the other line changed');
+  });
+
+  await test('typing a different medicine over a line and pressing Escape twice keeps the old medicine', async () => {
+    await addMed('bulk medicine 0305'); closeList(); focusCell(0, 'product'); typeInto('paracet');
+    await until(() => $('bill-search-results-dropdown').style.display === 'block' && (window._lastSearchResults || []).length > 0);
+    key('Escape'); expect($('bill-search-results-dropdown').style.display === 'none', 'list still open');
+    key('Escape'); expect(items()[0].name === 'BULK MEDICINE 0305' && document.activeElement.value === 'BULK MEDICINE 0305', 'medicine changed: ' + document.activeElement.value);
+    expect(items().length === 1, 'Esc cleared the bill');
+  });
+
+  await test('Rate: MRP stays read-only, the selling price can be lowered, totals follow, batch/qty/unit are kept', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');
+    focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    expect(where() === 'row0:rate', where());
+    typeInto('30'); key('Enter');
+    const it = items()[0];
+    expect(it.rate === 30 && it.rateOverride === 30 && it.selectedBatch === 'PCM-FAR' && it.quantity === 3 && it.unitType === 'strip', JSON.stringify([it.rate, it.selectedBatch, it.quantity]));
+    expect($('bill-row-amount-0').textContent === '₹100.80', $('bill-row-amount-0').textContent);       // 90 + 12 %
+    const mrpCell = document.querySelector('tr[data-rid] [data-cell="mrp"]'); expect(mrpCell.textContent === '₹34.00', 'MRP cell ' + mrpCell.textContent);
+    expect(near(parseFloat($('bill-grand-total-val').textContent.replace(/[^0-9.]/g, '')), billComputeLines(items(), 0).grandTotal), 'footer total');
+    const master = (await api.searchBillingBatches('far', 'PARACETAMOL 500', 5)).find((b) => b.batch_number === 'PCM-FAR');
+    expect(master.unit_price === 34, 'the inventory MRP was changed: ' + master.unit_price);
+    expect(document.querySelector('tr[data-rid] [data-cell="rate"]').value === '30.00', 'value not kept after redraw');
+  });
+
+  await test('Rate: empty / zero / negative / malformed / above MRP are refused and the old price is kept', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter'); focusCell(0, 'rate');
+    for (const bad of ['', '0', '-5', 'abc', '1e1', '34.01', '35', '12.345']) {
+      typeInto(bad); key('Enter');
+      expect(where() === 'row0:rate' && items()[0].rate === 34, `"${bad}" accepted (rate ${items()[0].rate}, at ${where()})`);
+    }
+    typeInto('34'); key('Enter'); expect(items()[0].rateOverride === null && where() === 'row0:disc', 'MRP itself should be fine');
+  });
+
+  await test('Rate override is dropped when the unit changes; it never exceeds the new MRP', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter'); focusCell(0, 'rate'); typeInto('30'); key('Enter');
+    focusCell(0, 'unit'); key('Enter'); key('ArrowDown'); key('Enter');
+    expect(items()[0].rateOverride === null && near(items()[0].rate, 3.4), 'override kept across units: ' + items()[0].rate);
+  });
+
+  await test('the saved invoice uses the edited selling price', async () => {
+    await addMed('bulk medicine 0310'); closeList(); focusCell(0, 'rate'); const mrp = items()[0].rate; typeInto(String(mrp - 1)); key('Enter');
+    focusCell(0, 'qty'); typeInto('2'); key('Enter');
+    const before = (await api.request('/sales?skip=0&limit=1'))[0];
+    const expected = billComputeLines(items(), 0).grandTotal;
+    await commitBillTransaction(false, true); await wait(300);
+    const latest = (await api.request('/sales?skip=0&limit=1'))[0];
+    expect(latest.id !== (before && before.id) && near(Number(latest.total_amount), expected), `saved ${latest.total_amount} vs screen ${expected}`);
+  });
+
+  await test('buttons show the real shortcuts: Draft F6, Save & New F9, Save & Print F10, Clear Esc, payments Alt+1..4', async () => {
+    const txt = (sel) => [...document.querySelectorAll(sel)].map((b) => b.textContent.replace(/\s+/g, ' ').trim());
+    const all = txt('.bill-buttons .btn').join(' | ');
+    expect(/Esc.*Clear/.test(all) && /F6.*Save as Draft/.test(all) && /F9.*Save & New/.test(all) && /F10.*Save & Print/.test(all), all);
+    const pays = txt('.pay-mode-btn').join(' | ');
+    expect(/Cash Alt\+1/.test(pays) && /UPI Alt\+2/.test(pays) && /Card Alt\+3/.test(pays) && /Credit Alt\+4/.test(pays), pays);
+    document.querySelectorAll('.bill-buttons kbd').forEach((k) => { const cs = getComputedStyle(k); expect(cs.display !== 'none' && cs.visibility !== 'hidden' && k.offsetWidth > 8, 'badge hidden'); });
+    return all;
+  });
+
+  await test('the displayed shortcuts really run the action: F6 holds once, F10 saves and prints once, F9 saves once', async () => {
+    await addMed('bulk medicine 0320'); closeList(); focusCell(0, 'qty');
+    const realHold = api.createHeldBill.bind(api); let holds = 0; api.createHeldBill = async (p) => { holds++; await wait(300); return realHold(p); };
+    try { key('F6'); key('F6', { repeat: true }); key('F6'); await wait(900); } finally { api.createHeldBill = realHold; }
+    expect(holds === 1 && items().length === 0, `held ${holds} times, lines left ${items().length}`);
+    await freshBill(); await addMed('bulk medicine 0321'); closeList(); focusCell(0, 'qty');
+    const realSale = api.createSale.bind(api); let sales = 0; api.createSale = async (p) => { sales++; await wait(300); return realSale(p); };
+    let opened = null; window.open = (u) => { opened = u; return {}; };
+    try { key('F10'); key('F10', { repeat: true }); key('F10'); await wait(1200); } finally { window.open = realOpen; }
+    expect(sales === 1 && items().length === 0 && /\/billing\/\d+\/pdf/.test(opened || ''), `sales ${sales}, opened ${opened}, lines ${items().length}`);
+    await addMed('bulk medicine 0322'); closeList(); focusCell(0, 'qty'); sales = 0;
+    try { key('F9'); for (let i = 0; i < 5; i++) key('F9', { repeat: true }); await wait(1200); } finally { api.createSale = realSale; }
+    expect(sales === 1 && items().length === 0, `F9 sales ${sales}`);
+  });
+
+  await test('a save key does nothing while a list is open or the typed value is invalid', async () => {
+    await addMed('bulk medicine 0330'); closeList(); focusCell(1, 'product'); typeInto('paracet');
+    await until(() => $('bill-search-results-dropdown').style.display === 'block' && (window._lastSearchResults || []).length > 0);
+    const real = api.createSale.bind(api); let n = 0; api.createSale = async (p) => { n++; return real(p); };
+    try {
+      key('F9'); await wait(200); expect(n === 0 && items().length === 1, 'saved with the medicine list open');
+      key('Escape'); focusCell(0, 'qty'); typeInto('abc'); key('F10'); await wait(200);
+      expect(n === 0 && items().length === 1 && where() === 'row0:qty', 'saved with a bad quantity');
+    } finally { api.createSale = real; }
   });
 
   window.alert = realAlert; window.open = realOpen;

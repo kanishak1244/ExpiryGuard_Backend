@@ -104,7 +104,7 @@
   // Used by the medicine dropdown in billing_flow.js after it fills itself.
   window.billPlacePopup = function (el, anchor) {
     if (!onGridPage() || !el) return;
-    const a = anchor || $('bill-medicine-search-input');
+    const a = anchor || (billGrid.searchEl && billGrid.searchEl.isConnected ? billGrid.searchEl : null) || $('bill-medicine-search-input');
     if (!a) return;
     if (el.parentElement !== document.body) document.body.appendChild(el);
     placeAt(el, a, Math.max(580, a.getBoundingClientRect().width), Math.min(el.scrollHeight + 4, 440));
@@ -300,18 +300,21 @@
   }
 
   // ---------- unit dropdown ----------
-  function openUnitPopupFor(key) {
+  function openUnitPopupFor(key, typed) {
     const item = itemOfKey(key);
     const anchor = cellEl(key, 'unit');
     if (!item || !anchor) return;
-    const canLoose = !!(item.loosePrice && Number(item.loosePrice) > 0);
-    const opts = [
-      { selectable: true, value: 'strip', html: '<span class="bp-main">Strip</span><span class="bp-sub">full pack · ₹' + Number(item.packPrice || 0).toFixed(2) + '</span>' },
-      { selectable: canLoose, value: 'loose', why: 'Loose sale needs the tablets-per-strip of this medicine. Set it in Inventory first.',
-        html: '<span class="bp-main">Loose</span><span class="bp-sub">' + (canLoose ? 'per tablet · ₹' + Number(item.loosePrice).toFixed(2) : 'not set up for this medicine') + '</span>' },
-    ];
+    const units = gridUnitOptions(item);
+    const opts = units.map((u) => ({
+      selectable: u.selectable, value: u.value,
+      html: u.value === 'strip'
+        ? '<span class="bp-main">Strip</span><span class="bp-sub">full pack · ₹' + Number(item.packPrice || 0).toFixed(2) + ' each</span>'
+        : '<span class="bp-main">Loose</span><span class="bp-sub">per tablet · ₹' + Number(item.loosePrice).toFixed(2) + ' each</span>',
+    }));
+    const at = typed ? gridMatchUnit(units, typed) : -1;
+    const cur = Math.max(0, units.findIndex((u) => u.value === (item.unitType === 'loose' ? 'loose' : 'strip')));
     popupOpen({
-      kind: 'unit', key, anchor, width: 260, options: opts, index: item.unitType === 'loose' ? 1 : 0,
+      kind: 'unit', key, anchor, width: 300, options: opts, index: at >= 0 ? at : cur,
       onPick: (o) => { const i = indexOfId(key); billSetUnit(i, o.value); renderBillItemsTable(); recalculateTotals(); focusPos({ row: i, col: 'qty' }); },
     });
   }
@@ -320,10 +323,10 @@
     const item = items()[i];
     if (!item || item.unitType === unitType) return;
     item.unitType = unitType;
-    const pack = Number(item.packPrice || item.mrp || 0);
-    item.rate = unitType === 'loose' ? Number(item.loosePrice) : pack;
+    if (item.rateOverride) { item.rateOverride = null; billToast('The selling price was reset to the MRP of the new unit.', false); }
+    item.rate = gridEffectiveRate(item);
     const v = gridValidateQty(String(item.quantity), item);
-    if (!v.ok && v.limit >= 1) { item.quantity = v.limit; billToast('Quantity changed to ' + v.limit + ' (all that is in stock).', false); }
+    if (!v.ok && v.limit >= 1) { item.quantity = v.limit; billToast('Quantity changed to ' + v.limit + ' (all that is in stock in this unit).', false); }
   }
 
   // ---------- batch apply (used by the Batch dropdown) ----------
@@ -343,7 +346,11 @@
     item.packSize = bData.packSize || item.packSize || '';
     item.loosePrice = bData.pricePerUnit ? Number(bData.pricePerUnit) : (item.unitsPerPack ? Number((item.packPrice / item.unitsPerPack).toFixed(2)) : null);
     if (item.unitType === 'loose' && !item.loosePrice) item.unitType = 'strip';
-    item.rate = item.unitType === 'loose' ? item.loosePrice : item.packPrice;
+    if (item.rateOverride && !(Number(item.rateOverride) <= gridBaseRate(item) + 0.005)) {
+      item.rateOverride = null;
+      billToast('The selling price was above this batch\'s MRP, so it was reset to the MRP.', false);
+    }
+    item.rate = gridEffectiveRate(item);
     const v = gridValidateQty(String(item.quantity), item);
     if (!v.ok && v.limit >= 1) { item.quantity = v.limit; billToast('Quantity changed to ' + v.limit + ' (stock of this batch).', false); }
     return true;
@@ -352,23 +359,27 @@
   // ---------- rendering ----------
   function rowWarn(item) { return billRowWarning(item); }
 
+  const roCell = (col, html, cls) => '<td class="c-ro' + (cls ? ' ' + cls : '') + '"><div class="cell-ro" tabindex="0" data-cell="' + col + '">' + html + '</div></td>';
+
   function lineRowHtml(item, idx) {
     const key = item.id;
     const expState = billBatchState({ expiryDate: item.expiryDate, stock: item.availableStock });
-    const expClass = expState === 'expired' ? ' exp-bad' : expState === 'near' ? ' exp-warn' : '';
+    const expClass = expState === 'expired' ? 'exp-bad' : expState === 'near' ? 'exp-warn' : '';
     const sub = [item.brand, item.composition].filter(Boolean).join(' • ');
+    const mrp = gridBaseRate(item);
     return '<tr data-row="' + idx + '" data-rid="' + esc(key) + '" onclick="billingPreviewLine(' + idx + ')" onfocusin="billingPreviewLine(' + idx + ')">' +
       '<td class="c-no">' + (idx + 1) + '</td>' +
-      '<td class="c-ro-edit"><input class="cell-input" data-cell="product" readonly value="' + esc(item.name) + '" title="' + esc(item.name + (sub ? ' — ' + sub : '')) + '"><div class="cell-note" id="bill-row-warn-' + idx + '">' + rowWarn(item) + '</div></td>' +
-      '<td class="c-ro">' + esc(item.packSize || '-') + '</td>' +
+      '<td class="c-edit c-prod"><input class="cell-input" data-cell="product" autocomplete="off" spellcheck="false" value="' + esc(item.name) + '" title="' + esc(item.name + (sub ? ' — ' + sub : '') + ' · type to change the medicine') + '"><div class="cell-note" id="bill-row-warn-' + idx + '">' + rowWarn(item) + '</div></td>' +
+      roCell('packing', esc(item.packSize || '-')) +
       '<td class="c-edit"><input class="cell-input" data-cell="batch" value="' + esc(item.selectedBatch || '') + '" autocomplete="off" title="Type to filter the batches · Space or Alt+↓ shows them all"></td>' +
-      '<td class="c-ro' + expClass + '">' + esc(item.expiryDate || '-') + '</td>' +
-      '<td class="c-edit"><input class="cell-input c-center" data-cell="unit" readonly value="' + (item.unitType === 'loose' ? 'Loose' : 'Strip') + '" title="Space or Alt+↓ to change"></td>' +
+      roCell('expiry', esc(item.expiryDate || '-'), expClass) +
+      '<td class="c-edit"><input class="cell-input c-center" data-cell="unit" readonly value="' + (item.unitType === 'loose' ? 'Loose' : 'Strip') + '" title="Enter or Space opens the list"></td>' +
       '<td class="c-edit"><input class="cell-input c-center item-qty-input" data-cell="qty" inputmode="numeric" autocomplete="off" value="' + esc(item.quantity) + '"></td>' +
-      '<td class="c-ro c-num" title="Selling price is the MRP and cannot be raised above it. Use Disc % to give a discount.">₹' + Number(item.rate).toFixed(2) + '</td>' +
+      roCell('mrp', '₹' + mrp.toFixed(2), 'c-num') +
+      '<td class="c-edit"><input class="cell-input c-num item-rate-input" data-cell="rate" inputmode="decimal" autocomplete="off" value="' + Number(item.rate).toFixed(2) + '" title="Selling price per unit. The MRP is the most you can charge."></td>' +
       '<td class="c-edit"><input class="cell-input c-center item-disc-input" data-cell="disc" inputmode="decimal" autocomplete="off" value="' + esc(item.discountPercent) + '"></td>' +
-      '<td class="c-ro c-center">' + Number(item.gstRate) + '%</td>' +
-      '<td class="c-ro c-num c-amount"><span id="bill-row-amount-' + idx + '">₹' + billRowAmount(item).toFixed(2) + '</span></td>' +
+      roCell('gst', Number(item.gstRate) + '%', 'c-center') +
+      roCell('amount', '<span id="bill-row-amount-' + idx + '">₹' + billRowAmount(item).toFixed(2) + '</span>', 'c-num c-amount') +
       '<td class="c-act"><button type="button" class="cell-del" tabindex="-1" onclick="removeBillItem(' + idx + ')" title="Remove this line (Ctrl+Delete)">🗑️</button></td>' +
       '</tr>';
   }
@@ -381,7 +392,7 @@
       '<span id="bill-search-loading-spinner" class="search-spinner-inline" style="display:none;"></span></td>' +
       '<td class="c-ro"></td>' +
       '<td class="c-edit"><input class="cell-input" data-cell="batch" id="bill-entry-batch" autocomplete="off" placeholder="or batch no." value="' + esc(batchText) + '"></td>' +
-      '<td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-act"></td></tr>';
+      '<td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-ro"></td><td class="c-act"></td></tr>';
   }
 
   function render() {
@@ -409,6 +420,7 @@
       if (el) {
         setActive(keep.key, keep.col);
         el.focus();
+        if (el.tagName === 'INPUT') billGrid.searchEl = el.getAttribute('data-cell') === 'product' ? el : billGrid.searchEl;
         if (keep.start !== null && keep.start !== undefined && el.setSelectionRange && !el.readOnly) { try { el.setSelectionRange(keep.start, keep.end); } catch (e) { /* not selectable */ } }
       }
     } else if (billGrid.active) {
@@ -490,11 +502,24 @@
       clearCellError(el);
       item.discountPercent = v.value;
       el.value = String(v.value);
+    } else if (pos.col === 'rate' && item) {
+      const v = gridValidateRate(el.value, gridBaseRate(item));
+      if (!v.ok) { showCellError(el, v.error); return false; }
+      clearCellError(el);
+      applyRate(item, v.value);
+      el.value = Number(item.rate).toFixed(2);
     } else if (pos.col === 'batch' && item) {
       el.value = item.selectedBatch || '';                          // typed filter text that was not picked is dropped
+    } else if (pos.col === 'product' && item) {
+      if (el.value !== item.name) { el.value = item.name; billGrid.replaceKey = null; closeProductDropdown(); }   // typed but not picked: the medicine stays
     }
     if (item) { recalculateTotals(); billUpdateRow(pos.row); }
     return true;
+  }
+  // A selling price equal to the MRP is "no override"; a lower one is kept on the line (the master record is never touched).
+  function applyRate(item, value) {
+    item.rateOverride = value >= gridBaseRate(item) - 0.005 ? null : value;
+    item.rate = gridEffectiveRate(item);
   }
   function revertCell(el) {
     const pos = posOfEl(el);
@@ -503,7 +528,9 @@
     clearCellError(el);
     if (pos.col === 'qty' && item) el.value = String(item.quantity);
     else if (pos.col === 'disc' && item) el.value = String(item.discountPercent);
+    else if (pos.col === 'rate' && item) el.value = Number(item.rate).toFixed(2);
     else if (pos.col === 'batch' && item) el.value = item.selectedBatch || '';
+    else if (pos.col === 'product' && item) { el.value = item.name; billGrid.replaceKey = null; closeProductDropdown(); }
     else if (pos.col === 'batch' && pos.key === 'entry') el.value = '';
     else if (pos.col === 'product' && pos.key === 'entry') clearMedicineSearch(false);
   }
@@ -518,6 +545,9 @@
     if (next) focusPos(next);
   }
 
+  const isTextCell = (el) => el.tagName === 'INPUT' && !el.readOnly;
+  const productDirty = (el, pos, item) => (pos.key === 'entry' ? el.value.trim() !== '' : !!item && el.value !== item.name);
+
   function onGridKeydown(e) {
     const el = e.target && e.target.closest ? e.target.closest('[data-cell]') : null;
     if (!el) return;
@@ -527,12 +557,13 @@
     const key = e.key;
     const n = items().length;
     const entry = pos.key === 'entry';
+    const item = itemOfKey(pos.key);
     const popupHere = billGrid.popup && (billGrid.popup.anchor === el);
-    const prodOpen = entry && pos.col === 'product' && productDropdownOpen();
+    const prodOpen = pos.col === 'product' && productDropdownOpen();
 
-    // Alt+Down / Space / F4 show the list of a Batch or Unit cell
-    if (!entry && (pos.col === 'batch' || pos.col === 'unit') && !popupHere &&
-        ((key === 'ArrowDown' && e.altKey) || key === 'F4' || (key === ' ' && pos.col === 'unit') || (key === ' ' && pos.col === 'batch' && el.selectionStart === el.selectionEnd && el.value === (itemOfKey(pos.key).selectedBatch || '')))) {
+    // Alt+Down / F4 / Space show the list of a Batch cell; Unit also opens with Enter
+    if (!entry && !popupHere && (pos.col === 'batch' || pos.col === 'unit') &&
+        ((key === 'ArrowDown' && e.altKey) || key === 'F4' || (key === ' ' && (pos.col === 'unit' || (el.selectionStart === el.selectionEnd && el.value === (item.selectedBatch || '')))))) {
       e.preventDefault();
       if (pos.col === 'batch') openBatchPopupFor(pos.key, ''); else openUnitPopupFor(pos.key);
       return;
@@ -551,11 +582,16 @@
         if (prodOpen) handleSearchKeydown(e); else popupPick(billGrid.popup.index);
         return;
       }
-      if (key === 'Tab') {                                            // Tab never picks: it must not choose the wrong medicine
-        popupClose(); closeProductDropdown();
-        if (!commitCell(el)) { e.preventDefault(); return; }
+      if (key === 'Tab') {
         e.preventDefault();
-        move(pos, e.shiftKey ? 'shifttab' : 'tab', el);
+        if (popupHere && billGrid.popup.kind === 'unit') {              // a Unit choice is always a valid one: Tab confirms it
+          const i = billGrid.popup.index;
+          popupPick(i);
+          return;
+        }
+        popupClose(); closeProductDropdown();                           // Tab never picks a medicine or batch: it must not choose the wrong one
+        if (!commitCell(el)) return;
+        focusPos(gridTab(pos, e.shiftKey, n));
         return;
       }
     }
@@ -563,17 +599,16 @@
     switch (key) {
       case 'Enter': {
         e.preventDefault();
-        if (entry && pos.col === 'product') {
-          const typed = el.value.trim();
-          if (!typed) return;
+        if (pos.col === 'product' && productDirty(el, pos, item)) {
           if (billSearchPending) { billPendingEnter = true; return; }  // scanner: add as soon as the answer arrives
-          handleMedicineSearchInput(typed);
+          handleMedicineSearchInput(el.value.trim());
           billPendingEnter = true;
           return;
         }
         if (entry && pos.col === 'batch') { if (!el.value.trim()) focusPos({ row: n, col: 'product' }); return; }
+        if (!entry && pos.col === 'unit') { openUnitPopupFor(pos.key); return; }
         if (!commitCell(el)) return;
-        move(pos, 'enter', el);
+        focusPos(gridEnter(pos, n));
         return;
       }
       case 'Tab': {
@@ -588,7 +623,7 @@
       }
       case 'ArrowDown':
       case 'ArrowUp': {
-        if (entry && pos.col === 'product' && key === 'ArrowDown' && el.value.trim() && (window._lastSearchResults || []).length) {
+        if (pos.col === 'product' && key === 'ArrowDown' && productDirty(el, pos, item) && (window._lastSearchResults || []).length) {
           e.preventDefault();                                         // Down re-opens the suggestions
           const dd = $('bill-search-results-dropdown'); dd.style.display = 'block'; billPlacePopup(dd);
           return;
@@ -600,7 +635,7 @@
       }
       case 'ArrowLeft':
       case 'ArrowRight': {
-        const caret = el.readOnly ? null : { start: el.selectionStart, end: el.selectionEnd, length: el.value.length };
+        const caret = isTextCell(el) ? { start: el.selectionStart, end: el.selectionEnd, length: el.value.length } : null;
         const next = gridHorizontal(pos, key === 'ArrowRight' ? 1 : -1, n, caret);
         if (!next) return;                                            // still editing the text
         if (!commitCell(el)) { e.preventDefault(); return; }
@@ -608,7 +643,13 @@
         focusPos(next);
         return;
       }
-      default: break;
+      default:
+        // type-ahead in the Unit cell: "l" opens the list on Loose
+        if (!entry && pos.col === 'unit' && key.length === 1 && !e.ctrlKey && !e.altKey && key !== ' ') {
+          e.preventDefault();
+          openUnitPopupFor(pos.key, key);
+        }
+        break;
     }
   }
 
@@ -626,6 +667,14 @@
     } else if (col === 'disc' && item) {
       const v = gridValidateDiscount(el.value);
       if (v.ok) { clearCellError(el); item.discountPercent = v.value; recalculateTotals(); billUpdateRow(pos.row); } else { el.classList.add('cell-error'); el.title = v.error; }
+    } else if (col === 'rate' && item) {
+      const v = gridValidateRate(el.value, gridBaseRate(item));
+      if (v.ok) { clearCellError(el); applyRate(item, v.value); recalculateTotals(); billUpdateRow(pos.row); } else { el.classList.add('cell-error'); el.title = v.error; }
+    } else if (col === 'product' && item) {
+      billGrid.replaceKey = pos.key; billGrid.searchEl = el;           // a different medicine for THIS line
+      handleMedicineSearchInput(el.value);
+    } else if (col === 'product' && pos.key === 'entry') {
+      billGrid.replaceKey = null; billGrid.searchEl = el;
     } else if (col === 'batch' && item) {
       openBatchPopupFor(pos.key, el.value.trim() === (item.selectedBatch || '') ? '' : el.value.trim());
     } else if (col === 'batch' && pos.key === 'entry') {
@@ -640,6 +689,10 @@
     if (!pos) return;
     setActive(pos.key, pos.col);
     if (billGrid.popup && billGrid.popup.anchor !== el) popupClose();
+    if (pos.col === 'product') {
+      if (billGrid.searchEl !== el) closeProductDropdown();
+      billGrid.searchEl = el; billGrid.replaceKey = pos.key === 'entry' ? null : pos.key;
+    }
     if (typeof el.select === 'function' && !el.readOnly) { try { el.select(); } catch (err) { /* not selectable */ } }
   }
   function onGridFocusout(e) {
@@ -650,17 +703,21 @@
       const pos = posOfEl(el);
       if (billGrid.popup && billGrid.popup.anchor === el && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#bill-cell-popup'))) popupClose();
       if (pos && !el.isConnected) return;
-      if (pos && (pos.col === 'qty' || pos.col === 'disc')) {
+      if (pos && (pos.col === 'qty' || pos.col === 'disc' || pos.col === 'rate')) {
         const item = itemOfKey(pos.key);
         if (item && !commitCellQuiet(el, pos, item)) revertCell(el);   // left with a bad value: put back the last good one
       } else if (pos && pos.col === 'batch') {
         const item = itemOfKey(pos.key);
         if (item) el.value = item.selectedBatch || '';
+      } else if (pos && pos.col === 'product' && pos.key !== 'entry') {
+        const item = itemOfKey(pos.key);
+        if (item && el.value !== item.name) { el.value = item.name; billGrid.replaceKey = null; closeProductDropdown(); }
       }
     }, 0);
   }
   function commitCellQuiet(el, pos, item) {
     if (pos.col === 'qty') { const v = gridValidateQty(el.value, item); if (!v.ok) return false; item.quantity = v.value; el.value = String(v.value); }
+    else if (pos.col === 'rate') { const v = gridValidateRate(el.value, gridBaseRate(item)); if (!v.ok) return false; applyRate(item, v.value); el.value = Number(item.rate).toFixed(2); }
     else { const v = gridValidateDiscount(el.value); if (!v.ok) return false; item.discountPercent = v.value; el.value = String(v.value); }
     clearCellError(el);
     recalculateTotals(); billUpdateRow(pos.row);
@@ -674,6 +731,15 @@
     if (pos.col === 'batch') openBatchPopupFor(pos.key, '');
     else if (pos.col === 'unit') openUnitPopupFor(pos.key);
   }
+
+  // True when the cell the cursor is in holds a valid value (or nothing was being edited). A bad value keeps the cursor there.
+  window.billGridCommitActive = function () {
+    const el = document.activeElement;
+    if (!el || !el.getAttribute || !el.getAttribute('data-cell') || !$('bill-items-table-body') || !$('bill-items-table-body').contains(el)) return true;
+    return commitCell(el);
+  };
+  function productDropdownOpenGlobal() { return productDropdownOpen(); }
+  window.productDropdownOpen = productDropdownOpenGlobal;
 
   // Esc: close the list / cancel an unfinished edit. Returns true when it did something (then Esc does not also clear the bill).
   window.billGridEscape = function (e) {
@@ -695,8 +761,9 @@
       const item = pos && itemOfKey(pos.key);
       const dirty = (pos.col === 'qty' && item && t.value !== String(item.quantity)) ||
         (pos.col === 'disc' && item && t.value !== String(item.discountPercent)) ||
+        (pos.col === 'rate' && item && t.value !== Number(item.rate).toFixed(2)) ||
         (pos.col === 'batch' && t.value !== (item ? item.selectedBatch || '' : '')) ||
-        (pos.col === 'product' && pos.key === 'entry' && t.value !== '');
+        (pos.col === 'product' && (pos.key === 'entry' ? t.value !== '' : !!item && t.value !== item.name));
       if (dirty) { revertCell(t); consume(); return true; }
     }
     return false;

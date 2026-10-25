@@ -12,55 +12,95 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   Object.keys(api).forEach(k => { root[k] = api[k]; });
 })(typeof window !== 'undefined' ? window : globalThis, function (M) {
-  // Cells the cursor visits in a bill line, left to right. Packing, Expiry, MRP, GST and Amount are read only.
-  const GRID_COLS = ['product', 'batch', 'unit', 'qty', 'disc'];
+  // Every cell of a bill line, left to right. The cursor can stand on all of them (Up/Down/Left/Right), so a read-only
+  // cell (Expiry, MRP ...) is never a trap. Tab and Enter only stop on the editable ones.
+  const ALL_COLS = ['product', 'packing', 'batch', 'expiry', 'unit', 'qty', 'mrp', 'rate', 'disc', 'gst', 'amount'];
+  const EDIT_COLS = ['product', 'batch', 'unit', 'qty', 'rate', 'disc'];
+  const GRID_COLS = EDIT_COLS;
   // The empty row at the bottom (where the next medicine is typed) has only these.
   const ENTRY_COLS = ['product', 'batch'];
 
-  const colsOf = (row, n) => (row >= n ? ENTRY_COLS : GRID_COLS);
+  const orderOf = (row, n) => (row >= n ? ENTRY_COLS : ALL_COLS);
+  const isEdit = (col) => EDIT_COLS.indexOf(col) >= 0;
 
-  // pos = { row, col }; row === n means the empty entry row. Returns the next position (never off the grid).
+  // pos = { row, col }; row === n means the empty entry row. Returns the next editable position (never off the grid).
   function gridTab(pos, shift, n) {
-    const cols = colsOf(pos.row, n);
-    const i = cols.indexOf(pos.col);
+    const order = orderOf(pos.row, n);
+    const i = order.indexOf(pos.col);
     if (!shift) {
-      if (i < cols.length - 1) return { row: pos.row, col: cols[i + 1] };
+      for (let j = i + 1; j < order.length; j++) if (isEdit(order[j])) return { row: pos.row, col: order[j] };
       if (pos.row >= n) return { row: n, col: 'product' };                  // end of the entry row stays in it
       return { row: pos.row + 1, col: 'product' };                          // next line's Product (the entry row after the last)
     }
-    if (i > 0) return { row: pos.row, col: cols[i - 1] };
+    for (let j = i - 1; j >= 0; j--) if (isEdit(order[j])) return { row: pos.row, col: order[j] };
     if (pos.row === 0) return { row: 0, col: 'product' };
-    const prev = pos.row - 1;
-    return { row: prev, col: GRID_COLS[GRID_COLS.length - 1] };
+    return { row: pos.row - 1, col: EDIT_COLS[EDIT_COLS.length - 1] };
   }
 
-  // Enter commits the cell. In the last cell of a line the cursor goes to the next EMPTY Product cell (the entry row).
+  // Enter commits the cell. In the last editable cell of a line the cursor goes to the next EMPTY Product cell (the entry row).
   function gridEnter(pos, n) {
-    const cols = colsOf(pos.row, n);
-    const i = cols.indexOf(pos.col);
-    if (i < cols.length - 1) return { row: pos.row, col: cols[i + 1] };
+    const order = orderOf(pos.row, n);
+    const i = order.indexOf(pos.col);
+    for (let j = i + 1; j < order.length; j++) if (isEdit(order[j])) return { row: pos.row, col: order[j] };
     return { row: n, col: 'product' };
   }
 
   // Up / Down move between lines in the same column (the entry row only has Product and Batch).
   function gridVertical(pos, dir, n) {
     const row = Math.min(n, Math.max(0, pos.row + dir));
-    const cols = colsOf(row, n);
-    const col = cols.indexOf(pos.col) >= 0 ? pos.col : cols[cols.length - 1];
-    return { row, col };
+    if (row < n) return { row, col: pos.col };
+    if (ENTRY_COLS.indexOf(pos.col) >= 0) return { row, col: pos.col };
+    return { row, col: ALL_COLS.indexOf(pos.col) <= 1 ? 'product' : 'batch' };
   }
 
   // Left / Right move between cells only when the caret is already at that edge of the text (so editing is not hijacked).
   function gridHorizontal(pos, dir, n, caret) {
-    const cols = colsOf(pos.row, n);
-    const i = cols.indexOf(pos.col);
+    const order = orderOf(pos.row, n);
+    const i = order.indexOf(pos.col);
     if (caret) {
       if (dir < 0 && caret.start > 0) return null;
       if (dir > 0 && caret.end < caret.length) return null;
     }
     const j = i + dir;
-    if (j < 0 || j >= cols.length) return null;
-    return { row: pos.row, col: cols[j] };
+    if (j < 0 || j >= order.length) return null;
+    return { row: pos.row, col: order[j] };
+  }
+
+  // Units offered for a line: only the ones that are valid for this medicine and batch.
+  // Strip (a full pack) always; Loose only when a per-tablet price exists (tablets per strip are known).
+  function gridUnitOptions(item) {
+    const opts = [{ value: 'strip', label: 'Strip', selectable: true }];
+    if (item && Number(item.loosePrice) > 0) opts.push({ value: 'loose', label: 'Loose', selectable: true });
+    return opts;
+  }
+  // Type-ahead in the Unit cell: first option whose label starts with the typed text.
+  function gridMatchUnit(opts, typed) {
+    const q = String(typed || '').trim().toLowerCase();
+    if (!q) return -1;
+    return opts.findIndex((o) => o.label.toLowerCase().indexOf(q) === 0);
+  }
+
+  // Price per unit for the current unit (the MRP of the batch), and the price actually charged: the MRP unless the
+  // cashier entered a lower selling price. A selling price above the MRP is never used.
+  function gridBaseRate(item) {
+    if (!item) return 0;
+    const v = item.unitType === 'loose' ? Number(item.loosePrice) : Number(item.packPrice || item.mrp);
+    return isFinite(v) ? v : 0;
+  }
+  function gridEffectiveRate(item) {
+    const base = gridBaseRate(item);
+    const ov = Number(item && item.rateOverride);
+    return (ov > 0 && ov <= base + 0.005) ? ov : base;
+  }
+  // Selling price typed in the Rate cell: a number above 0, at most 2 decimals, never above the MRP.
+  function gridValidateRate(raw, mrp) {
+    const text = String(raw === null || raw === undefined ? '' : raw).trim();
+    if (text === '') return { ok: false, error: 'Enter a selling price.' };
+    if (!/^\d+(\.\d{1,2})?$/.test(text)) return { ok: false, error: 'Price must be a number such as 25 or 24.50.' };
+    const n = Number(text);
+    if (!(n > 0)) return { ok: false, error: 'Price must be more than 0.' };
+    if (n > Number(mrp) + 0.005) return { ok: false, error: 'Price cannot be above the MRP (₹' + Number(mrp).toFixed(2) + ').' };
+    return { ok: true, value: n };
   }
 
   // Where to put a dropdown: under the cell, or above it when there is not enough room; kept inside the screen.
@@ -151,7 +191,7 @@
   function gridNewRowId() { seq += 1; return 'r' + seq + '-' + Math.random().toString(36).slice(2, 7); }
 
   return {
-    GRID_COLS, ENTRY_COLS, gridTab, gridEnter, gridVertical, gridHorizontal, gridPopupPlacement, gridHighlight,
+    GRID_COLS, ALL_COLS, EDIT_COLS, ENTRY_COLS, gridUnitOptions, gridMatchUnit, gridBaseRate, gridEffectiveRate, gridValidateRate, gridTab, gridEnter, gridVertical, gridHorizontal, gridPopupPlacement, gridHighlight,
     gridBatchOptions, gridValidateQty, gridValidateDiscount, gridSameLine, gridFilterParties, gridNewRowId, escapeText,
   };
 });
