@@ -2033,3 +2033,16 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
 #billing-page td.c-ro { padding: 0; }
 #billing-page .cell-input.c-num { text-align: right; }
 #billing-page td.c-prod .cell-input { font-weight: 600; }
+
+/* ---- footer after the clean-up: Bill Discount (one box, % or ₹) + Invoice Value ---- */
+#billing-page .bill-foot { display: flex; align-items: stretch; justify-content: space-between; gap: 12px; flex: none; }
+#billing-page .bill-disc { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-card); flex: 1 1 auto; min-width: 0; }
+#billing-page .bill-disc-label { font-size: 12px; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .03em; margin: 0; white-space: nowrap; }
+#billing-page .bill-disc select.form-input { width: 58px; height: 30px; padding: 2px 6px; font-weight: 800; font-size: 15px; text-align: center; }
+#billing-page .bill-disc input.form-input { width: 110px; height: 30px; padding: 2px 8px; text-align: right; font-weight: 700; font-size: 14px; }
+#billing-page .bill-disc .form-input:focus { box-shadow: 0 0 0 2px rgba(16, 185, 129, .6); background: rgba(16, 185, 129, .10); outline: none; }
+#billing-page .bill-disc-note { font-size: 12px; color: var(--color-text-muted); min-height: 16px; }
+#billing-page .bill-disc-note.bad { color: #DC2626; font-weight: 600; }
+#billing-page .bill-disc input.form-input.cell-error { box-shadow: inset 0 0 0 2px #DC2626; }
+#billing-page .bill-foot .bill-invoice-value { min-width: 260px; flex: 0 0 auto; padding: 4px 18px; }
+@media (max-width: 1024px) { #billing-page .bill-foot { flex-direction: column; } #billing-page .bill-foot .bill-invoice-value { min-width: 0; } }

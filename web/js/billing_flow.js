@@ -11,7 +11,8 @@ let activeBillState = {
   invoiceDate: new Date().toISOString().split('T')[0],
   paymentMode: 'CASH',
   splitPayments: [],
-  billDiscountPercent: 0.0,
+  billDiscountMode: 'percent',
+  billDiscountText: '',
   manualRoundOff: 0.0,
   useManualRoundOff: false,
   activeHeldBillId: null,
@@ -491,7 +492,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
   searchHighlightIndex = -1;
 
   let html = formattedItems.map((r, idx) => `
-    <div class="search-result-item" id="search-res-item-${idx}" onclick="selectMedicineForBill(${idx})" onmouseover="billingPreviewResult(${idx})"
+    <div class="search-result-item" id="search-res-item-${idx}" onclick="selectMedicineForBill(${idx})"
          style="padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--color-border); transition: background 0.12s ease; ${billBatchSellable(r) ? '' : 'opacity: 0.6;'}">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
         <div style="flex: 1; min-width: 0;">
@@ -587,7 +588,6 @@ function updateSearchHighlight(count) {
       }
     }
   }
-  if (searchHighlightIndex >= 0) billingPreviewResult(searchHighlightIndex);
 }
 
 // ----------------------------------------------------
@@ -610,67 +610,6 @@ function billBatchBadge(b) {
 function billToast(msg, isError) {
   if (typeof showToastNotification === 'function') showToastNotification((isError ? '⚠️ ' : '') + msg);
 }
-
-function billingBatchToPanel(b, fallback) {
-  const exp = b.expiryDate || null;
-  const days = exp ? Math.floor((new Date(String(exp).slice(0, 10) + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000) : null;
-  return {
-    id: b.productId !== undefined ? b.productId : fallback,
-    batch_number: b.batchNumber,
-    expiry_date: exp,
-    quantity: b.stock,
-    unit_price: b.mrp,
-    days_remaining: days,
-    status: days !== null && days < 0 ? 'Expired' : 'Safe',
-  };
-}
-
-function billingToPanelItem(base, batches) {
-  const list = (batches && batches.length ? batches : [base.batch]).map((b, i) => billingBatchToPanel(b, 'b' + i));
-  const cur = billingBatchToPanel(base.batch, 'cur');
-  return {
-    id: cur.id,
-    product_name: base.name,
-    category: base.category || null,
-    brand: base.brand || null,
-    composition: base.composition || null,
-    hsn_code: base.hsnCode || null,
-    gst_percentage: base.gst !== undefined && base.gst !== '' ? Number(base.gst) : null,
-    tablets_per_strip: null,  // the bill's pack size can be a default, so it is never shown as a fact
-    batch_number: cur.batch_number,
-    expiry_date: cur.expiry_date,
-    quantity: cur.quantity,
-    unit_price: cur.unit_price,
-    days_remaining: cur.days_remaining,
-    status: cur.status,
-    _batches: list,
-    _hideCost: true,
-  };
-}
-
-function billingPreviewResult(idx) {
-  const r = (window._lastSearchResults || [])[idx];
-  if (!r || typeof window.medShowForBilling !== 'function') return;
-  // other batches of this medicine that the search already returned
-  const same = (window._lastSearchResults || []).filter(x => String(x.name).trim().toLowerCase() === String(r.name).trim().toLowerCase());
-  window.medShowForBilling(billingToPanelItem(
-    { name: r.name, brand: r.brand, composition: r.composition, hsnCode: r.hsnCode, gst: r.gst, unitsPerPack: r.unitsPerPack, batch: r },
-    same
-  ));
-}
-window.billingPreviewResult = billingPreviewResult;
-
-function billingPreviewLine(idx) {
-  const it = activeBillState.items[idx];
-  if (!it || typeof window.medShowForBilling !== 'function') return;
-  const current = (it.batches || []).find(b => b.batchNumber === it.selectedBatch) ||
-    { batchNumber: it.selectedBatch, expiryDate: it.expiryDate, stock: it.availableStock, mrp: it.packPrice, productId: it.productId };
-  window.medShowForBilling(billingToPanelItem(
-    { name: it.name, brand: it.brand, composition: it.composition, hsnCode: it.hsnCode, gst: it.gstRate, unitsPerPack: it.unitsPerPack, batch: current },
-    it.batches
-  ));
-}
-window.billingPreviewLine = billingPreviewLine;
 
 // Global click outside to dismiss search dropdown
 document.addEventListener('click', (e) => {
@@ -820,7 +759,6 @@ function billAddMedicine(med, overrides = {}) {
   }
   renderBillItemsTable();
   recalculateTotals();
-  billingPreviewLine(replaceIdx >= 0 ? replaceIdx : activeBillState.items.length - 1);
 
   // Keyboard flow: after choosing a medicine the cursor lands in its Qty (type a number, Enter = next medicine).
   // Voice billing already knows the quantity, so it goes straight back to the search box.
@@ -922,7 +860,7 @@ function renderBillItemsTableLegacy() {
     const expColor = expState === 'expired' ? '#DC2626' : (expState === 'near' ? '#B45309' : 'inherit');
 
     return `
-      <tr data-row="${idx}" onclick="billingPreviewLine(${idx})" onfocusin="billingPreviewLine(${idx})">
+      <tr data-row="${idx}">
         <td style="font-weight: 700; color: var(--color-text-muted); text-align: center;">${idx + 1}</td>
 
         <td>
@@ -1057,8 +995,20 @@ function removeBillItem(index) {
 // NOTE: the "Walk-in Customer" entry uses the id 'walkin'. It used to be 1, which is also the id of the pharmacy's
 // first real customer, so that customer could not be told apart from a walk-in.
 // The arithmetic lives in billing_math.js (same steps and order as the server).
+// The bill discount as the maths and the server see it: { mode, value }. An invalid box counts as 0 (and blocks saving).
+function billDiscountNow(calcForLimit) {
+  const mode = activeBillState.billDiscountMode === 'flat' ? 'flat' : 'percent';
+  const limit = calcForLimit ? calcForLimit.taxableSubtotal : billComputeLines(activeBillState.items, 0).taxableSubtotal;
+  const chk = billCheckDiscount(mode, activeBillState.billDiscountText, limit);
+  return { mode, value: chk.ok ? chk.value : 0, ok: chk.ok, error: chk.error };
+}
+function billDiscountPayload() {
+  const d = billDiscountNow();
+  return { discount_type: d.value > 0 ? d.mode : null, discount_value: d.value > 0 ? d.value : 0.0 };
+}
 function billCurrentCalc() {
-  return billComputeLines(activeBillState.items, activeBillState.billDiscountPercent);
+  const d = billDiscountNow();
+  return billComputeLines(activeBillState.items, { mode: d.mode, value: d.value });
 }
 
 function recalculateTotals() {
@@ -1112,6 +1062,8 @@ function recalculateTotals() {
                          <tr><td>SGST Output</td><td>${r / 2}%</td><td>₹${byRate[r].toFixed(2)}</td></tr>`).join('');
   }
 
+  billRefreshDiscountNote(calc, billDiscountNow(calc));
+
   // Store calculated values in state
   activeBillState.calculated = {
     rawSubtotal,
@@ -1125,9 +1077,53 @@ function recalculateTotals() {
   };
 }
 
+// Quick POS pop-up (other pages): its box is always a percentage.
 function handleBillDiscountChange(val) {
-  activeBillState.billDiscountPercent = parseFloat(val) || 0;
+  activeBillState.billDiscountMode = 'percent';
+  activeBillState.billDiscountText = String(parseFloat(val) || '');
   recalculateTotals();
+}
+
+// Bill Discount box of the billing screen: one value, whose meaning is the selected mode (% or ₹).
+function handleBillDiscountInput(text) {
+  activeBillState.billDiscountText = String(text);
+  recalculateTotals();
+}
+function handleBillDiscountModeChange(mode) {
+  const next = mode === 'flat' ? 'flat' : 'percent';
+  if (next === activeBillState.billDiscountMode) return;
+  const hadValue = String(activeBillState.billDiscountText || '').trim() !== '' && Number(activeBillState.billDiscountText) !== 0;
+  activeBillState.billDiscountMode = next;
+  // "10" as a percentage is not "10" rupees: the old number is cleared, never silently reinterpreted.
+  activeBillState.billDiscountText = '';
+  billSyncDiscountInputs();
+  recalculateTotals();
+  if (hadValue) billToast(`Discount is now in ${next === 'flat' ? '₹ (rupees)' : '% (percent)'}. Enter the new value.`, false);
+}
+// Put the state into the visible boxes (new bill, bill tab switch, resumed draft).
+function billSyncDiscountInputs() {
+  const mode = document.getElementById('bill-discount-mode');
+  const inp = document.getElementById('bill-discount-input');
+  if (mode) mode.value = activeBillState.billDiscountMode === 'flat' ? 'flat' : 'percent';
+  if (inp) { inp.value = activeBillState.billDiscountText || ''; inp.classList.remove('cell-error'); }
+  const legacy = document.getElementById('bill-discount-percent-input');          // Quick POS pop-up
+  if (legacy) legacy.value = activeBillState.billDiscountMode === 'percent' && activeBillState.billDiscountText ? activeBillState.billDiscountText : '0';
+}
+function billRefreshDiscountNote(calc, d) {
+  const note = document.getElementById('bill-discount-note');
+  const inp = document.getElementById('bill-discount-input');
+  if (inp) inp.classList.toggle('cell-error', !d.ok);
+  if (!note) return;
+  if (!d.ok) { note.textContent = d.error; note.className = 'bill-disc-note bad'; return; }
+  const without = billComputeLines(activeBillState.items, 0).grandTotal;
+  const saves = Math.max(0, billR2(without - calc.grandTotal));
+  note.className = 'bill-disc-note';
+  note.textContent = d.value > 0 ? `Takes ₹${saves.toFixed(2)} off the invoice (applied before GST)` : '';
+}
+// Used by the save keys and the save buttons: an invalid discount must never reach the server.
+function billDiscountProblem() {
+  const d = billDiscountNow();
+  return d.ok ? null : d.error;
 }
 
 function handlePaymentModeChange(mode) {
@@ -1394,6 +1390,13 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
     return;
   }
 
+  const discProblem = billDiscountProblem();
+  if (discProblem) {
+    billToast(discProblem, true);
+    const di = document.getElementById('bill-discount-input'); if (di) { di.focus(); di.select(); }
+    return;
+  }
+
   const lineProblem = billFindLineProblem();
   if (lineProblem) {
     billToast(lineProblem.message, true);
@@ -1467,8 +1470,7 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
     ...(String(activeBillState.doctorName || '').trim() ? { doctor_name: String(activeBillState.doctorName).trim() } : {}),
     ...(String(activeBillState.doctorRegNo || '').trim() ? { doctor_reg_no: String(activeBillState.doctorRegNo).trim() } : {}),
     is_interstate: false,
-    discount_type: activeBillState.billDiscountPercent > 0 ? 'percent' : null,
-    discount_value: Number(activeBillState.billDiscountPercent) || 0.0,
+    ...billDiscountPayload(),
     ...(activeBillState.activeHeldBillId ? { held_bill_id: activeBillState.activeHeldBillId } : {})
   };
 
@@ -1617,7 +1619,7 @@ function billTabsRender() {
 function billRefreshFromState() {
   const inv = document.getElementById('bill-invoice-number-input'); if (inv) inv.value = activeBillState.invoiceNumber || '';
   const dt = document.getElementById('bill-invoice-date-input'); if (dt) dt.value = activeBillState.invoiceDate || '';
-  const disc = document.getElementById('bill-discount-percent-input'); if (disc) disc.value = String(activeBillState.billDiscountPercent || 0);
+  billSyncDiscountInputs();
   billSyncHeaderInputs();
   renderCustomerDropdown();
   handlePaymentModeChange(activeBillState.paymentMode || 'CASH');
@@ -1720,7 +1722,8 @@ function resetBillForm() {
     invoiceNumber: generateBillInvoiceNumber(),
     invoiceDate: new Date().toISOString().split('T')[0],
     paymentMode: 'CASH',
-    billDiscountPercent: 0.0,
+    billDiscountMode: 'percent',
+  billDiscountText: '',
     manualRoundOff: 0.0,
     useManualRoundOff: false,
     activeHeldBillId: null,
@@ -1731,8 +1734,7 @@ function resetBillForm() {
   const invInput = document.getElementById('bill-invoice-number-input');
   if (invInput) invInput.value = activeBillState.invoiceNumber;
 
-  const discInput = document.getElementById('bill-discount-percent-input');
-  if (discInput) discInput.value = '0';
+  billSyncDiscountInputs();
 
   const pendingNameInput = document.getElementById('pending-customer-name-input');
   if (pendingNameInput) pendingNameInput.value = '';
@@ -1831,8 +1833,7 @@ async function holdCurrentBill() {
     customer_phone: activeBillState.customer && activeBillState.customer.phone !== 'Cash Sale' ? activeBillState.customer.phone : null,
     payment_method: activeBillState.paymentMode || 'CASH',
     split_payments: (activeBillState.paymentMode === 'SPLIT' && activeBillState.splitPayments && activeBillState.splitPayments.length > 0) ? activeBillState.splitPayments : null,
-    discount_type: activeBillState.billDiscountPercent > 0 ? 'percent' : null,
-    discount_value: Number(activeBillState.billDiscountPercent) || 0.0,
+    ...billDiscountPayload(),
     notes: (note && note.trim()) ? note.trim() : null,
     items: payloadItems
   };
@@ -1978,7 +1979,9 @@ async function resumeHeldBillWeb(heldBillId) {
     activeBillState.activeHeldBillId = heldBill.id;
     activeBillState.activeHeldBillNumber = heldBill.held_bill_number;
     activeBillState.paymentMode = heldBill.payment_method || 'CASH';
-    activeBillState.billDiscountPercent = (heldBill.discount_type === 'percent') ? heldBill.discount_value : 0;
+    activeBillState.billDiscountMode = heldBill.discount_type === 'flat' ? 'flat' : 'percent';
+    activeBillState.billDiscountText = Number(heldBill.discount_value) > 0 ? String(heldBill.discount_value) : '';
+    billSyncDiscountInputs();
     
     if (heldBill.split_payments && Array.isArray(heldBill.split_payments) && heldBill.split_payments.length > 0) {
       activeBillState.splitPayments = JSON.parse(JSON.stringify(heldBill.split_payments));
@@ -2168,6 +2171,10 @@ function billShortcuts(e) {
   if (e.key === 'F7') { handled(); openHeldBillsModal(); return; }
   if (e.key === 'F10' || (e.ctrlKey && !e.shiftKey && e.key === 'Enter')) { handled(); if (billSaveKeyAllowed(e)) commitBillTransaction(true, false); return; }
   if (e.ctrlKey && e.shiftKey && e.key === 'Enter') { handled(); if (billSaveKeyAllowed(e)) commitBillTransaction(false, true); return; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+    const dm = document.getElementById('bill-discount-mode');
+    if (dm) { handled(); dm.focus(); return; }
+  }
   if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x')) { handled(); confirmClearBill(); return; }
   if (e.ctrlKey && e.key === 'Delete') {
     const row = t && t.closest ? t.closest('tr[data-row]') : null;

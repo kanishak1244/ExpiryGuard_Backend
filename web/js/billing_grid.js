@@ -359,7 +359,7 @@
   // ---------- rendering ----------
   function rowWarn(item) { return billRowWarning(item); }
 
-  const roCell = (col, html, cls) => '<td class="c-ro' + (cls ? ' ' + cls : '') + '"><div class="cell-ro" tabindex="0" data-cell="' + col + '">' + html + '</div></td>';
+  const roCell = (col, html, cls) => '<td class="c-ro' + (cls ? ' ' + cls : '') + '"><div class="cell-ro" tabindex="-1" data-cell="' + col + '">' + html + '</div></td>';
 
   function lineRowHtml(item, idx) {
     const key = item.id;
@@ -367,7 +367,7 @@
     const expClass = expState === 'expired' ? 'exp-bad' : expState === 'near' ? 'exp-warn' : '';
     const sub = [item.brand, item.composition].filter(Boolean).join(' • ');
     const mrp = gridBaseRate(item);
-    return '<tr data-row="' + idx + '" data-rid="' + esc(key) + '" onclick="billingPreviewLine(' + idx + ')" onfocusin="billingPreviewLine(' + idx + ')">' +
+    return '<tr data-row="' + idx + '" data-rid="' + esc(key) + '">' +
       '<td class="c-no">' + (idx + 1) + '</td>' +
       '<td class="c-edit c-prod"><input class="cell-input" data-cell="product" autocomplete="off" spellcheck="false" value="' + esc(item.name) + '" title="' + esc(item.name + (sub ? ' — ' + sub : '') + ' · type to change the medicine') + '"><div class="cell-note" id="bill-row-warn-' + idx + '">' + rowWarn(item) + '</div></td>' +
       roCell('packing', esc(item.packSize || '-')) +
@@ -612,7 +612,12 @@
         return;
       }
       case 'Tab': {
-        if (entry && pos.col === 'batch' && !e.shiftKey && !el.value.trim()) { e.preventDefault(); focusPos({ row: n, col: 'product' }); return; }
+        if (entry && pos.col === 'batch' && !e.shiftKey && !el.value.trim()) {
+          const dm = $('bill-discount-mode');
+          e.preventDefault();
+          if (dm) dm.focus(); else focusPos({ row: n, col: 'product' });
+          return;
+        }
         if (!commitCell(el)) { e.preventDefault(); return; }
         const next = gridTab(pos, e.shiftKey, n);
         if (next.row === pos.row && next.col === pos.col) return;     // edge of the grid: let the browser go on
@@ -746,6 +751,7 @@
     if (!onGridPage()) return false;
     const consume = () => { e.preventDefault(); e.stopPropagation(); };
     const t = e.target;
+    if (t && (t.id === 'bill-discount-input' || t.id === 'bill-discount-mode')) { consume(); focusEntryProduct(); return true; }
     if (billGrid.popup) {
       const wasParty = billGrid.popup.kind === 'party';
       popupClose();
@@ -796,6 +802,24 @@
         if (document.activeElement !== party) billSyncPartyInput();
       }, 0));
       party.addEventListener('click', () => { if (!billGrid.popup) openPartyPopup(''); });
+    }
+    // Bill Discount box: % / ₹ by keyboard (type % or ₹, or use the arrow keys), Enter moves on, Esc goes back to the grid
+    const dm = $('bill-discount-mode');
+    const di = $('bill-discount-input');
+    if (dm) {
+      dm.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        const pick = (mode) => { e.preventDefault(); dm.value = mode; handleBillDiscountModeChange(mode); };
+        if (e.key === '%') pick('percent');
+        else if (e.key === '₹' || /^[rRfF]$/.test(e.key)) pick('flat');
+        else if (e.key === 'Enter') { e.preventDefault(); if (di) { di.focus(); di.select(); } }
+      });
+    }
+    if (di) {
+      di.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.altKey) { e.preventDefault(); focusEntryProduct(); }
+      });
+      di.addEventListener('focus', () => di.select());
     }
     const reposition = () => {
       const p = billGrid.popup;

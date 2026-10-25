@@ -60,7 +60,30 @@
 
   // Line by line, like the server: line discount (a rupee amount taken off before GST), bill discount shared over
   // the lines (the last line takes the remainder), CGST and SGST each rounded per line.
-  function billComputeLines(items, billDiscountPercent) {
+  // The bill discount is one value with a mode: 'percent' (of the taxable subtotal) or 'flat' (rupees taken off the
+  // taxable subtotal, before GST: the server's rule). A plain number means percent (older callers).
+  function billDiscountSpec(d) {
+    if (d && typeof d === 'object') return { mode: d.mode === 'flat' ? 'flat' : 'percent', value: Number(d.value) || 0 };
+    return { mode: 'percent', value: Number(d) || 0 };
+  }
+
+  // Checks what was typed in the Bill Discount box. Returns { ok, value } or { ok:false, error }.
+  // percent: 0-100; flat: not more than the taxable subtotal (the server refuses a bigger one). Blank means 0.
+  function billCheckDiscount(mode, text, taxableSubtotal) {
+    const raw = String(text === null || text === undefined ? '' : text).trim();
+    if (raw === '') return { ok: true, value: 0 };
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) return { ok: false, error: 'Enter a number such as 10 or 7.5 (no minus sign or letters).' };
+    const n = Number(raw);
+    if (mode === 'flat') {
+      const max = Math.max(0, Number(taxableSubtotal) || 0);
+      if (n > max + 0.0001) return { ok: false, error: 'A \u20b9 discount cannot be more than the bill value before GST (\u20b9' + max.toFixed(2) + ').' };
+    } else if (n > 100) {
+      return { ok: false, error: 'A % discount cannot be more than 100.' };
+    }
+    return { ok: true, value: n };
+  }
+
+  function billComputeLines(items, billDiscount) {
     const lines = items.map(item => {
       const qty = Math.floor(Number(item.quantity)) || 1;
       const gross = billR2(qty * Number(item.rate || 0));
@@ -70,13 +93,15 @@
     const lineDiscTotal = lines.reduce((a, l) => a + l.lineDisc, 0);
     const grossSubtotal = lines.reduce((a, l) => a + l.gross, 0);
     const taxableSubtotal = billR2(grossSubtotal - lineDiscTotal);
-    const pct = Math.min(100, Math.max(0, Number(billDiscountPercent) || 0));
-    const billDiscount = Math.min(billR2(taxableSubtotal * pct / 100), taxableSubtotal);
+    const spec = billDiscountSpec(billDiscount);
+    const billDiscountAmount = spec.mode === 'flat'
+      ? Math.min(billR2(Math.max(0, spec.value)), taxableSubtotal)
+      : Math.min(billR2(taxableSubtotal * Math.min(100, Math.max(0, spec.value)) / 100), taxableSubtotal);
     let allocated = 0;
     lines.forEach((l, idx) => {
       const last = idx === lines.length - 1;
-      const share = last ? billR2(billDiscount - allocated)
-        : (taxableSubtotal > 0 ? billR2(billDiscount * l.taxable / taxableSubtotal) : 0);
+      const share = last ? billR2(billDiscountAmount - allocated)
+        : (taxableSubtotal > 0 ? billR2(billDiscountAmount * l.taxable / taxableSubtotal) : 0);
       if (!last) allocated += share;
       l.finalTaxable = billR2(l.taxable - share);
       l.cgst = billR2(l.finalTaxable * (billR2(l.gst / 2) / 100));
@@ -86,7 +111,7 @@
     });
     const sum = (key) => billR2(lines.reduce((a, l) => a + l[key], 0));
     return {
-      lines, taxableSubtotal, billDiscount, lineDiscTotal: billR2(lineDiscTotal),
+      lines, taxableSubtotal, billDiscount: billDiscountAmount, lineDiscTotal: billR2(lineDiscTotal),
       netTaxable: sum('finalTaxable'), cgst: sum('cgst'), sgst: sum('sgst'), totalGst: sum('tax'), grandTotal: sum('total'),
     };
   }
@@ -107,7 +132,7 @@
   }
 
   return {
-    NEAR_EXPIRY_DAYS, billR2, billGstOf, billDiscPct, billDaysToExpiry, billBatchState, billBatchSellable,
+    NEAR_EXPIRY_DAYS, billDiscountSpec, billCheckDiscount, billR2, billGstOf, billDiscPct, billDaysToExpiry, billBatchState, billBatchSellable,
     billComputeLines, billRowAmount, billMakeLatestGate,
   };
 });

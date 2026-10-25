@@ -181,9 +181,9 @@ window.runBillingGridE2E = async function () {
     focusCell(0, 'qty'); typeInto('3'); key('Enter'); key('Enter'); typeInto('10'); key('Enter');
     expect($('bill-row-amount-0').textContent === '₹102.82', $('bill-row-amount-0').textContent);
     await addMed('bulk medicine 0060'); closeList(); focusCell(1, 'qty'); typeInto('7'); key('Enter');
-    const c = billComputeLines(items(), activeBillState.billDiscountPercent);
+    const c = billCurrentCalc();
     expect(near(parseFloat($('bill-grand-total-val').textContent.replace(/[^0-9.]/g, '')), c.grandTotal), $('bill-grand-total-val').textContent + ' vs ' + c.grandTotal);
-    expect(near(parseFloat($('bill-cgst-val').textContent.replace(/[^0-9.]/g, '')), c.cgst), 'cgst');
+    expect(c.cgst > 0 && near(c.cgst * 2, c.totalGst), 'cgst/sgst split');
   });
 
   await test('deleting a line (Ctrl+Delete) removes only that line and leaves the others untouched', async () => {
@@ -432,6 +432,111 @@ window.runBillingGridE2E = async function () {
       key('Escape'); focusCell(0, 'qty'); typeInto('abc'); key('F10'); await wait(200);
       expect(n === 0 && items().length === 1 && where() === 'row0:qty', 'saved with a bad quantity');
     } finally { api.createSale = real; }
+  });
+
+
+  // ---------- clean-up round: removed panels and the Bill Discount (% or ₹) box ----------
+  const setDisc = (mode, text) => { const m = $('bill-discount-mode'); m.value = mode; handleBillDiscountModeChange(mode); const i = $('bill-discount-input'); i.value = text; i.dispatchEvent(new Event('input', { bubbles: true })); };
+  const total = () => parseFloat($('bill-grand-total-val').textContent.replace(/[^0-9.]/g, ''));
+  const lastSale = async () => (await api.request('/sales?skip=0&limit=1'))[0];
+
+  await test('the four panels and the medicine-details panel are gone; invoice value and discount box remain', async () => {
+    expect($('medicine-details-panel') === null && $('med-detail-content') === null && $('med-detail-toggle') === null, 'details panel rendered');
+    expect($('bill-tax-breakup') === null && $('bill-item-disc-val') === null && $('bill-cgst-val') === null && $('bill-sgst-val') === null && $('bill-roundoff-val') === null, 'a removed panel element is still there');
+    const page = document.body.innerText;
+    expect(!/Additional Details|Discount Info|Tax Info|CGST Output|SGST Output|Select a medicine to see details/.test(page), 'removed text still shown');
+    expect($('bill-grand-total-val') && $('bill-discount-mode') && $('bill-discount-input') && $('bill-save-print-btn'), 'a needed control is missing');
+    expect(document.querySelectorAll('#bill-discount-input').length === 1 && document.querySelectorAll('.bill-disc input').length === 1, 'two discount inputs');
+  });
+
+  await test('billing a medicine without the removed panels: GST is still in the total and in the saved invoice', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');
+    focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    expect($('bill-row-amount-0').textContent === '₹114.24' && near(total(), 114.24), $('bill-row-amount-0').textContent + ' / ' + total());   // 3 x 34 + 12 %
+    window.open = () => ({}); await commitBillTransaction(false, true); window.open = realOpen; await wait(300);
+    const s = await lastSale(); expect(near(Number(s.total_amount), 114.24) && near(Number(s.tax_amount), 12.24), `saved ${s.total_amount} tax ${s.tax_amount}`);
+  });
+
+  await test('Bill Discount %: total follows immediately and matches the shared rules', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter'); focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    setDisc('percent', '10');
+    expect(near(total(), 102.82) && /off the invoice/.test($('bill-discount-note').textContent), total() + ' | ' + $('bill-discount-note').textContent);   // 102 - 10.2 = 91.8 + 12 %
+    expect(activeBillState.billDiscountMode === 'percent' && activeBillState.billDiscountText === '10', 'state not in step');
+  });
+
+  await test('Bill Discount ₹: rupees come off the taxable value before GST', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter'); focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    setDisc('flat', '50');
+    expect(near(total(), 58.24) && /56\.00/.test($('bill-discount-note').textContent), total() + ' | ' + $('bill-discount-note').textContent);   // (102 - 50) x 1.12
+  });
+
+  await test('switching mode clears the old number and shows the new mode (never reinterpreted silently)', async () => {
+    await addMed('paracet'); closeList(); setDisc('percent', '10'); const before = total();
+    $('bill-discount-mode').value = 'flat'; handleBillDiscountModeChange('flat');
+    expect($('bill-discount-input').value === '' && activeBillState.billDiscountMode === 'flat' && $('bill-discount-mode').selectedOptions[0].text === '₹', 'value kept or mode not shown');
+    expect(total() > before, 'discount still applied after the switch');
+  });
+
+  await test('invalid discounts: negative, letters, over 100 %, more than the bill (₹) show an error and block saving', async () => {
+    await addMed('paracet'); closeList(); focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    const real = api.createSale.bind(api); let calls = 0; api.createSale = async (p) => { calls++; return real(p); };
+    try {
+      for (const [mode, text] of [['percent', '-5'], ['percent', 'abc'], ['percent', '101'], ['flat', '99999'], ['flat', '1e3']]) {
+        setDisc(mode, text);
+        expect($('bill-discount-input').classList.contains('cell-error') && $('bill-discount-note').classList.contains('bad'), `${mode} "${text}" not flagged`);
+        await commitBillTransaction(false, true);
+        expect(calls === 0 && items().length === 1 && document.activeElement.id === 'bill-discount-input', `${mode} "${text}" got through`);
+      }
+    } finally { api.createSale = real; }
+    setDisc('percent', '5'); expect(!$('bill-discount-input').classList.contains('cell-error'), 'error not cleared');
+  });
+
+  await test('discount keyboard path: Ctrl+Shift+D, type % / ₹, Enter, value, Enter back to the grid; Tab from the grid reaches it', async () => {
+    await addMed('paracet'); closeList(); focusCell(items().length, 'batch'); key('Tab');
+    expect(document.activeElement.id === 'bill-discount-mode', 'Tab from the entry row: ' + document.activeElement.id);
+    focusCell(0, 'qty'); key('D', { ctrlKey: true, shiftKey: true }); expect(document.activeElement.id === 'bill-discount-mode', 'shortcut');
+    key('₹'); expect(activeBillState.billDiscountMode === 'flat' && $('bill-discount-mode').value === 'flat', 'rupee key');
+    key('%'); expect(activeBillState.billDiscountMode === 'percent', 'percent key');
+    key('Enter'); expect(document.activeElement.id === 'bill-discount-input', 'Enter to the value');
+    typeInto('5'); key('Enter'); expect(where() === 'entry:product' && activeBillState.billDiscountText === '5', where());
+    key('D', { ctrlKey: true, shiftKey: true }); key('Escape'); expect(where() === 'entry:product' && items().length === 1, 'Esc inside the box must not clear the bill');
+  });
+
+  await test('save & print with a % discount: the saved invoice equals the screen, discount type recorded', async () => {
+    await addMed('bulk medicine 0400'); closeList(); focusCell(0, 'qty'); typeInto('3'); key('Enter'); setDisc('percent', '7.5');
+    const screen = total(); let opened = null; window.open = (u) => { opened = u; return {}; };
+    try { await commitBillTransaction(true, false); } finally { window.open = realOpen; }
+    await wait(300); const s = await lastSale();
+    expect(near(Number(s.total_amount), screen) && /\/billing\/\d+\/pdf/.test(opened || ''), `saved ${s.total_amount} vs ${screen}, opened ${opened}`);
+    expect(s.discount_type === 'percent' && Number(s.discount_value) === 7.5, `${s.discount_type} ${s.discount_value}`);
+  });
+
+  await test('save & print with a ₹ discount: the saved invoice equals the screen, discount type recorded', async () => {
+    await addMed('bulk medicine 0401'); closeList(); focusCell(0, 'qty'); typeInto('3'); key('Enter'); setDisc('flat', '12.5');
+    const screen = total(); let opened = null; window.open = (u) => { opened = u; return {}; };
+    try { await commitBillTransaction(true, false); } finally { window.open = realOpen; }
+    await wait(300); const s = await lastSale();
+    expect(near(Number(s.total_amount), screen) && /\/billing\/\d+\/pdf/.test(opened || ''), `saved ${s.total_amount} vs ${screen}, opened ${opened}`);
+    expect(s.discount_type === 'flat' && Number(s.discount_value) === 12.5, `${s.discount_type} ${s.discount_value}`);
+  });
+
+  await test('draft (held bill) keeps the discount mode and value when it is brought back', async () => {
+    for (const [mode, text] of [['flat', '20'], ['percent', '12.5']]) {
+      await freshBill(); await addMed('bulk medicine 0410'); closeList(); focusCell(0, 'qty'); typeInto('4'); key('Enter'); setDisc(mode, text);
+      const screen = total();
+      await holdCurrentBill(); await wait(500);
+      expect(items().length === 0 && $('bill-discount-input').value === '' && $('bill-discount-mode').value === 'percent', 'new bill not clean');
+      const h = (await api.getHeldBills())[0]; await resumeHeldBillWeb(h.id); await until(() => items().length > 0);
+      expect(activeBillState.billDiscountMode === mode && $('bill-discount-mode').value === mode && $('bill-discount-input').value === text, `${mode} ${text} came back as ${activeBillState.billDiscountMode} ${$('bill-discount-input').value}`);
+      expect(near(total(), screen), `total ${total()} vs ${screen}`);
+    }
+  });
+
+  await test('a second bill tab keeps its own discount', async () => {
+    await freshBill(); await addMed('bulk medicine 0420'); closeList(); setDisc('flat', '5');
+    billTabNew(); await wait(100); expect($('bill-discount-input').value === '' && $('bill-discount-mode').value === 'percent', 'new tab inherited the discount');
+    billTabSwitch(0); await wait(100); expect($('bill-discount-input').value === '5' && $('bill-discount-mode').value === 'flat', 'first tab lost its discount');
+    billTabClose(1); await wait(100);
   });
 
   window.alert = realAlert; window.open = realOpen;

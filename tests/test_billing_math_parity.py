@@ -30,8 +30,13 @@ const m = require(process.argv[1]);
 const bills = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 const out = bills.map(b => {
   const items = b.lines.map(l => ({ rate: l.rate, quantity: l.qty, discountPercent: l.disc, gstRate: l.gst }));
-  const c = m.billComputeLines(items, b.billDisc);
-  return { discounts: c.lines.map(l => l.lineDisc), taxable: c.netTaxable, gst: c.totalGst, total: c.grandTotal };
+  let spec = { mode: 'percent', value: b.billDisc };
+  if (b.flatFrac) {                      // a rupee discount: a share of this bill's taxable subtotal (so it is always allowed)
+    const base = m.billComputeLines(items, 0);
+    spec = { mode: 'flat', value: m.billR2(base.taxableSubtotal * b.flatFrac) };
+  }
+  const c = m.billComputeLines(items, spec);
+  return { discounts: c.lines.map(l => l.lineDisc), taxable: c.netTaxable, gst: c.totalGst, total: c.grandTotal, flat: spec.mode === 'flat' ? spec.value : 0 };
 });
 process.stdout.write(JSON.stringify(out));
 """
@@ -46,7 +51,8 @@ class TestScreenMatchesServer(unittest.TestCase):
             lines = [dict(rate=round(rng.uniform(1, 900), 2), qty=rng.randint(1, 9),
                           disc=rng.choice([0, 0, 2.5, 5, 7.33, 10, 12.5, 18, 33.3]), gst=rng.choice([0, 5, 12, 18, 28]))
                      for _ in range(rng.randint(1, 6))]
-            bills.append(dict(lines=lines, billDisc=rng.choice([0, 0, 1, 2.5, 5, 7.5, 10, 12.34])))
+            bills.append(dict(lines=lines, billDisc=rng.choice([0, 0, 1, 2.5, 5, 7.5, 10, 12.34]),
+                              flatFrac=rng.choice([0, 0, 0.013, 0.05, 0.1, 0.37, 0.99, 1.0])))
 
         proc = subprocess.run(["node", "-e", JS_RUNNER, os.path.join(ROOT, "web", "js", "billing_math.js")],
                               input=json.dumps(bills), capture_output=True, text=True, timeout=60)
@@ -81,7 +87,8 @@ class TestScreenMatchesServer(unittest.TestCase):
             db.commit()
             sale = crud.create_sale_transaction(
                 db, SaleCreate(items=items, payment_method="CASH",
-                               discount_type="percent" if bill["billDisc"] else None, discount_value=bill["billDisc"]),
+                               discount_type=("flat" if bill["flatFrac"] else ("percent" if bill["billDisc"] else None)),
+                               discount_value=(shown["flat"] if bill["flatFrac"] else bill["billDisc"])),
                 1, current_user=user)
             server = (round(sale.total_taxable_value, 2), round(sale.tax_amount, 2), round(sale.total_amount, 2))
             if server != (shown["taxable"], shown["gst"], shown["total"]):

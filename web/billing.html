@@ -31,7 +31,7 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=12.1">
+  <link rel="stylesheet" href="css/styles.css?v=12.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -281,26 +281,16 @@
           <div class="bill-grid-foot"><span id="bill-item-count-badge">0 lines • 0 units</span></div>
         </div>
 
-        <!-- Discount, tax and invoice value -->
+        <!-- Bill discount (one box, % or rupees) and the invoice value -->
         <div class="bill-foot">
-          <fieldset class="bill-box"><legend>Discount Info</legend>
-            <div class="bill-kv"><span>Item Disc.</span><b id="bill-item-disc-val">₹0.00</b></div>
-            <div class="bill-kv"><span>Subtotal (taxable)</span><b id="bill-subtotal-val">₹0.00</b></div>
-          </fieldset>
-          <fieldset class="bill-box"><legend>Tax Info</legend>
-            <div class="bill-kv"><span>CGST</span><b id="bill-cgst-val">₹0.00</b></div>
-            <div class="bill-kv"><span>SGST</span><b id="bill-sgst-val">₹0.00</b></div>
-          </fieldset>
-          <fieldset class="bill-box bill-box-disc"><legend>Bill Discount</legend>
-            <div class="bill-kv"><span>Bill Discount %</span>
-              <input type="number" id="bill-discount-percent-input" min="0" max="100" step="0.01" class="form-input" value="0" oninput="handleBillDiscountChange(this.value)"></div>
-            <div class="bill-kv"><span>Bill Disc. Amt.</span><b id="bill-discount-amount-val">- ₹0.00</b></div>
-            <div class="bill-kv"><span>Total Disc.</span><b id="bill-total-disc-val">₹0.00</b></div>
-          </fieldset>
-          <div class="bill-box bill-box-tax">
-            <table class="bill-tax-table"><thead><tr><th>Additional Details</th><th>%</th><th>₹ Amount</th></tr></thead>
-              <tbody id="bill-tax-breakup"><tr><td colspan="3" style="color: var(--color-text-muted);">No tax yet</td></tr></tbody></table>
-            <div class="bill-kv bill-kv-small"><span>Round-Off</span><b id="bill-roundoff-val">+₹0.00</b></div>
+          <div class="bill-disc" role="group" aria-label="Bill discount">
+            <label class="bill-disc-label" for="bill-discount-input">Bill Discount <kbd>Ctrl+Shift+D</kbd></label>
+            <select id="bill-discount-mode" class="form-input" aria-label="Discount type: percent or rupees" onchange="handleBillDiscountModeChange(this.value)">
+              <option value="percent">%</option>
+              <option value="flat">₹</option>
+            </select>
+            <input type="text" id="bill-discount-input" class="form-input" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Bill discount value" oninput="handleBillDiscountInput(this.value)">
+            <span id="bill-discount-note" class="bill-disc-note" aria-live="polite"></span>
           </div>
           <div class="bill-invoice-value"><span>Invoice Value</span><b id="bill-grand-total-val">₹0.00</b></div>
         </div>
@@ -327,12 +317,6 @@
             <button type="button" class="btn btn-primary" id="bill-save-print-btn" onclick="commitBillTransaction(true, false)"><kbd>F10</kbd> Save &amp; Print</button>
           </div>
         </div>
-
-        <!-- Medicine details (read-only): follows the highlighted search result or the bill line being edited -->
-        <section id="medicine-details-panel" class="med-detail" aria-live="polite" aria-label="Medicine details">
-          <button type="button" id="med-detail-toggle" class="med-detail-toggle btn btn-secondary" aria-expanded="true">▾ Hide</button>
-          <div id="med-detail-content"><div class="med-detail-empty">Select a medicine to see details</div></div>
-        </section>
 
       </main>
     </div>
@@ -432,16 +416,16 @@
   </div>
 
 
-  <script src="js/api.js?v=12.1" defer></script>
+  <script src="js/api.js?v=12.2" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=11.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
-  <script src="js/billing_math.js?v=11.4" defer></script>
-  <script src="js/billing_grid_core.js?v=12.1" defer></script>
-  <script src="js/billing_flow.js?v=12.1" defer></script>
-  <script src="js/billing_grid.js?v=12.1" defer></script>
+  <script src="js/billing_math.js?v=12.2" defer></script>
+  <script src="js/billing_grid_core.js?v=12.2" defer></script>
+  <script src="js/billing_flow.js?v=12.2" defer></script>
+  <script src="js/billing_grid.js?v=12.2" defer></script>
 </body>
 </html>

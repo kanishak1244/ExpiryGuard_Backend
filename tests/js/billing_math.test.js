@@ -90,3 +90,41 @@ test('search: only the newest request may show its results (overlapping requests
   gate.next();               // the box was cleared: everything on its way is stale
   assert.equal(gate.isCurrent(t2), false);
 });
+
+test('bill discount in rupees: taken off the taxable subtotal before GST, shared over the lines, GST on what is left', () => {
+  const lines = [item(100, 1, 0, 12), item(100, 1, 0, 12)];                 // taxable 200, GST 12 %
+  const c = m.billComputeLines(lines, { mode: 'flat', value: 50 });
+  assert.equal(c.billDiscount, 50);
+  assert.equal(c.netTaxable, 150);
+  assert.equal(c.totalGst, 18);                                              // 12 % of 150
+  assert.equal(c.grandTotal, 168);
+  assert.equal(c.lines[0].finalTaxable + c.lines[1].finalTaxable, 150);
+});
+
+test('percent object and the old plain number give the same bill', () => {
+  const lines = [item(100, 2, 10, 12), item(50, 2, 0, 5)];
+  assert.deepEqual(m.billComputeLines(lines, { mode: 'percent', value: 10 }), m.billComputeLines(lines, 10));
+});
+
+test('a rupee discount over the taxable subtotal is capped in the maths (and refused by the check)', () => {
+  const lines = [item(100, 1, 0, 12)];
+  assert.equal(m.billComputeLines(lines, { mode: 'flat', value: 500 }).grandTotal, 0);
+  assert.equal(m.billCheckDiscount('flat', '500', 100).ok, false);
+  assert.equal(m.billCheckDiscount('flat', '100', 100).ok, true);
+  assert.equal(m.billCheckDiscount('flat', '100.01', 100).ok, false);
+});
+
+test('discount box check: blank is 0; negative, letters, 3 decimals, over 100 % are refused', () => {
+  assert.deepEqual(m.billCheckDiscount('percent', '', 100), { ok: true, value: 0 });
+  assert.deepEqual(m.billCheckDiscount('percent', ' 7.5 ', 100), { ok: true, value: 7.5 });
+  assert.equal(m.billCheckDiscount('percent', '100', 100).ok, true);
+  for (const bad of ['-1', '-0', 'abc', '1e2', '5.123', '100.5', '1,5', '₹5']) assert.equal(m.billCheckDiscount('percent', bad, 100).ok, false, bad);
+  assert.equal(m.billCheckDiscount('flat', '0', 0).ok, true);
+  assert.equal(m.billCheckDiscount('flat', '1', 0).ok, false);              // nothing on the bill yet
+});
+
+test('same rupee and percent discount can differ: 10 % of 200 is 20, 10 rupees is 10 (the mode matters)', () => {
+  const lines = [item(100, 2, 0, 0)];
+  assert.equal(m.billComputeLines(lines, { mode: 'percent', value: 10 }).grandTotal, 180);
+  assert.equal(m.billComputeLines(lines, { mode: 'flat', value: 10 }).grandTotal, 190);
+});
