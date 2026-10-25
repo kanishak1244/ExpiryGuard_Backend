@@ -1905,3 +1905,36 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
   #billing-page .bill-buttons kbd { margin-right: 4px; font-size: 10.5px; }
   #billing-page .med-detail { margin-top: 0; }
 }
+
+/* patient and doctor details are folded away until needed */
+#billing-page .bill-opt { display: none; }
+#billing-page .bill-head-left.opt-open .bill-opt { display: contents; }
+#billing-page .bill-opt-toggle { align-self: flex-start; border: none; background: none; color: var(--color-text-muted); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 0; }
+#billing-page .bill-opt-toggle:hover, #billing-page .bill-opt-toggle:focus-visible { color: #10B981; outline: none; text-decoration: underline; }
+
+/* ===== Sale bill screen on tablets / narrow windows (below 1025px): compact two-column form, scrolling grid ===== */
+@media (max-width: 1024px) {
+  #billing-page .bill-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  #billing-page .bill-tab { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  #billing-page .bill-tab.active { box-shadow: inset 0 2px 0 #10B981; }
+  #billing-page .bill-tab-close, #billing-page .bill-tab-new { border: none; background: none; cursor: pointer; color: inherit; font-size: 13px; }
+  #billing-page .bill-head { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-bottom: 8px; }
+  #billing-page .bill-head-left { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  #billing-page .bill-head-left .bill-row-wide { grid-column: 1 / -1; }
+  #billing-page .bill-head-right { display: flex; flex-direction: column; gap: 6px; }
+  #billing-page .bill-row { display: flex; flex-direction: column; gap: 2px; margin: 0; }
+  #billing-page .bill-row > span { font-size: 11.5px; color: var(--color-text-muted); font-weight: 600; }
+  #billing-page .bill-row .form-input { height: 34px; padding: 4px 8px; font-size: 13px; }
+  #billing-page .bill-grid-panel { padding: 0 !important; margin-bottom: 8px; }
+  #billing-page .bill-grid { max-height: 46vh; overflow: auto; }
+  #billing-page .bill-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  #billing-page .bill-box { border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 10px; margin: 0; }
+  #billing-page .bill-invoice-value { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(16,185,129,.35); border-radius: 8px; padding: 8px 14px; }
+  #billing-page .bill-invoice-value b { font-size: 26px; color: #059669; }
+  #billing-page .bill-kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+  #billing-page .bill-kv .form-input { width: 70px; height: 28px; text-align: right; }
+  #billing-page .bill-actions { display: flex; flex-direction: column; gap: 8px; position: sticky; bottom: 0; background: var(--color-surface-bg); padding: 8px 0; z-index: 5; }
+  #billing-page .bill-pay, #billing-page .bill-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+  #billing-page .bill-buttons .btn { flex: 1 1 120px; padding: 10px 12px; font-weight: 700; }
+  #billing-page .bill-opt-toggle { border: none; background: none; color: var(--color-text-muted); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 0; text-align: left; }
+}

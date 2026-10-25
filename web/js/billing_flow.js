@@ -243,7 +243,9 @@ async function handleSaveNewCustomer(e) {
 let currentBillingSearchMode = 'name'; // 'name' | 'code'
 let searchAbortController = null;
 let searchDebounceTimer = null;
-let currentSearchSeq = 0;
+const searchGate = billMakeLatestGate();   // only the newest search may show its results
+let billSearchPending = false;             // a search is waiting for its answer
+let billPendingEnter = false;              // Enter (e.g. from a barcode scanner) arrived before the answer
 let searchHighlightIndex = -1;
 
 function setBillingSearchMode(mode) {
@@ -344,6 +346,9 @@ async function handleMedicineSearchInput(val) {
       searchAbortController = null;
     }
     showSearchSpinner(false);
+    searchGate.next();            // anything still on its way is now stale
+    billSearchPending = false;
+    billPendingEnter = false;
     dropdown.style.display = 'none';
     dropdown.innerHTML = '';
     window._lastSearchResults = [];
@@ -358,7 +363,9 @@ async function handleMedicineSearchInput(val) {
   }
   searchAbortController = new AbortController();
   const currentSignal = searchAbortController.signal;
-  const requestSeq = ++currentSearchSeq;
+  const requestSeq = searchGate.next();
+  billSearchPending = true;
+  billPendingEnter = false;
 
   // Show loading indicator
   showSearchSpinner(true);
@@ -372,7 +379,7 @@ async function handleMedicineSearchInput(val) {
   const debounceDelay = 200;
 
   searchDebounceTimer = setTimeout(async () => {
-    if (currentSignal.aborted || requestSeq !== currentSearchSeq) return;
+    if (currentSignal.aborted || !searchGate.isCurrent(requestSeq)) return;
 
     try {
       let results = [];
@@ -395,7 +402,7 @@ async function handleMedicineSearchInput(val) {
       }
 
       // Guard against stale response overwriting a newer search request
-      if (currentSignal.aborted || requestSeq !== currentSearchSeq) return;
+      if (currentSignal.aborted || !searchGate.isCurrent(requestSeq)) return;
 
       showSearchSpinner(false);
       const itemsList = Array.isArray(results) ? results : (results && Array.isArray(results.items) ? results.items : []);
@@ -403,7 +410,8 @@ async function handleMedicineSearchInput(val) {
 
     } catch (err) {
       if (err.name === 'AbortError') return;
-      if (requestSeq === currentSearchSeq) {
+      if (searchGate.isCurrent(requestSeq)) {
+        billSearchPending = false;
         showSearchSpinner(false);
         console.warn('Medicine search error:', err);
         renderSearchResultsDropdown([], cleanQ, true);
@@ -416,6 +424,7 @@ window.handleMedicineSearchInput = handleMedicineSearchInput;
 function renderSearchResultsDropdown(rawItems, query, isError = false) {
   const dropdown = document.getElementById('bill-search-results-dropdown');
   if (!dropdown) return;
+  billSearchPending = false;
 
   if (isError) {
     dropdown.innerHTML = `
@@ -495,6 +504,14 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
   // The first result is highlighted at once: Enter adds it, Up/Down moves, the details panel follows.
   searchHighlightIndex = 0;
   updateSearchHighlight(formattedItems.length);
+  billSearchPending = false;
+  if (billPendingEnter) {
+    billPendingEnter = false;
+    const q = String(query || '').trim();
+    const exact = formattedItems.findIndex(r => r.barcode && String(r.barcode) === q);
+    if (exact >= 0) selectMedicineForBill(exact);
+    else if (formattedItems.length === 1) selectMedicineForBill(0);
+  }
 }
 
 // ----------------------------------------------------
@@ -524,6 +541,8 @@ function handleSearchKeydown(e) {
 
   if (e.key === 'Enter') {
     e.preventDefault();
+    const typed = (e.target && e.target.value || '').trim();
+    if (billSearchPending && typed) { billPendingEnter = true; return; }   // scanner: add as soon as the answer arrives
     if (isOpen) {
       const targetIdx = (searchHighlightIndex >= 0) ? searchHighlightIndex : 0;
       selectMedicineForBill(targetIdx);
@@ -563,25 +582,6 @@ function updateSearchHighlight(count) {
 // BATCH RULES (UI side; the server enforces the same rules again when the bill is saved)
 // expired = expiry date before today (server rule); near expiry = within NEAR_EXPIRY_DAYS
 // ----------------------------------------------------
-const NEAR_EXPIRY_DAYS = 60;
-
-function billDaysToExpiry(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
-  if (isNaN(d.getTime())) return null;
-  return Math.floor((d - new Date(new Date().toDateString())) / 86400000);
-}
-function billBatchState(b) {
-  const days = billDaysToExpiry(b.expiryDate);
-  if (days !== null && days < 0) return 'expired';
-  if (!(Number(b.stock) > 0)) return 'out';
-  if (days !== null && days <= NEAR_EXPIRY_DAYS) return 'near';
-  return 'ok';
-}
-function billBatchSellable(b) {
-  const st = billBatchState(b);
-  return st === 'ok' || st === 'near';
-}
 function billBatchBadge(b) {
   const st = billBatchState(b);
   const days = billDaysToExpiry(b.expiryDate);
@@ -774,6 +774,14 @@ function selectMedicineForBill(index, overrides = {}) {
     batches: batchesList
   };
 
+  // A second Enter (or a double scan) a moment after the first must not add the same medicine again.
+  const addKey = primaryBatch.productId + '|' + primaryBatch.batchNumber;
+  if (window.__lastBillAdd && window.__lastBillAdd.key === addKey && Date.now() - window.__lastBillAdd.at < 400) {
+    clearMedicineSearch(false);
+    return;
+  }
+  window.__lastBillAdd = { key: addKey, at: Date.now() };
+
   clearMedicineSearch(false);
   activeBillState.items.push(newItem);
   renderBillItemsTable();
@@ -818,13 +826,6 @@ function billLineKey(e, idx) {
 }
 window.billLineKey = billLineKey;
 
-function billRowAmount(item) {
-  // line total before any bill-level discount (the bill discount is shown in the footer)
-  const qty = Math.floor(Number(item.quantity)) || 1;
-  const gross = billR2(qty * Number(item.rate || 0));
-  const taxable = billR2(gross - billR2(Math.round(gross * (Number(item.discountPercent) || 0)) / 100));
-  return billR2(taxable + billR2(taxable * (billR2(billGstOf(item) / 2) / 100)) * 2);
-}
 function billRowWarning(item) {
   const st = billBatchState({ expiryDate: item.expiryDate, stock: item.availableStock });
   if (st === 'expired') return '<span style="color:#DC2626;font-weight:700;">EXPIRED batch: choose another batch</span>';
@@ -1010,46 +1011,13 @@ function removeBillItem(index) {
 
 // NOTE: the "Walk-in Customer" entry uses the id 'walkin'. It used to be 1, which is also the id of the pharmacy's
 // first real customer, so that customer could not be told apart from a walk-in.
-// 0% is a real GST rate (never turned into 12%).
-function billGstOf(item) {
-  const g = Number(item.gstRate);
-  return isFinite(g) ? g : 0;
-}
-
-function billR2(x) { return Math.round((Number(x) + Number.EPSILON) * 100) / 100; }
-
-// Same arithmetic, in the same order, as the server uses when it saves the bill (each line is rounded to the
-// paisa, the bill discount is shared over the lines, GST is rounded per line), so the amount on the screen is
-// the amount on the saved invoice.
-function billComputeLines() {
-  const items = activeBillState.items;
-  const lines = items.map(item => {
-    const qty = Math.floor(Number(item.quantity)) || 1;
-    const gross = billR2(qty * Number(item.rate || 0));
-    const lineDisc = billR2(Math.round(gross * (Number(item.discountPercent) || 0)) / 100);
-    return { item, gross, lineDisc, taxable: billR2(gross - lineDisc), gst: billGstOf(item) };
-  });
-  const lineDiscTotal = lines.reduce((a, l) => a + l.lineDisc, 0);
-  const grossSubtotal = lines.reduce((a, l) => a + l.gross, 0);
-  const taxableSubtotal = billR2(grossSubtotal - lineDiscTotal);
-  const billDiscount = Math.min(billR2(taxableSubtotal * (Number(activeBillState.billDiscountPercent) || 0) / 100), taxableSubtotal);
-  let allocated = 0;
-  lines.forEach((l, idx) => {
-    const last = idx === lines.length - 1;
-    const share = last ? billR2(billDiscount - allocated)
-      : (taxableSubtotal > 0 ? billR2(billDiscount * l.taxable / taxableSubtotal) : 0);
-    if (!last) allocated += share;
-    l.finalTaxable = billR2(l.taxable - share);
-    l.cgst = billR2(l.finalTaxable * (billR2(l.gst / 2) / 100));
-    l.sgst = l.cgst;
-    l.tax = billR2(l.cgst + l.sgst);
-    l.total = billR2(l.finalTaxable + l.tax);
-  });
-  return { lines, taxableSubtotal, billDiscount, lineDiscTotal };
+// The arithmetic lives in billing_math.js (same steps and order as the server).
+function billCurrentCalc() {
+  return billComputeLines(activeBillState.items, activeBillState.billDiscountPercent);
 }
 
 function recalculateTotals() {
-  const calc = billComputeLines();
+  const calc = billCurrentCalc();
   const rawSubtotal = calc.taxableSubtotal;
   const billDiscount = calc.billDiscount;
   const netTaxable = calc.lines.reduce((a, l) => a + l.finalTaxable, 0);
@@ -1510,7 +1478,8 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
 
     // Asynchronous decoupled PDF launch
     if (printPdf && pdfUrl) {
-      window.open(pdfUrl, '_blank');
+      const w = window.open(pdfUrl, '_blank');
+      if (!w) billToast(`Bill ${invoiceNum} is saved. The browser blocked the print window: use "View PDF".`, true);
     }
 
     // Completely non-blocking background refreshes
@@ -1549,6 +1518,23 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
 // ----------------------------------------------------
 // HEADER INPUTS AND OPEN BILLS (tabs)
 // ----------------------------------------------------
+// Patient and doctor details are optional: folded away until needed (opens by itself when something is filled in).
+function billSetOptionalOpen(open, remember) {
+  const left = document.querySelector('.bill-head-left');
+  const btn = document.getElementById('bill-opt-toggle');
+  if (left) left.classList.toggle('opt-open', !!open);
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(!!open));
+    btn.firstChild.textContent = (open ? '▾' : '▸') + ' Patient & doctor details ';
+  }
+  if (remember) { try { localStorage.setItem('dawaiflow_bill_opt_open', open ? '1' : '0'); } catch (e) { console.warn('could not remember the details toggle', e); } }
+}
+function billToggleOptional() {
+  const left = document.querySelector('.bill-head-left');
+  billSetOptionalOpen(!(left && left.classList.contains('opt-open')), true);
+}
+window.billToggleOptional = billToggleOptional;
+
 function billSyncHeaderInputs() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
   set('bill-patient-phone', activeBillState.patientPhone);
@@ -1556,6 +1542,11 @@ function billSyncHeaderInputs() {
   set('bill-doctor-name', activeBillState.doctorName);
   set('bill-doctor-reg', activeBillState.doctorRegNo);
   set('pending-customer-name-input', activeBillState.pendingCustomerName);
+  const filled = [activeBillState.patientPhone, activeBillState.patientName, activeBillState.doctorName, activeBillState.doctorRegNo]
+    .some(v => String(v || '').trim());
+  let remembered = false;
+  try { remembered = localStorage.getItem('dawaiflow_bill_opt_open') === '1'; } catch (e) { console.warn('details toggle not readable', e); }
+  billSetOptionalOpen(filled || remembered, false);
 }
 
 // Several bills can be open at once (F8 = new bill). The active bill is always `activeBillState`; the others

@@ -1010,7 +1010,29 @@ def create_transaction(
 # ===========================
 
 def generate_bill_number() -> str:
-    return f"BILL-{uuid.uuid4().hex[:6].upper()}"
+    return f"BILL-{uuid.uuid4().hex[:8].upper()}"
+
+
+def _unused_bill_number(db: Session) -> str:
+    """A bill number that is not taken yet (the column is unique; a collision would otherwise be a server error)."""
+    for _ in range(10):
+        candidate = generate_bill_number()
+        if not db.query(models.Sale.id).filter(models.Sale.bill_number == candidate).first():
+            return candidate
+    return generate_bill_number()
+
+
+def _round_half_up(value, ndigits: int = 0):
+    """
+    Decimal-safe rounding to the paisa, half away from zero (2.675 -> 2.68). Python's round() works on the binary
+    float and gives 2.67, which would make invoices differ from the screen and from the printed receipt.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    if value is None:
+        return value
+    quantum = Decimal(1).scaleb(-ndigits)
+    result = Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP)
+    return float(result) if ndigits else int(result)
 
 
 def deduct_product_stock(
@@ -1179,6 +1201,7 @@ def create_sale_transaction(
     """
     Completes one pharmacy bill in a single optimized database transaction.
     """
+    round = _round_half_up  # money is rounded half-up to the paisa in this function (see _round_half_up)
     # Keep the freshly created objects usable after commit: with the default expire-on-commit every attribute
     # read for the response would re-SELECT the sale, items, payments and returns (4 extra database trips).
     db.expire_on_commit = False
@@ -1413,7 +1436,7 @@ def create_sale_transaction(
                 detail="Bill discount cannot exceed the taxable subtotal.",
             )
 
-        bill_number = generate_bill_number()
+        bill_number = _unused_bill_number(db)
         sale_items_to_create = []
         total_taxable_value = 0.0
         total_cgst = 0.0

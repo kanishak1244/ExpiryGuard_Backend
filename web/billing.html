@@ -31,7 +31,7 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=11.0">
+  <link rel="stylesheet" href="css/styles.css?v=11.5">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -157,6 +157,7 @@
             <label class="bill-row bill-row-wide"><span>Party Name <kbd>F2</kbd></span>
               <select id="bill-customer-select" class="form-input" onchange="handleCustomerSelectChange(this.value)"></select>
             </label>
+            <div class="bill-opt" id="bill-opt">
             <label class="bill-row"><span>Patient Mob./ID</span>
               <input type="text" id="bill-patient-phone" class="form-input" inputmode="tel" maxlength="15" placeholder="Optional" oninput="activeBillState.patientPhone = this.value" autocomplete="off">
             </label>
@@ -169,6 +170,7 @@
             <label class="bill-row"><span>Doctor Name</span>
               <input type="text" id="bill-doctor-name" class="form-input" placeholder="Optional" oninput="activeBillState.doctorName = this.value" autocomplete="off">
             </label>
+            </div>
           </div>
           <div class="bill-head-right">
             <label class="bill-row"><span>Bill No.</span>
@@ -177,6 +179,7 @@
             <label class="bill-row"><span>Date</span>
               <input type="date" id="bill-invoice-date-input" class="form-input" value="" onchange="activeBillState.invoiceDate = this.value">
             </label>
+            <button type="button" id="bill-opt-toggle" class="bill-opt-toggle" aria-expanded="false" onclick="billToggleOptional()">▸ Patient &amp; doctor details <small>(optional)</small></button>
             <!-- Inline Pending Customer Prompt -->
             <div id="pending-customer-prompt" style="display: none; margin-top: 8px; padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border: 1px solid var(--status-warning); border-radius: var(--radius-md);">
               <label style="font-size: 11.5px; font-weight: 600; color: var(--color-text-primary); display: block; margin-bottom: 3px;">Customer / Patient Name (for Pending Ledger):</label>
@@ -456,6 +459,7 @@
   <script src="js/app.js?v=11.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
-  <script src="js/billing_flow.js?v=11.3" defer></script>
+  <script src="js/billing_math.js?v=11.4" defer></script>
+  <script src="js/billing_flow.js?v=11.4" defer></script>
 </body>
 </html>
