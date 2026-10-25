@@ -1829,3 +1829,20 @@ tr.inv-row.inv-row-selected td { background: rgba(16, 185, 129, .10); }
 .bill-more-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 260px)); gap: 12px; padding: 8px 0 4px; }
 kbd { background: var(--color-surface-bg, #F1F5F9); border: 1px solid var(--color-border, #E2E8F0); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: inherit; }
 .search-result-item.selected { background: rgba(16, 185, 129, 0.12); }
+
+/* ===== Sidebar: icon rail that opens on hover (desktop) ===== */
+@media (min-width: 769px) {
+  :root { --sidebar-width: 66px; }
+  .sidebar { width: 66px; min-width: 66px; overflow: hidden; transition: width 0.18s ease, box-shadow 0.18s ease; }
+  .sidebar:hover, .sidebar:focus-within { width: 250px; min-width: 250px; z-index: 300; box-shadow: 8px 0 28px rgba(15, 23, 42, 0.3); }
+  .sidebar .brand-title, .sidebar .menu-category, .sidebar .nav-text, .sidebar .user-info,
+  .sidebar .user-profile-badge > *:not(.user-avatar) { opacity: 0; white-space: nowrap; pointer-events: none; transition: opacity 0.12s ease; }
+  .sidebar:hover .brand-title, .sidebar:hover .menu-category, .sidebar:hover .nav-text, .sidebar:hover .user-info,
+  .sidebar:hover .user-profile-badge > *:not(.user-avatar),
+  .sidebar:focus-within .brand-title, .sidebar:focus-within .menu-category, .sidebar:focus-within .nav-text,
+  .sidebar:focus-within .user-info, .sidebar:focus-within .user-profile-badge > *:not(.user-avatar) { opacity: 1; pointer-events: auto; transition-delay: 0.08s; }
+  .sidebar:not(:hover):not(:focus-within) * { scrollbar-width: none; }
+  .sidebar:not(:hover):not(:focus-within) *::-webkit-scrollbar { display: none; }
+}
+html[data-theme="dark"] .nav-item:not(.active):hover { background-color: rgba(255, 255, 255, 0.08); color: #F8FAFC; }
+html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
