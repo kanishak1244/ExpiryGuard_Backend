@@ -745,6 +745,7 @@ function medSortBatches(list) {
 }
 
 function medBatchesFor(p) {
+  if (Array.isArray(p._batches)) return { list: p._batches, complete: true };  // supplied by the caller (Create New Bill)
   const key = medKey(p.product_name);
   if (medDetail.batchCache.has(key)) return { list: medDetail.batchCache.get(key), complete: true };
   // Until the full list arrives, use the batches already on this page.
@@ -753,10 +754,11 @@ function medBatchesFor(p) {
 }
 
 function medRenderPanel(p, state) {
-  const panel = document.getElementById('medicine-details-panel');
-  if (!panel) return;
+  const host = document.getElementById('medicine-details-panel');
+  if (!host) return;
+  const panel = host.querySelector('#med-detail-content') || host;
   if (!p) {
-    panel.innerHTML = '<div class="med-detail-empty">Select a medicine above (click, hover, or use the Up / Down arrow keys) to see its details.</div>';
+    panel.innerHTML = '<div class="med-detail-empty">Select a medicine to see details</div>';
     return;
   }
   const owner = medIsOwnerView();
@@ -779,7 +781,8 @@ function medRenderPanel(p, state) {
   const totalQty = batches.reduce((s, b) => s + (medNum(b.quantity) || 0), 0);
   const expiredQty = batches.filter(medIsExpired).reduce((s, b) => s + (medNum(b.quantity) || 0), 0);
 
-  const row = (label, value) => `<div class="med-detail-row"><span>${label}</span><span>${value}</span></div>`;
+  // `full` is the long name shown as a tooltip when the label is shortened to fit the pinned panel.
+  const row = (label, value, full) => `<div class="med-detail-row"><span title="${full || label}">${label}</span><span title="${String(value).replace(/<[^>]*>/g, '').replace(/"/g, '&quot;')}">${value}</span></div>`;
   const batchRows = batches.map(b => {
     const expired = medIsExpired(b);
     const cls = `${b.id === p.id ? 'med-batch-current' : ''} ${expired ? 'med-batch-expired' : ''}`.trim();
@@ -800,35 +803,38 @@ function medRenderPanel(p, state) {
       <span class="med-detail-title">${medText(p.product_name)}</span>
       <span class="med-detail-sub">${medText(p.category)}${p.batch_number ? ' · batch ' + medText(p.batch_number) : ''}</span>
     </div>
+    <div class="med-detail-summary">MRP ${medMoney(mrp)} · Batch ${medText(p.batch_number)} · Exp ${medText(p.expiry_date)}${medIsExpired(p) ? ' <span class="badge badge-danger">Expired</span>' : ''} · Stock ${medNum(p.quantity) === null ? '-' : medNum(p.quantity)} · GST ${pct(gstRaw)} · HSN ${medText(p.hsn_code)}</div>
+    <div class="med-detail-body">
     <div class="med-detail-grid">
       <div class="med-detail-card"><h4>Purchase</h4>
-        ${row('MRP (per pack)', medMoney(mrp))}
-        ${owner ? row('Purchase rate (this batch)', medMoney(rate)) : row('Purchase rate', 'Owner only')}
+        ${row('MRP', medMoney(mrp), 'MRP (per pack)')}
+        ${p._hideCost ? '' : (owner ? row('Buy rate', medMoney(rate), 'Purchase rate (this batch)') : row('Buy rate', 'Owner only', 'Purchase rate (owner only)'))}
       </div>
       <div class="med-detail-card"><h4>Sale</h4>
-        ${row('Selling rate (MRP)', medMoney(mrp))}
-        ${looseStored !== null && looseStored > 0 ? row('Loose, per tablet', medMoney(looseStored)) : ''}
-        ${owner ? row('Margin on MRP', margin) : row('Margin', 'Owner only')}
+        ${row('Sell rate', medMoney(mrp), 'Selling rate (based on MRP)')}
+        ${looseStored !== null && looseStored > 0 ? row('Loose/tab', medMoney(looseStored), 'Loose price per tablet') : ''}
+        ${p._hideCost ? '' : (owner ? row('Margin', margin, 'Margin on MRP') : row('Margin', 'Owner only', 'Margin (owner only)'))}
       </div>
       <div class="med-detail-card"><h4>Tax</h4>
         ${row('HSN', medText(p.hsn_code))}
         ${row('GST', pct(gstRaw))}
-        ${row('CGST + SGST', half === null ? '-' : `${pct(half)} + ${pct(half)}`)}
+        ${row('CGST+SGST', half === null ? '-' : `${pct(half)}+${pct(half)}`, 'CGST + SGST split')}
       </div>
       <div class="med-detail-card"><h4>Other</h4>
         ${row('Company', medText(p.brand))}
         ${row('Pack', pack)}
-        ${row('Composition', medText(p.composition))}
+        ${row('Salt', medText(p.composition), 'Composition')}
       </div>
       <div class="med-detail-card"><h4>Stock</h4>
-        ${row('Total quantity', totalQty)}
-        ${expiredQty > 0 ? row('Of which expired', expiredQty) : ''}
+        ${row('Total qty', totalQty, 'Total quantity (all batches)')}
+        ${expiredQty > 0 ? row('Expired', expiredQty, 'Of which expired') : ''}
         ${row('Batches', batches.length)}
       </div>
     </div>
     <div class="med-detail-batches">
       <table><thead><tr><th>Batch</th><th>Expiry</th><th>Qty</th><th>MRP</th></tr></thead><tbody>${batchRows}</tbody></table>
       ${stateLine}
+    </div>
     </div>`;
 }
 
@@ -886,6 +892,38 @@ function medSelect(id, opts) {
   medScheduleFetch(p);
 }
 
+// Collapse / expand the pinned panel (remembered per browser). Safe to call more than once.
+window.medInitPanelToggle = function() {
+  const host = document.getElementById('medicine-details-panel');
+  const toggle = document.getElementById('med-detail-toggle');
+  if (!host || !toggle || toggle.dataset.wired === '1') return;
+  toggle.dataset.wired = '1';
+  const applyCollapsed = (c) => {
+    host.classList.toggle('med-collapsed', c);
+    toggle.textContent = c ? '▴ Details' : '▾ Hide';
+    toggle.setAttribute('aria-expanded', String(!c));
+  };
+  const storeKey = 'dawaiflow_med_panel_collapsed_' + (document.getElementById('billing-page') ? 'bill' : 'inv');
+  let collapsed = !!document.getElementById('billing-page');  // bill screen: collapsed (one-line summary) until opened
+  try { const v = localStorage.getItem(storeKey); if (v !== null) collapsed = v === '1'; } catch (e) {}
+  applyCollapsed(collapsed);
+  toggle.addEventListener('click', () => {
+    collapsed = !collapsed;
+    applyCollapsed(collapsed);
+    try { localStorage.setItem(storeKey, collapsed ? '1' : '0'); } catch (e) {}
+  });
+};
+
+// Used by Create New Bill: show a medicine that the page already has in memory (no request).
+window.medShowForBilling = function(p) {
+  if (!p) { medDetail.selectedId = null; medRenderPanel(null); return; }
+  medDetail.rows = new Map([[p.id, p]]);
+  medDetail.selectedId = p.id;
+  medRenderPanel(p, 'ready');
+};
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => window.medInitPanelToggle());
+else window.medInitPanelToggle();
+
 function medWire() {
   if (medDetail.wired) return;
   const tbody = document.getElementById('inventory-table-body');
@@ -893,6 +931,23 @@ function medWire() {
   medDetail.wired = true;
   const wrap = tbody.closest('.table-responsive');
   if (wrap) wrap.setAttribute('tabindex', '0');
+
+  window.medInitPanelToggle();
+  // Summary tiles (hidden on short screens to keep room for the list).
+  const sumBtn = document.getElementById('inv-summary-toggle');
+  if (sumBtn) sumBtn.addEventListener('click', () => {
+    const open = document.getElementById('inventory-page').classList.toggle('inv-summary-open');
+    sumBtn.textContent = open ? '▴ Hide summary' : '▾ Summary';
+  });
+  // ArrowDown in the search box jumps into the list (first row) so the keyboard never needs the mouse.
+  const searchBox = document.getElementById('inventory-search');
+  if (searchBox) searchBox.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown' && medDetail.order.length && wrap) {
+      ev.preventDefault();
+      wrap.focus({ preventScroll: true });
+      medSelect(medDetail.selectedId !== null ? medDetail.selectedId : medDetail.order[0], { scroll: true });
+    }
+  });
 
   const rowId = (ev) => {
     const tr = ev.target.closest && ev.target.closest('tr.inv-row');

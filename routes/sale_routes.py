@@ -271,7 +271,7 @@ def get_held_bill_by_id(
     return held_bill
 
 
-@router.post("/billing/held/{held_bill_id}/resume", response_model=schemas.HeldBillResponse)
+@router.post("/billing/held/{held_bill_id}/resume", response_model=schemas.HeldBillResumeResponse)
 def resume_held_bill(
     held_bill_id: int,
     db: Session = Depends(get_db),

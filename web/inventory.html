@@ -31,13 +31,13 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=9.1">
+  <link rel="stylesheet" href="css/styles.css?v=10.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container" id="inventory-page">
+  <div class="app-container layout-pinned" id="inventory-page">
     
     <!-- Sidebar -->
     <!-- Canonical Sidebar Navigation -->
@@ -173,6 +173,7 @@
         </style>
 
         <!-- Smart KPI Summary Cards -->
+        <div class="inv-summary-bar"><button type="button" id="inv-summary-toggle" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;">▾ Summary</button></div>
         <div class="inventory-metrics-grid">
           <div class="inv-stat-card" onclick="setInventoryFilter('all')">
             <span class="stat-label" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted-text);">Total Products</span>
@@ -288,7 +289,8 @@
 
           <!-- Medicine details (read-only): fills in when a row is hovered, clicked or reached with the arrow keys -->
           <section id="medicine-details-panel" class="med-detail" aria-live="polite" aria-label="Medicine details">
-            <div class="med-detail-empty">Select a medicine above (click, hover, or use the Up / Down arrow keys) to see its details.</div>
+            <button type="button" id="med-detail-toggle" class="med-detail-toggle btn btn-secondary" aria-expanded="true">▾ Hide</button>
+            <div id="med-detail-content"><div class="med-detail-empty">Select a medicine to see details</div></div>
           </section>
 
         </div>
@@ -347,7 +349,7 @@
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
-  <script src="js/app.js?v=9.6" defer></script>
+  <script src="js/app.js?v=10.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
 </body>
 </html>

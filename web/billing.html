@@ -31,13 +31,13 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=9.0">
+  <link rel="stylesheet" href="css/styles.css?v=10.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container" id="billing-page">
+  <div class="app-container layout-pinned" id="billing-page">
     
     <!-- Canonical Sidebar Navigation -->
     <!-- Canonical Sidebar Navigation -->
@@ -126,13 +126,13 @@
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
           <button class="btn btn-warning" id="view-held-bills-btn" onclick="openHeldBillsModal()" style="display: flex; align-items: center; gap: 6px; background: #ea580c; color: white; border: none; font-weight: 600;">
-            <span>⏸️ Held Bills (<span id="held-bills-badge-count">0</span>)</span>
+            <span>⏸️ Held Bills (<span id="held-bills-badge-count">0</span>) <small style="opacity:.85">F7</small></span>
           </button>
           <button class="btn btn-secondary" onclick="openAddNewCustomerModal()" style="display: flex; align-items: center; gap: 6px;">
             <span>+ Add New Party</span>
           </button>
-          <button class="btn btn-secondary" onclick="resetBillForm()" style="display: flex; align-items: center; gap: 6px;">
-            <span>🔄 Clear / Reset</span>
+          <button class="btn btn-secondary" onclick="confirmClearBill()" style="display: flex; align-items: center; gap: 6px;">
+            <span>🔄 Clear <small style="opacity:.7">Ctrl+Shift+X</small></span>
           </button>
         </div>
       </header>
@@ -152,25 +152,13 @@
         <div class="billing-grid-header">
           <!-- Customer Selection -->
           <div>
-            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Customer / Patient Party</label>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Customer (F2)</label>
             <select id="bill-customer-select" class="form-input" style="font-size: 13.5px; font-weight: 500;" onchange="handleCustomerSelectChange(this.value)"></select>
-          </div>
-
-          <!-- Invoice Number -->
-          <div>
-            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Invoice No</label>
-            <input type="text" id="bill-invoice-number-input" class="form-input" style="font-size: 13.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;" value="" oninput="activeBillState.invoiceNumber = this.value">
-          </div>
-
-          <!-- Invoice Date -->
-          <div>
-            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Date</label>
-            <input type="date" id="bill-invoice-date-input" class="form-input" style="font-size: 13.5px; font-weight: 500;" value="" onchange="activeBillState.invoiceDate = this.value">
           </div>
 
           <!-- Payment Mode Toggle -->
           <div>
-            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Payment Mode</label>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Payment (Alt+1-4)</label>
             <div style="display: flex; gap: 6px;">
               <button type="button" class="btn btn-primary pay-mode-btn" data-mode="CASH" onclick="handlePaymentModeChange('CASH')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">💵 Cash</button>
               <button type="button" class="btn btn-secondary pay-mode-btn" data-mode="UPI" onclick="handlePaymentModeChange('UPI')" style="flex: 1; padding: 7px 0; font-size: 12px; font-weight: 600;">📱 UPI</button>
@@ -190,6 +178,24 @@
             </div>
           </div>
         </div>
+
+        <details class="bill-more" id="bill-more">
+          <summary>More options (invoice no, date)</summary>
+          <div class="bill-more-body">
+          <!-- Invoice Number -->
+          <div>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Invoice No</label>
+            <input type="text" id="bill-invoice-number-input" class="form-input" style="font-size: 13.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace, sans-serif;" value="" oninput="activeBillState.invoiceNumber = this.value">
+          </div>
+
+          <!-- Invoice Date -->
+          <div>
+            <label class="form-label" style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); margin-bottom: 6px;">Date</label>
+            <input type="date" id="bill-invoice-date-input" class="form-input" style="font-size: 13.5px; font-weight: 500;" value="" onchange="activeBillState.invoiceDate = this.value">
+          </div>
+
+          </div>
+        </details>
 
         <!-- Section 2: Search Medicine Autocomplete Input & Voice Billing -->
         <div class="billing-search-box" style="position: relative;">
@@ -287,8 +293,7 @@
                   <th style="min-width: 150px;">Batch & Expiry (FEFO)</th>
                   <th style="min-width: 120px; text-align: center;">Unit Type</th>
                   <th style="width: 80px; text-align: center;">Qty</th>
-                  <th style="width: 65px; text-align: center;">Free</th>
-                  <th style="width: 95px; text-align: right;">Rate (₹)</th>
+                  <th style="width: 90px; text-align: right;">MRP (₹)</th>
                   <th style="width: 70px; text-align: center;">Disc %</th>
                   <th style="width: 70px; text-align: center;">GST %</th>
                   <th style="width: 105px; text-align: right;">Amount (₹)</th>
@@ -297,11 +302,10 @@
               </thead>
               <tbody id="bill-items-table-body">
                 <tr>
-                  <td colspan="11" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">
+                  <td colspan="10" style="text-align: center; padding: 36px 20px; color: var(--color-text-muted);">
                     <div style="font-size: 28px; margin-bottom: 8px; opacity: 0.8;">💊</div>
                     <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary);">No medicines added yet</div>
-                    <div style="font-size: 13px; margin-top: 4px; color: var(--color-text-muted);">Search for a medicine above to start the bill.</div>
-                    <div style="font-size: 11.5px; margin-top: 6px; color: var(--color-text-muted); opacity: 0.85;">⚡ Medicines are automatically selected in FEFO order.</div>
+                    <div style="font-size: 13px; margin-top: 4px; color: var(--color-text-muted);">Press <kbd>/</kbd> and type a medicine name or code.</div>
                   </td>
                 </tr>
               </tbody>
@@ -318,11 +322,7 @@
               <input type="number" id="bill-discount-percent-input" min="0" max="100" class="form-input" style="width: 80px; text-align: center; font-weight: 600;" value="0" oninput="handleBillDiscountChange(this.value)">
             </div>
             
-            <div class="totals-info-box">
-              <div>⚡ <strong>Automated FEFO Deduction:</strong> Stock is auto-debited in First-Expiry-First-Out order.</div>
-              <div style="margin-top: 4px;">⚡ <strong>Keyboard Navigation:</strong> Press <code>Enter</code> on Qty/Free/Rate/Disc to quickly advance through fields without mouse.</div>
-              <div style="margin-top: 4px;">⚡ <strong>GST Split:</strong> Computed live as 50% CGST + 50% SGST on taxable values.</div>
-            </div>
+            <div class="totals-info-box"><div><strong>Keys:</strong> <kbd>/</kbd> search · <kbd>Enter</kbd> add medicine · <kbd>Enter</kbd> in Qty = next · <kbd>F6</kbd> hold · <kbd>F10</kbd> save &amp; print</div></div>
           </div>
 
           <!-- Right column: Computed totals stack & Action Buttons -->
@@ -362,17 +362,23 @@
             <!-- Action Buttons -->
             <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
               <button type="button" class="btn btn-warning" style="background: #ea580c; color: white; border: none; padding: 11px 20px; font-weight: 700; font-size: 13.5px; border-radius: var(--radius-md);" onclick="holdCurrentBill()">
-                ⏸️ Hold Bill
+                ⏸️ Hold Bill (F6)
               </button>
               <button type="button" class="btn btn-secondary" style="padding: 11px 22px; font-weight: 600; font-size: 13.5px; border-radius: var(--radius-md);" onclick="commitBillTransaction(false, true)">
                 Save & New Bill
               </button>
               <button type="button" class="btn btn-primary" id="bill-save-print-btn" style="padding: 11px 28px; font-size: 14.5px; font-weight: 700; border-radius: var(--radius-md);" onclick="commitBillTransaction(true, false)">
-                🖨️ Save & Print GST Invoice
+                🖨️ Save & Print (F10)
               </button>
             </div>
           </div>
         </div>
+
+        <!-- Medicine details (read-only): follows the highlighted search result or the bill line being edited -->
+        <section id="medicine-details-panel" class="med-detail" aria-live="polite" aria-label="Medicine details">
+          <button type="button" id="med-detail-toggle" class="med-detail-toggle btn btn-secondary" aria-expanded="true">▾ Hide</button>
+          <div id="med-detail-content"><div class="med-detail-empty">Select a medicine to see details</div></div>
+        </section>
 
       </main>
     </div>
@@ -476,9 +482,9 @@
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
-  <script src="js/app.js?v=9.4" defer></script>
+  <script src="js/app.js?v=10.1" defer></script>
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
-  <script src="js/billing_flow.js?v=9.4" defer></script>
+  <script src="js/billing_flow.js?v=10.7" defer></script>
 </body>
 </html>
