@@ -1782,6 +1782,7 @@ def create_sale_transaction(
         # If this sale was generated from a held bill, mark that held bill COMPLETED
         held_bill_id = getattr(sale_data, "held_bill_id", None)
         if held_bill_id:
+            db.flush()          # the sale must have its id before the held bill points at it (the app's sessions do not autoflush)
             held_bill = (
                 db.query(models.HeldBill)
                 .filter(
@@ -2124,6 +2125,7 @@ def create_held_bill(
                 "hsn_code": item.hsn_code or prod.hsn_code or "3004",
                 "gst_percentage": gst_pct,
                 "estimated_line_total": line_total,
+                "discount_percent": item.discount_percent,
             })
 
         taxable_subtotal = max(0.0, subtotal - total_line_discounts)
@@ -2239,6 +2241,7 @@ def get_held_bills(
         db.query(models.HeldBill)
         .options(joinedload(models.HeldBill.items))
         .filter(models.HeldBill.user_id == user_id)
+        .filter(or_(models.HeldBill.notes.is_(None), ~models.HeldBill.notes.like("COUNTER:%")))   # Counter Sale rows have their own list
     )
     if status and status.upper() != "ALL":
         query = query.filter(models.HeldBill.status == status.upper())
@@ -2263,6 +2266,7 @@ def get_held_bill_count(db: Session, user_id: int) -> int:
         .filter(
             models.HeldBill.user_id == user_id,
             models.HeldBill.status == "HELD",
+            or_(models.HeldBill.notes.is_(None), ~models.HeldBill.notes.like("COUNTER:%")),
         )
         .count()
     )
@@ -2295,6 +2299,8 @@ def resume_held_bill(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Held bill #{held_bill_id} not found.",
         )
+    if held_bill.notes and str(held_bill.notes).startswith("COUNTER:"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This is a Counter Sale transaction. Open it from the Counter Sale screen.")
     if held_bill.status != "HELD":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

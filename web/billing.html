@@ -31,7 +31,7 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=12.3">
+  <link rel="stylesheet" href="css/styles.css?v=13.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -189,6 +189,16 @@
           </div>
         </div>
 
+        <!-- Counter Sale header: the customer in front (shown only in Counter Sale mode) -->
+        <div id="counter-head" class="counter-head" role="group" aria-label="Counter sale customer">
+          <span class="counter-badge">COUNTER SALE</span>
+          <span class="counter-active">Customer <b id="counter-active-ref">#1</b></span>
+          <input type="text" id="counter-name" class="form-input" placeholder="Name (optional)" maxlength="120" autocomplete="off" aria-label="Customer name (optional)">
+          <input type="text" id="counter-phone" class="form-input" placeholder="Mobile (optional)" maxlength="20" inputmode="tel" autocomplete="off" aria-label="Customer mobile (optional)">
+          <span class="counter-total" title="Total of the customer in front">Items <b id="counter-active-count">0</b> · Total <b id="counter-active-total">₹0.00</b></span>
+          <span class="bill-hint counter-keys"><kbd>PgUp</kbd>/<kbd>PgDn</kbd> customer · <kbd>F8</kbd> new · <kbd>F9</kbd> finish &amp; next · <kbd>F10</kbd> convert</span>
+        </div>
+
         <!-- Section 2: Search Medicine Autocomplete Input & Voice Billing -->
         <div class="billing-search-box bill-toolbar">
           <div class="bill-toolbar-row">
@@ -256,6 +266,7 @@
               <thead>
                 <tr>
                   <th style="width: 34px; text-align: center;">#</th>
+                  <th class="th-cust" style="width: 86px;" title="Customer reference (Counter Sale)">Cust.</th>
                   <th style="min-width: 240px;">Product</th>
                   <th style="width: 78px;">Packing</th>
                   <th style="min-width: 130px;">Batch</th>
@@ -281,6 +292,27 @@
             </table>
           </div>
           <div class="bill-grid-foot"><span id="bill-item-count-badge">0 lines • 0 units</span></div>
+        </div>
+
+        <!-- Counter Sale footer: customer-wise summary and actions -->
+        <div id="counter-foot" class="counter-foot">
+          <div class="counter-sum-wrap">
+            <table class="data-table counter-sum" aria-label="Customers">
+              <thead><tr><th>Customer</th><th class="cs-num">Items</th><th class="cs-num">Total</th><th>Status</th><th></th></tr></thead>
+              <tbody id="counter-sum-body"></tbody>
+            </table>
+            <div class="counter-sum-foot"><span id="counter-sum-error" class="bill-disc-note bad"></span>
+              <button type="button" id="counter-load-more" class="cs-btn" style="display:none;">Load more</button></div>
+          </div>
+          <div class="counter-actions">
+            <label class="counter-pay-label" for="counter-pay">Pay by <kbd>Alt+1-4</kbd></label>
+            <select id="counter-pay" class="form-input" aria-label="Payment mode for the bill">
+              <option value="CASH">Cash</option><option value="UPI">UPI</option><option value="CARD">Card</option><option value="CREDIT">Credit</option>
+            </select>
+            <button type="button" class="btn btn-secondary" onclick="counterNewCustomerNow()"><kbd>F8</kbd> New Customer</button>
+            <button type="button" class="btn btn-secondary" onclick="counterFinishActive()"><kbd>F9</kbd> Finish &amp; Next</button>
+            <button type="button" class="btn btn-primary" onclick="counterConvertTarget({ kind: 'draft' })"><kbd>F10</kbd> Convert to Bill</button>
+          </div>
         </div>
 
         <!-- Bill discount (one box, % or rupees) and the invoice value -->
@@ -418,7 +450,7 @@
   </div>
 
 
-  <script src="js/api.js?v=12.3" defer></script>
+  <script src="js/api.js?v=13.0" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
@@ -427,8 +459,10 @@
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
   <script src="js/billing_math.js?v=12.2" defer></script>
   <script src="js/billing_grid_core.js?v=12.2" defer></script>
+  <script src="js/billing_counter_core.js?v=13.0" defer></script>
   <script src="js/billing_catalog.js?v=12.3" defer></script>
-  <script src="js/billing_flow.js?v=12.4" defer></script>
-  <script src="js/billing_grid.js?v=12.4" defer></script>
+  <script src="js/billing_flow.js?v=13.0" defer></script>
+  <script src="js/billing_grid.js?v=13.0" defer></script>
+  <script src="js/billing_counter.js?v=13.0" defer></script>
 </body>
 </html>

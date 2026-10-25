@@ -21,3 +21,11 @@ await runBillingGridE2E()   // -> { total, passed, failed: [] }
 
 The pure rules (cell movement, dropdown placement, batch order, quantity/discount checks) have Node unit tests:
 `node --test tests/js/*.test.js`.
+
+## Counter Sale run
+
+`counter_sale_e2e.js` (`await runCounterSaleE2E()`) checks the Counter Sale tab: mode switch, retail bill kept, many customers,
+search/batch/keyboard, totals + GST per customer, expired batch, finish (READY) / convert (one invoice, one stock deduction),
+retry and network failure, concurrent stock, drafts surviving a reload, reopen, cancel, unique invoice numbers, and that
+Retail Billing still saves a normal bill. Same rules: TEST pharmacy only, re-seed first. It also needs the `EXTRA MEDICINE`
+rows (batches `X00000`...) used for the batch-number search.

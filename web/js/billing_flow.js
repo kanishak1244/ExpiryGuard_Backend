@@ -754,9 +754,12 @@ function billAddMedicine(med, overrides = {}) {
 
   // The same batch is already on the bill: never a second line (its stock would be counted twice); go to its quantity.
   // (a Product cell that was typed over replaces THAT line: replaceIdx)
+  const counterMode = typeof billIsCounter === 'function' && billIsCounter();
+  if (counterMode) newItem.customerId = activeBillState.counter.activeId;
+  const sameCust = (o) => !counterMode || o.customerId === newItem.customerId;
   const replaceKey = window.billGrid ? billGrid.replaceKey : null;
   const replaceIdx = replaceKey ? activeBillState.items.findIndex(o => o.id === replaceKey) : -1;
-  const sameAt = activeBillState.items.findIndex((o, j) => j !== replaceIdx && String(o.productId) === String(newItem.productId) && String(o.selectedBatch || '') === String(newItem.selectedBatch || ''));
+  const sameAt = activeBillState.items.findIndex((o, j) => j !== replaceIdx && sameCust(o) && String(o.productId) === String(newItem.productId) && String(o.selectedBatch || '') === String(newItem.selectedBatch || ''));
   if (replaceIdx >= 0) {
     const cur = activeBillState.items[replaceIdx];
     billGrid.replaceKey = null;
@@ -777,7 +780,10 @@ function billAddMedicine(med, overrides = {}) {
   billClearSearchState();
   if (replaceIdx >= 0) {
     newItem.id = activeBillState.items[replaceIdx].id;     // the line keeps its identity
+    if (counterMode) newItem.customerId = activeBillState.items[replaceIdx].customerId;
     activeBillState.items[replaceIdx] = newItem;
+  } else if (counterMode) {
+    activeBillState.items.splice(counterInsertIndex(activeBillState.items, newItem.customerId), 0, newItem);   // next to this customer's lines
   } else {
     activeBillState.items.push(newItem);
   }
@@ -1036,6 +1042,7 @@ function billCurrentCalc() {
 }
 
 function recalculateTotals() {
+  if (typeof billIsCounter === 'function' && billIsCounter()) { counterAfterEdit(); return; }   // Counter Sale: totals are per customer
   const calc = billCurrentCalc();
   const rawSubtotal = calc.taxableSubtotal;
   const billDiscount = calc.billDiscount;
@@ -1403,6 +1410,7 @@ function billFindLineProblem() {
 }
 
 async function commitBillTransaction(printPdf = false, saveAndNew = false) {
+  if (typeof billIsCounter === 'function' && billIsCounter()) { billToast('Counter Sale: use Finish & Next (F9) or Convert to Bill (F10).', false); return; }
   if (isCommittingBill) {
     console.warn('[BILLING] Commit transaction already in-flight. Duplicate tap suppressed.');
     return;
@@ -1635,11 +1643,14 @@ function billTabsRender() {
   host.innerHTML = billTabs.map((t, i) => {
     const st = i === billActiveTab ? activeBillState : t.state;
     const n = st && st.items ? st.items.length : 0;
-    return `<div class="bill-tab ${i === billActiveTab ? 'active' : ''}" role="tab" aria-selected="${i === billActiveTab}" onclick="billTabSwitch(${i})">
-      <span>${escapeHtml(t.name)}${n ? ' <small>(' + n + ')</small>' : ''}</span>
+    const isCounter = t.mode === 'counter';
+    const n2 = isCounter && st ? (st.counter ? st.counter.customers.filter(c => c.status === 'draft').length : 0) : n;
+    return `<div class="bill-tab ${i === billActiveTab ? 'active' : ''} ${isCounter ? 'bill-tab-counter' : ''}" role="tab" aria-selected="${i === billActiveTab}" onclick="billTabSwitch(${i})">
+      <span>${isCounter ? '🧮 ' : ''}${escapeHtml(t.name)}${n2 ? ' <small>(' + n2 + (isCounter ? ' cust.' : '') + ')</small>' : ''}</span>
       ${billTabs.length > 1 ? `<button type="button" class="bill-tab-close" title="Close this bill" onclick="event.stopPropagation(); billTabClose(${i})">×</button>` : ''}
     </div>`;
-  }).join('') + '<button type="button" class="bill-tab-new" title="Open another bill (F8)" onclick="billTabNew()">+ New <kbd>F8</kbd></button>';
+  }).join('') + '<button type="button" class="bill-tab-new" title="Open another bill (F8)" onclick="billTabNew()">+ New Bill <kbd>F8</kbd></button>'
+    + (billTabs.some(t => t.mode === 'counter') ? '' : '<button type="button" class="bill-tab-new bill-tab-counter-new" title="Counter Sale: many walk-in customers in one grid" onclick="counterOpenTab()">+ Counter Sale</button>');
 }
 
 function billRefreshFromState() {
@@ -1655,11 +1666,13 @@ function billRefreshFromState() {
   updateResumedHeldBanner();
   clearMedicineSearch(false);
   billTabsRender();
+  if (typeof counterApplyMode === 'function') counterApplyMode();
   if (typeof billFocusStart === 'function') billFocusStart(); else billFocusSearch();
 }
 
 function billTabSwitch(i) {
   if (i === billActiveTab || !billTabs[i] || !billTabs[i].state) return;
+  if (typeof counterPersistNow === 'function') counterPersistNow();
   billTabs[billActiveTab].state = activeBillState;
   billActiveTab = i;
   activeBillState = billTabs[i].state;
@@ -1667,6 +1680,7 @@ function billTabSwitch(i) {
 }
 
 function billTabNew() {
+  if (typeof counterPersistNow === 'function') counterPersistNow();
   billTabs[billActiveTab].state = activeBillState;
   billTabs.push({ name: 'Sale Bill ' + (++billTabCounter), state: null });
   billActiveTab = billTabs.length - 1;
@@ -1705,6 +1719,7 @@ window.billTabClose = billTabClose;
 
 // Clear the bill (asks first when there is something on it).
 function confirmClearBill() {
+  if (typeof billIsCounter === 'function' && billIsCounter()) { counterDiscardActive(); return; }   // Counter Sale: discard only the customer in front
   if (!activeBillState.items || activeBillState.items.length === 0) { resetBillForm(); return; }
   const doClear = () => { resetBillForm(); billToast('Bill cleared.', false); };
   if (typeof window.showConfirmModal === 'function') {
@@ -1824,6 +1839,7 @@ function clearResumedHeldBill() {
 
 let isHoldingBill = false;   // a second press while the first is still saving must not park the bill twice
 async function holdCurrentBill() {
+  if (typeof billIsCounter === 'function' && billIsCounter()) { billToast('Counter Sale: F9 finishes this customer (kept as Ready).', false); return; }
   if (isHoldingBill) return;
   if (!activeBillState.items || activeBillState.items.length === 0) {
     billToast('Cannot hold an empty bill. Add at least one medicine first.', true);
@@ -1984,6 +2000,7 @@ function renderHeldBillsList(bills) {
 }
 
 async function resumeHeldBillWeb(heldBillId) {
+  if (typeof billIsCounter === 'function' && billIsCounter()) { billToast('Open a Retail Billing tab to resume a held bill.', true); return; }
   if (activeBillState.items && activeBillState.items.length > 0) {
     const confirmReplace = confirm('You have items in your current bill. Resuming will replace the current active cart. Proceed?');
     if (!confirmReplace) return;
@@ -2169,6 +2186,7 @@ function billSaveKeyAllowed(e) {
 
 function billShortcuts(e) {
   if (!document.getElementById('billing-page') || billModalOpen()) return;
+  if (typeof counterKey === 'function' && counterKey(e)) return;        // Counter Sale tab: its own keys first
   const t = e.target;
   const typing = t && t.tagName && (/^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === 'INPUT' && !['checkbox', 'button'].includes(t.type)));
   const handled = () => { e.preventDefault(); e.stopPropagation(); };
@@ -2188,6 +2206,7 @@ function billShortcuts(e) {
     return;
   }
   if (e.key === 'Escape' && typeof billGridEscape === 'function' && billGridEscape(e)) return;   // closes a list / cancels an edit first
+  if (e.key === 'Escape' && typeof billIsCounter === 'function' && billIsCounter()) return;       // Esc never clears a Counter Sale
   if (e.key === 'Escape' && activeBillState.items.length) {
     const dd = document.getElementById('bill-search-results-dropdown');
     const ddOpen = dd && dd.style.display === 'block';

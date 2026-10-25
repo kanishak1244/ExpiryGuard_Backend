@@ -1565,6 +1565,8 @@ class HeldBillItemCreate(BaseModel):
     hsn_code: Optional[str] = None
     gst_percentage: Optional[float] = Field(default=None, ge=0.0, le=100.0)
     estimated_line_total: Optional[float] = None
+    # The discount as the cashier typed it (the saved `discount` is the rupee amount); lets a reopened transaction show it exactly.
+    discount_percent: Optional[float] = Field(default=None, ge=0.0, le=100.0)
 
     @field_validator("unit_type", mode="before")
     @classmethod
@@ -1622,6 +1624,27 @@ class HeldBillCreate(BaseModel):
         if v_clean in ["flat", "percent"]:
             return v_clean
         return None
+
+
+class CounterTxnCreate(BaseModel):
+    """One customer's transaction on the Counter Sale screen ("Finish customer"). txn_id is made by the screen and makes retries safe."""
+    txn_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    ref: str = Field(min_length=1, max_length=40)
+    customer_name: Optional[str] = Field(default=None, max_length=120)
+    customer_phone: Optional[str] = Field(default=None, max_length=20)
+    replaces_id: Optional[int] = None
+    items: List[HeldBillItemCreate] = Field(min_length=1, max_length=200)
+
+
+class CounterConvert(BaseModel):
+    payment_method: Literal["CASH", "UPI", "CARD", "CREDIT", "PENDING"] = "CASH"
+    customer_name: Optional[str] = Field(default=None, max_length=120)
+    customer_phone: Optional[str] = Field(default=None, max_length=20)
+
+    @field_validator("payment_method", mode="before")
+    @classmethod
+    def _norm_pay(cls, v):
+        return v.strip().upper() if isinstance(v, str) else v
 
 
 class HeldBillResponse(BaseModel):

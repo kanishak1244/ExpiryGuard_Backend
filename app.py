@@ -36,6 +36,7 @@ from routes import (
     auth_routes,
     product_routes,
     sale_routes,
+    counter_routes,
     purchase_routes,
     customer_routes,
     ai_routes,
@@ -183,6 +184,7 @@ if WEB_DIR.exists():
 app.include_router(auth_routes.router)
 app.include_router(product_routes.router)
 app.include_router(sale_routes.router)
+app.include_router(counter_routes.router)
 app.include_router(purchase_routes.router)
 app.include_router(customer_routes.router)
 app.include_router(ai_routes.router)

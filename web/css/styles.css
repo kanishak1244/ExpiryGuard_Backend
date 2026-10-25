@@ -2052,3 +2052,61 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
 #billing-page .bill-hint-warn { color: #B45309; font-weight: 600; }
 #billing-page .bill-catalog-refresh { border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); border-radius: 4px; padding: 0 6px; height: 20px; line-height: 18px; cursor: pointer; font-size: 12px; }
 #billing-page .bill-catalog-refresh:hover, #billing-page .bill-catalog-refresh:focus-visible { color: #10B981; border-color: #10B981; outline: none; }
+
+/* ==========================================================================
+   Counter Sale mode (billing_counter.js): same screen, a tab beside the bill tabs
+   ========================================================================== */
+#billing-page .th-cust, #billing-page td.c-cust, #billing-page #counter-head, #billing-page #counter-foot { display: none; }
+#billing-page.mode-counter .th-cust, #billing-page.mode-counter td.c-cust { display: table-cell; }
+#billing-page.mode-counter #counter-head { display: flex; }
+#billing-page.mode-counter #counter-foot { display: flex; }
+#billing-page.mode-counter .bill-head, #billing-page.mode-counter .bill-foot, #billing-page.mode-counter .bill-actions,
+#billing-page.mode-counter #resumed-held-banner { display: none !important; }
+
+#billing-page .bill-tab-counter { box-shadow: inset 0 2px 0 #3B82F6; }
+#billing-page .bill-tab-counter.active { box-shadow: inset 0 2px 0 #3B82F6; background: rgba(59, 130, 246, .10); color: var(--color-text-primary); }
+#billing-page .bill-tab-counter-new { color: #3B82F6; }
+
+#billing-page .counter-head { align-items: center; gap: 10px; flex-wrap: wrap; padding: 4px 8px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-card); flex: none; }
+#billing-page .counter-badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #fff; background: #3B82F6; padding: 2px 8px; border-radius: 4px; }
+#billing-page .counter-active { font-size: 13px; color: var(--color-text-muted); }
+#billing-page .counter-active b { font-size: 15px; color: var(--color-text-primary); }
+#billing-page .counter-head .form-input { width: 170px; height: 28px; padding: 2px 8px; font-size: 13px; }
+#billing-page .counter-total { font-size: 12.5px; color: var(--color-text-muted); margin-left: auto; }
+#billing-page .counter-total b { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+#billing-page .counter-keys { white-space: nowrap; }
+
+#billing-page td.c-cust { text-align: center; font-weight: 800; font-size: 12.5px; cursor: pointer; background: rgba(59, 130, 246, .07); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#billing-page td.c-cust small { display: block; font-weight: 500; font-size: 9.5px; line-height: 1; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; }
+#billing-page td.c-cust.cust-active { box-shadow: inset 3px 0 0 #3B82F6; color: #2563EB; }
+#billing-page tr.cust-other td { opacity: .6; }
+#billing-page tr.cust-other td.c-cust { opacity: 1; }
+
+#billing-page .counter-foot { gap: 12px; align-items: stretch; flex: none; }
+#billing-page .counter-sum-wrap { flex: 1 1 auto; min-width: 0; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-card); max-height: 150px; overflow: auto; }
+#billing-page .counter-sum { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#billing-page .counter-sum th { position: sticky; top: 0; background: var(--color-surface-bg); font-size: 11px; padding: 3px 8px; text-align: left; z-index: 1; }
+#billing-page .counter-sum td { padding: 2px 8px; border-top: 1px solid var(--color-border); }
+#billing-page .counter-sum .cs-num { text-align: right; font-variant-numeric: tabular-nums; }
+#billing-page .counter-sum td.cs-who { font-weight: 700; }
+#billing-page .counter-sum td.cs-who small { font-weight: 500; color: var(--color-text-muted); margin-left: 4px; }
+#billing-page .counter-sum td.cs-act { text-align: right; white-space: nowrap; }
+#billing-page .counter-sum tr.cs-active td { background: rgba(59, 130, 246, .10); }
+#billing-page .counter-sum tr.cs-draft { cursor: pointer; }
+#billing-page .counter-sum .cs-empty { text-align: center; color: var(--color-text-muted); padding: 10px; }
+#billing-page .cs-st { font-size: 10.5px; font-weight: 800; padding: 1px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: .03em; }
+#billing-page .cs-st.cs-draft { background: rgba(245, 158, 11, .18); color: #B45309; }
+#billing-page .cs-st.cs-ready { background: rgba(59, 130, 246, .18); color: #1D4ED8; }
+#billing-page .cs-st.cs-converted { background: rgba(16, 185, 129, .18); color: #047857; }
+#billing-page .cs-st.cs-cancelled { background: rgba(100, 116, 139, .2); color: #475569; }
+#billing-page .cs-btn { border: 1px solid var(--color-border); background: transparent; color: inherit; border-radius: 5px; padding: 1px 8px; margin-left: 4px; font-size: 11.5px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+#billing-page .cs-btn:hover, #billing-page .cs-btn:focus-visible { border-color: #10B981; color: #10B981; outline: none; }
+#billing-page .cs-btn-go { border-color: #10B981; color: #10B981; }
+#billing-page .cs-btn-x { color: #DC2626; }
+#billing-page .counter-sum-foot { display: flex; justify-content: space-between; padding: 2px 8px; }
+#billing-page .counter-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; align-content: center; justify-content: flex-end; flex: 0 0 380px; }
+#billing-page .counter-actions .btn { padding: 8px 12px; font-weight: 700; white-space: nowrap; }
+#billing-page .counter-actions kbd { background: rgba(255, 255, 255, .20); color: inherit; border: 1px solid currentColor; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-weight: 700; margin-right: 4px; }
+#billing-page .counter-pay-label { font-size: 12px; font-weight: 700; color: var(--color-text-muted); margin: 0; }
+#billing-page .counter-actions select.form-input { width: 90px; height: 30px; padding: 2px 6px; }
+@media (max-width: 1100px) { #billing-page.mode-counter #counter-foot { flex-direction: column; } #billing-page .counter-actions { flex: none; justify-content: flex-start; } }

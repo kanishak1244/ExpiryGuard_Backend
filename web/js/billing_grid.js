@@ -66,6 +66,7 @@
     const el = cellEl(key, pos.col);
     if (!el) return false;
     setActive(key, pos.col);
+    if (billGrid.popup && billGrid.popup.anchor !== el) popupClose();     // moving to another cell always closes the list of the old one
     el.focus();
     if (typeof el.select === 'function' && !(opts && opts.keepCaret)) el.select();
     el.scrollIntoView({ block: 'nearest' });
@@ -260,7 +261,8 @@
   };
   // A new, empty bill starts in Party Name; a bill that already has lines starts in the Product cell.
   window.billFocusStart = function () {
-    if (onGridPage() && items().length === 0) { if (!window.billFocusParty()) focusEntryProduct(); }
+    if (window.billIsCounter && billIsCounter()) focusEntryProduct();                    // Counter Sale: straight to the Product cell
+    else if (onGridPage() && items().length === 0) { if (!window.billFocusParty()) focusEntryProduct(); }
     else if (onGridPage()) focusEntryProduct();
     else billFocusSearch();
   };
@@ -421,7 +423,7 @@
     if (!item || !bData) return false;
     const st = billBatchState(bData);
     if (st === 'expired' || st === 'out') { billToast('Batch ' + (bData.batchNumber || '-') + ' ' + (st === 'expired' ? 'is expired' : 'has no stock') + ' and cannot be sold.', true); return false; }
-    const clash = items().findIndex((o, j) => j !== index && gridSameLine(o, { productId: bData.productId || item.productId, selectedBatch: bData.batchNumber }));
+    const clash = items().findIndex((o, j) => j !== index && (o.customerId === item.customerId) && gridSameLine(o, { productId: bData.productId || item.productId, selectedBatch: bData.batchNumber }));
     if (clash >= 0) { billToast('That batch is already on line ' + (clash + 1) + '. Change its quantity instead.', true); return false; }
     if (bData.productId) item.productId = bData.productId;
     item.selectedBatch = bData.batchNumber;
@@ -453,8 +455,11 @@
     const expClass = expState === 'expired' ? 'exp-bad' : expState === 'near' ? 'exp-warn' : '';
     const sub = [item.brand, item.composition].filter(Boolean).join(' • ');
     const mrp = gridBaseRate(item);
-    return '<tr data-row="' + idx + '" data-rid="' + esc(key) + '">' +
-      '<td class="c-no">' + (idx + 1) + '</td>' +
+    const counter = window.billIsCounter && billIsCounter();
+    const cust = counter ? customerCell(item.customerId) : '';
+    const other = counter && item.customerId !== activeBillState.counter.activeId ? ' class="cust-other"' : '';
+    return '<tr data-row="' + idx + '" data-rid="' + esc(key) + '"' + other + '>' +
+      '<td class="c-no">' + (idx + 1) + '</td>' + cust +
       '<td class="c-edit c-prod"><input class="cell-input" data-cell="product" autocomplete="off" spellcheck="false" value="' + esc(item.name) + '" title="' + esc(item.name + (sub ? ' — ' + sub : '') + ' · type to change the medicine') + '"><div class="cell-note" id="bill-row-warn-' + idx + '">' + rowWarn(item) + '</div></td>' +
       roCell('packing', esc(item.packSize || '-')) +
       '<td class="c-edit"><input class="cell-input" data-cell="batch" value="' + esc(item.selectedBatch || '') + '" autocomplete="off" title="Type to filter the batches · Space or Alt+↓ shows them all"></td>' +
@@ -470,9 +475,19 @@
       '</tr>';
   }
 
+  // Counter Sale: the "Cust." column. A line shows its customer; the empty row shows the customer being entered.
+  function customerCell(customerId) {
+    const c = activeBillState.counter.customers.find((x) => x.id === customerId);
+    const active = customerId === activeBillState.counter.activeId;
+    return '<td class="c-cust' + (active ? ' cust-active' : '') + '" data-cust="' + esc(customerId) + '" title="Click to work on this customer">#' + esc(c ? c.ref : '?') +
+      (c && c.name ? '<small>' + esc(c.name) + '</small>' : '') + '</td>';
+  }
+
   function entryRowHtml(n, productText, batchText) {
+    const counter = window.billIsCounter && billIsCounter();
     return '<tr data-entry="1" class="entry-row">' +
       '<td class="c-no">' + (n + 1) + '</td>' +
+      (counter ? customerCell(activeBillState.counter.activeId) : '') +
       '<td class="c-edit"><input class="cell-input" data-cell="product" id="bill-medicine-search-input" type="text" autocomplete="off" spellcheck="false" ' +
       'placeholder="Type 2–3 letters of the medicine, composition, code or barcode…" value="' + esc(productText) + '" oninput="handleMedicineSearchInput(this.value)">' +
       '<span id="bill-search-loading-spinner" class="search-spinner-inline" style="display:none;"></span></td>' +
@@ -511,6 +526,15 @@
       }
     } else if (billGrid.active) {
       setActive(billGrid.active.key, billGrid.active.col);
+    }
+    // an open list follows its cell through a redraw (the cell element is new, the list belongs to the same line and column)
+    const pp = billGrid.popup;
+    if (pp && (pp.kind === 'batch' || pp.kind === 'unit') && pp.key) {
+      const a = cellEl(pp.key, pp.kind);
+      if (a) { pp.anchor = a; popupDraw(); } else popupClose();
+    } else if (pp && pp.kind === 'entrybatch') {
+      const a = $('bill-entry-batch');
+      if (a) { pp.anchor = a; popupDraw(); } else popupClose();
     }
     billTabsRender();
   }
@@ -569,6 +593,7 @@
     }
   }
   function billLoadBatches(rowId) { return billLoadBatchesImpl(rowId); }
+  window.billLoadBatchesFor = billLoadBatches;
 
   // The search list is a hint; the server's batches are the truth. If the chosen batch is gone, expired or empty now,
   // say so and take the next valid batch (never silently); if none is left, the line shows the problem and saving is blocked.

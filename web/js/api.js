@@ -1438,6 +1438,25 @@ class ApiClient {
     const res = await this.request(ep, opts);
     return Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []);
   }
+  // Counter Sale (many customers on the billing screen). See counter_sale.py for the lifecycle.
+  async counterFinish(payload) {
+    return this.request('/billing/counter', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  async counterList(status = 'READY', skip = 0, limit = 20, search = '') {
+    let ep = `/billing/counter?status=${encodeURIComponent(status)}&skip=${skip}&limit=${limit}`;
+    if (search) ep += `&search=${encodeURIComponent(search)}`;
+    return this.request(ep);
+  }
+  async counterGet(id) {
+    return this.request(`/billing/counter/${id}`);
+  }
+  async counterConvert(id, payload) {
+    return this.request(`/billing/counter/${id}/convert`, { method: 'POST', body: JSON.stringify(payload || {}) });
+  }
+  async counterCancel(id) {
+    return this.request(`/billing/counter/${id}`, { method: 'DELETE' });
+  }
+
   // Compact list of this pharmacy's batches for instant search on the billing screen (one download, then local search).
   async getBillingCatalog() {
     return this.request('/billing/catalog');
