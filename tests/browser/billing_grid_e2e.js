@@ -34,6 +34,7 @@ window.runBillingGridE2E = async function () {
   const realOpen = window.open;
 
   async function test(name, fn) {
+    if (window.__e2eOnly && !new RegExp(window.__e2eOnly, 'i').test(name)) return;       // run a few tests by name while debugging
     try { localStorage.setItem('e2e_last', name); localStorage.setItem('e2e_done', String(results.length)); } catch (e) { /* progress note only */ }
     try { await freshBill(); const d = await fn(); results.push({ name, ok: true, detail: d || '' }); }
     catch (e) { results.push({ name, ok: false, detail: String(e && e.message || e) }); }
@@ -316,6 +317,8 @@ window.runBillingGridE2E = async function () {
   });
 
   await test('Unit change recalculates the amount and re-checks stock in the new unit', async () => {
+    const far = billCatalog.batchSearch('PCM-FAR', 1)[0];                       // earlier runs sell some: put the documented stock back
+    await api.request('/products/' + far.id + '/quantity', { method: 'PUT', body: JSON.stringify({ quantity: 40 }) }); await billCatalog.refresh();
     await addMed('paracet'); closeList(); focusCell(0, 'batch'); typeInto('far'); key('Enter');
     focusCell(0, 'qty'); typeInto('40'); key('Enter');                       // 40 strips = all the stock
     focusCell(0, 'unit'); key('Enter'); key('ArrowDown'); key('Enter');      // loose: 400 tablets possible, qty 40 stays
@@ -672,6 +675,132 @@ window.runBillingGridE2E = async function () {
     await until(() => items().length === 1 && items()[0].selectedBatch === 'PCM-FAR', 8000);
     expect(items()[0].selectedBatch === 'PCM-FAR', 'kept the sold-out batch: ' + (items()[0] && items()[0].selectedBatch));
     await api.request('/products/' + near.id + '/quantity', { method: 'PUT', body: JSON.stringify({ quantity: 12 }) });
+  });
+
+
+  // ---------- search text must never carry over into the next empty row ----------
+  const entryProduct = () => $('bill-medicine-search-input');
+  const entryBatch = () => $('bill-entry-batch');
+  const entryEmpty = () => entryProduct().value === '' && entryBatch().value === '';
+  const noQueryOnLines = () => items().every((i) => !('query' in i) && !('searchText' in i));
+  // press Enter until the cursor is back in the empty Product cell (the normal "next medicine" flow); returns how many presses
+  const enterToNextProduct = async (max = 12) => {
+    let n = 0;
+    while (where() !== 'entry:product' && n < max) {
+      if (where().endsWith(':unit') && !billGrid.popup) { key('Enter'); await wait(20); if (billGrid.popup) key('Enter'); }   // Unit: Enter opens the list, Enter confirms
+      else key('Enter');
+      n++; await wait(40);
+    }
+    return n;
+  };
+  const sawGrid = () => Array.from(document.querySelectorAll('#bill-items-table-body tr[data-rid] [data-cell="product"]')).map((e) => e.value);
+
+  await test('"78" typed in the Product cell, medicine chosen with Enter, Enter again: the next Product cell is empty', async () => {
+    key('Enter'); focusCell(0, 'product'); typeInto('78');
+    await until(() => (window._lastSearchResults || []).length > 0 && $('bill-search-results-dropdown').style.display === 'block');
+    const wanted = window._lastSearchResults[0];
+    key('Enter'); await until(() => items().length === 1);
+    expect(items()[0].name === wanted.name && items()[0].selectedBatch === wanted.batchNumber, `${items()[0].name}/${items()[0].selectedBatch}`);
+    expect(entryEmpty() && $('bill-search-results-dropdown').style.display === 'none', 'search text left behind right after the selection: ' + entryProduct().value + '|' + entryBatch().value);
+    await enterToNextProduct();
+    expect(where() === 'entry:product' && entryEmpty(), `next row: "${entryProduct().value}" / "${entryBatch().value}" at ${where()}`);
+    expect(!sawGrid().some((v) => v === '78') && noQueryOnLines(), 'query stored on a line');
+    expect(entryProduct().placeholder.length > 5, 'placeholder missing');
+  });
+
+  await test('medicine searched by name: committed line keeps its data, the next row is empty', async () => {
+    focusCell(0, 'product'); typeInto('bulk medicine 0045'); await until(() => (window._lastSearchResults || []).length > 0);
+    const wanted = window._lastSearchResults[0]; key('Enter'); await until(() => items().length === 1);
+    focusCell(0, 'qty'); typeInto('3'); key('Enter'); await enterToNextProduct();
+    const it = items()[0];
+    expect(it.name === wanted.name && it.quantity === 3 && it.unitType === 'strip' && Number(it.gstRate) === 12 && it.rate > 0 && it.expiryDate, JSON.stringify([it.name, it.quantity, it.unitType, it.gstRate, it.rate]));
+    expect(entryEmpty() && where() === 'entry:product', `next row "${entryProduct().value}"`);
+  });
+
+  await test('batch number typed in the Batch cell, batch chosen: the right batch is committed and BOTH entry cells are empty afterwards', async () => {
+    focusCell(0, 'batch'); typeInto('X00078');
+    await until(() => billGrid.popup && billGrid.popup.options.length === 1);
+    key('Enter'); await until(() => items().length === 1);
+    expect(items()[0].selectedBatch === 'X00078' && /0078/.test(items()[0].name), `${items()[0].name}/${items()[0].selectedBatch}`);
+    expect(entryBatch().value === '' && entryProduct().value === '', `entry batch left as "${entryBatch().value}"`);   // this was the bug
+    await enterToNextProduct();
+    expect(where() === 'entry:product' && entryEmpty() && !sawGrid().includes('X00078'), `after Enter: "${entryProduct().value}" / "${entryBatch().value}"`);
+  });
+
+  await test('a partly typed batch number left in the entry row does not follow a medicine chosen from the Product cell', async () => {
+    focusCell(0, 'batch'); typeInto('X00'); await wait(50); key('Escape');   // cancelled
+    focusCell(0, 'batch'); typeInto('X0'); billGrid.popup && key('Tab');       // typed and left (Tab never picks)
+    focusCell(0, 'product'); typeInto('paracet'); await until(() => (window._lastSearchResults || []).length > 0);
+    key('Enter'); await until(() => items().length === 1);
+    expect(entryEmpty(), `stale text: "${entryProduct().value}" / "${entryBatch().value}"`);
+  });
+
+  await test('a selection is handled exactly once, even with repeated Enter (one line, no duplicates, one stored batch list)', async () => {
+    let calls = 0; const real = window.billAddMedicine; window.billAddMedicine = function () { calls++; return real.apply(this, arguments); };
+    try {
+      focusCell(0, 'product'); typeInto('78'); await until(() => (window._lastSearchResults || []).length > 0);
+      key('Enter'); key('Enter'); key('Enter'); await wait(300);
+    } finally { window.billAddMedicine = real; }
+    expect(items().length === 1 && calls <= 1, `lines ${items().length}, add calls ${calls}`);
+    expect(new Set(items().map((i) => i.productId)).size === items().length, 'duplicate product row');
+  });
+
+  await test('several different medicines in a row: every next row empty, every line keeps its own data', async () => {
+    const wanted = [];
+    for (const q of ['bulk medicine 0070', 'bulk medicine 0071', 'bulk medicine 0072', 'bulk medicine 0073', 'bulk medicine 0074']) {
+      focusCell(items().length, 'product');
+      expect(entryEmpty(), `row ${items().length + 1} started with "${entryProduct().value}" / "${entryBatch().value}"`);
+      typeInto(q); await until(() => (window._lastSearchResults || []).length > 0 && $('bill-search-results-dropdown').style.display === 'block');
+      wanted.push(window._lastSearchResults[0].name);
+      key('Enter'); await until(() => items().length === wanted.length);
+      focusCell(items().length - 1, 'qty'); typeInto(String(wanted.length + 1)); key('Enter'); await wait(20);
+      await enterToNextProduct();
+      expect(entryEmpty(), `after "${q}": "${entryProduct().value}" / "${entryBatch().value}"`);
+    }
+    expect(items().map((i) => i.name).join('|') === wanted.join('|'), 'lines: ' + items().map((i) => i.name).join('|'));
+    expect(items().every((it, i) => it.quantity === i + 2 && Number(it.gstRate) === 12 && it.rate > 0 && new Set(items().map((x) => x.id)).size === items().length), 'line data changed');
+  });
+
+  await test('changing the batch of an existing medicine leaves the next row empty and the line otherwise intact', async () => {
+    focusCell(0, 'product'); typeInto('paracet'); await until(() => (window._lastSearchResults || []).length > 0); key('Enter'); await until(() => items().length === 1);
+    focusCell(0, 'qty'); typeInto('4'); key('Enter');
+    focusCell(0, 'batch'); typeInto('far'); key('Enter');
+    expect(items()[0].selectedBatch === 'PCM-FAR' && items()[0].quantity === 4 && items()[0].rate === 34 && Number(items()[0].gstRate) === 12, JSON.stringify([items()[0].selectedBatch, items()[0].quantity, items()[0].rate]));
+    await enterToNextProduct();
+    expect(entryEmpty() && where() === 'entry:product', `"${entryProduct().value}" / "${entryBatch().value}"`);
+  });
+
+  await test('deleting a line: typed-but-unused search text stays in the entry row and never moves into another line', async () => {
+    await addMed('bulk medicine 0060'); closeList(); await addMed('bulk medicine 0061'); closeList(); await addMed('bulk medicine 0062'); closeList();
+    focusCell(3, 'product'); typeInto('zz9'); key('Escape'); billGrid.popup && key('Escape');       // closes the list, text stays
+    const names = items().map((i) => i.name); const ids = items().map((i) => i.id);
+    focusCell(1, 'qty'); key('Delete', { ctrlKey: true }); await wait(60);
+    expect(items().map((i) => i.id).join() === [ids[0], ids[2]].join(), 'wrong line removed');
+    expect(sawGrid().join('|') === [names[0], names[2]].join('|'), 'a line shows other text: ' + sawGrid().join('|'));
+    expect(!sawGrid().includes('zz9') && noQueryOnLines(), 'query moved into a line');
+  });
+
+  await test('re-rendering and late answers cannot bring the old text back (server search, slow first answer)', async () => {
+    billCatalog.setEnabled(false);
+    const real = api.searchBillingProducts.bind(api);
+    api.searchBillingProducts = async (q, m, l, s) => { if (q === '7') await wait(1000); return real(q, m, l, s); };
+    try {
+      focusCell(0, 'product'); typeInto('7'); await wait(260); typeInto('78');
+      await until(() => (window._lastSearchResults || []).length > 0 && !/Searching/.test($('bill-search-results-dropdown').innerText), 5000);
+      key('Enter'); await until(() => items().length === 1);
+      for (let i = 0; i < 3; i++) { renderBillItemsTable(); recalculateTotals(); }
+      await wait(1500);                                                                      // the slow answer for "7" arrives now
+      expect(entryEmpty() && $('bill-search-results-dropdown').style.display === 'none' && items().length === 1, `late answer: "${entryProduct().value}" dd=${$('bill-search-results-dropdown').style.display} lines ${items().length}`);
+      expect(sawGrid().length === 1 && !sawGrid().includes('78'), 'text in a line');
+    } finally { api.searchBillingProducts = real; billCatalog.setEnabled(true); }
+  });
+
+  await test('re-rendering after a selection (instant search): next row stays empty', async () => {
+    focusCell(0, 'product'); typeInto('78'); await until(() => (window._lastSearchResults || []).length > 0); key('Enter'); await until(() => items().length === 1);
+    for (let i = 0; i < 4; i++) { renderBillItemsTable(); }
+    billTabNew(); await wait(100); billTabSwitch(0); await wait(100);
+    expect(entryEmpty(), `after re-render / tab switch: "${entryProduct().value}" / "${entryBatch().value}"`);
+    billTabClose(1); await wait(100);
   });
 
   window.alert = realAlert; window.open = realOpen;

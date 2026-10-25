@@ -4,7 +4,7 @@
 spreadsheet behaviour: Party → Product → Batch → Unit → Qty → Disc, dropdown placement, batch rules, validation,
 totals, delete, stale search, duplicate save, network failure, printer failure, held bills, keyboard-only bill.
 
-It **saves real bills and takes stock**, so run it only against a TEST pharmacy.
+It **saves real bills and takes stock**, so run it only against a TEST pharmacy (re-seed between runs: every run sells some stock).
 
 Seed (local SQLite or a test database):
 

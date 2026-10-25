@@ -519,9 +519,15 @@
   // After a medicine is added: the cursor goes to its Batch cell with the batch list open.
   // A new / switched bill starts with an empty entry row (nothing typed carries over from another bill).
   window.billClearEntryRow = function () {
+    entryBatchGate.next();                                   // a batch answer still on its way is stale
+    clearTimeout(entryBatchTimer);
+    if (entryBatchAbort) { entryBatchAbort.abort(); entryBatchAbort = null; }
     const b = $('bill-entry-batch');
     if (b) b.value = '';
-    popupClose();
+    const p = $('bill-medicine-search-input');
+    if (p) p.value = '';
+    popupClose();                                            // no list of a previous bill / line stays open
+    closeProductDropdown();
   };
 
   window.billGridAfterAdd = function (rowId) {

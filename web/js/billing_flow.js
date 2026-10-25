@@ -325,6 +325,9 @@ function clearMedicineSearch(refocus = true) {
 
   window._lastSearchResults = [];
   searchHighlightIndex = -1;
+  searchGate.next();            // an answer still on its way is stale from now on
+  billSearchPending = false;
+  billPendingEnter = false;
 
   if (refocus && searchInput) {
     searchInput.focus();
@@ -641,6 +644,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// A medicine (or batch) was committed to a line: every bit of temporary search text goes with it, so the next empty
+// row starts really empty. Committed line data is never touched here.
+function billClearSearchState() {
+  clearMedicineSearch(false);
+  if (typeof billClearEntryRow === 'function') billClearEntryRow();
+}
+
 function selectMedicineForBill(index, overrides = {}) {
   const med = (window._lastSearchResults || [])[index];
   if (!med) return;
@@ -737,7 +747,7 @@ function billAddMedicine(med, overrides = {}) {
   // A second Enter (or a double scan) a moment after the first must not add the same medicine again.
   const addKey = primaryBatch.productId + '|' + primaryBatch.batchNumber;
   if (window.__lastBillAdd && window.__lastBillAdd.key === addKey && Date.now() - window.__lastBillAdd.at < 400) {
-    clearMedicineSearch(false);
+    billClearSearchState();
     return;
   }
   window.__lastBillAdd = { key: addKey, at: Date.now() };
@@ -750,7 +760,7 @@ function billAddMedicine(med, overrides = {}) {
   if (replaceIdx >= 0) {
     const cur = activeBillState.items[replaceIdx];
     billGrid.replaceKey = null;
-    clearMedicineSearch(false);
+    billClearSearchState();
     if (String(cur.productId) === String(newItem.productId) && String(cur.selectedBatch || '') === String(newItem.selectedBatch || '')) {
       renderBillItemsTable();                 // same medicine and batch chosen again: nothing changes
       billFocusQty(replaceIdx);
@@ -758,13 +768,13 @@ function billAddMedicine(med, overrides = {}) {
     }
   }
   if (sameAt >= 0) {
-    clearMedicineSearch(false);
+    billClearSearchState();
     billToast(`${med.name} (batch ${newItem.selectedBatch || '-'}) is already on line ${sameAt + 1}. Change its quantity.`, false);
     billFocusQty(sameAt);
     return;
   }
 
-  clearMedicineSearch(false);
+  billClearSearchState();
   if (replaceIdx >= 0) {
     newItem.id = activeBillState.items[replaceIdx].id;     // the line keeps its identity
     activeBillState.items[replaceIdx] = newItem;
