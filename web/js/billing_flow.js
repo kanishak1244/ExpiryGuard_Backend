@@ -126,6 +126,7 @@ function renderCustomerDropdown() {
       ${c.name} (${c.phone})${c.gstin ? ' - ' + c.gstin : ''}
     </option>`
   ).join('') + `<option value="NEW">+ Add New Customer / Party...</option>`;
+  if (typeof billSyncPartyInput === 'function') billSyncPartyInput();
 }
 
 function handleCustomerSelectChange(val) {
@@ -373,7 +374,7 @@ async function handleMedicineSearchInput(val) {
     <div style="padding: 14px 18px; text-align: center; color: var(--color-text-muted); font-size: 13.5px; display: flex; align-items: center; justify-content: center; gap: 8px;">
       <span style="display: inline-block; animation: spin 1s linear infinite;">🔄</span> Searching inventory…
     </div>`;
-  dropdown.style.display = 'block';
+  dropdown.style.display = 'block'; if (typeof billPlacePopup === 'function') billPlacePopup(dropdown);
 
   // Debounce 200ms (within 200–300ms requirement)
   const debounceDelay = 200;
@@ -421,6 +422,41 @@ async function handleMedicineSearchInput(val) {
 }
 window.handleMedicineSearchInput = handleMedicineSearchInput;
 
+const billHl = (t, q) => (typeof gridHighlight === 'function' ? gridHighlight(t, q) : escapeHtml(t));
+
+// One search-result row (snake_case from the server) -> the screen's medicine/batch object.
+function billFormatProductRow(p) {
+  return {
+    productId: p.id,
+    name: p.product_name || p.name || 'Unknown Medicine',
+    brand: p.brand || '',
+    composition: p.composition || '',
+    hsnCode: p.hsn_code || '3004',
+    batchNumber: p.batch_number || '',
+    barcode: p.barcode || '',
+    expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '',
+    stock: (p.quantity !== undefined && p.quantity !== null) ? Number(p.quantity) : 0,
+    mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 0,
+    pricePerUnit: p.price_per_unit || p.loose_tablet_price,
+    unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
+    packSize: p.pack_size_label || '',
+    // 0% is a real GST rate: only a missing value is "unknown"
+    gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? null
+  };
+}
+function billToBatch(r) {
+  return {
+    productId: r.productId,
+    batchNumber: r.batchNumber || '',
+    expiryDate: r.expiryDate || '',
+    stock: Number(r.stock) || 0,
+    mrp: Number(r.mrp) || 0,
+    pricePerUnit: r.pricePerUnit || null,
+    unitsPerPack: r.unitsPerPack || null,
+    packSize: r.packSize || ''
+  };
+}
+
 function renderSearchResultsDropdown(rawItems, query, isError = false) {
   const dropdown = document.getElementById('bill-search-results-dropdown');
   if (!dropdown) return;
@@ -431,7 +467,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
       <div style="padding: 16px 20px; text-align: center; color: #DC2626; font-size: 13px;">
         ⚠️ Unable to search medicines. Please check connection and try again.
       </div>`;
-    dropdown.style.display = 'block';
+    dropdown.style.display = 'block'; if (typeof billPlacePopup === 'function') billPlacePopup(dropdown);
     window._lastSearchResults = [];
     return;
   }
@@ -444,31 +480,12 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
           ${currentBillingSearchMode === 'code' ? 'Check the medicine code or barcode and try again.' : 'Check the spelling or try generic composition.'}
         </div>
       </div>`;
-    dropdown.style.display = 'block';
+    dropdown.style.display = 'block'; if (typeof billPlacePopup === 'function') billPlacePopup(dropdown);
     window._lastSearchResults = [];
     return;
   }
 
-  // Format uniform items from real inventory database
-  const formattedItems = rawItems.map(p => {
-    return {
-      productId: p.id,
-      name: p.product_name || p.name || 'Unknown Medicine',
-      brand: p.brand || '',
-      composition: p.composition || '',
-      hsnCode: p.hsn_code || '3004',
-      batchNumber: p.batch_number || '',
-      barcode: p.barcode || '',
-      expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '',
-      stock: (p.quantity !== undefined && p.quantity !== null) ? Number(p.quantity) : 0,
-      mrp: (p.unit_price !== undefined && p.unit_price !== null) ? Number(p.unit_price) : 0,
-      pricePerUnit: p.price_per_unit || p.loose_tablet_price,
-      unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
-      packSize: p.pack_size_label || '',
-      // 0% is a real GST rate: only a missing value is "unknown"
-      gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? null
-    };
-  });
+  const formattedItems = rawItems.map(billFormatProductRow);
 
   window._lastSearchResults = formattedItems;
   searchHighlightIndex = -1;
@@ -479,14 +496,14 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
         <div style="flex: 1; min-width: 0;">
           <div style="font-weight: 700; font-size: 14.5px; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span>${escapeHtml(r.name)}</span>
+            <span>${billHl(r.name, query)}</span>
             ${r.brand ? `<span style="font-size: 11.5px; font-weight: 500; color: var(--color-text-muted); background: var(--color-surface-bg); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--color-border);">${escapeHtml(r.brand)}</span>` : ''}
             ${r.barcode ? `<span class="badge badge-info" style="font-size: 10.5px;">🏷️ ${escapeHtml(r.barcode)}</span>` : ''}
           </div>
-          ${r.composition ? `<div style="font-size: 12px; font-weight: 600; color: #2563EB; margin-top: 3px; text-transform: uppercase;">Composition: ${escapeHtml(r.composition)}</div>` : ''}
+          ${r.composition ? `<div style="font-size: 12px; font-weight: 600; color: #2563EB; margin-top: 3px; text-transform: uppercase;">Composition: ${billHl(r.composition, query)}</div>` : ''}
           <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 12px;">
             ${r.hsnCode ? `<span>Code: <strong>${escapeHtml(r.hsnCode)}</strong></span>` : ''}
-            <span>Batch: <strong style="color: var(--status-safe);">${escapeHtml(r.batchNumber || '-')}</strong></span>
+            <span>Batch: <strong style="color: var(--status-safe);">${billHl(r.batchNumber || '-', query)}</strong></span>
             <span>Exp: <strong>${escapeHtml(r.expiryDate || '-')}</strong> ${billBatchBadge(r)}</span>
             <span>Stock: <strong style="${r.stock <= 0 ? 'color: #DC2626;' : 'color: #10B981;'}">${r.stock}</strong></span>
           </div>
@@ -500,7 +517,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
   `).join('');
 
   dropdown.innerHTML = html;
-  dropdown.style.display = 'block';
+  dropdown.style.display = 'block'; if (typeof billPlacePopup === 'function') billPlacePopup(dropdown);
   // The first result is highlighted at once: Enter adds it, Up/Down moves, the details panel follows.
   searchHighlightIndex = 0;
   updateSearchHighlight(formattedItems.length);
@@ -553,7 +570,7 @@ function handleSearchKeydown(e) {
   if (e.key === 'Escape') {
     if (dropdown) dropdown.style.display = 'none';
     searchHighlightIndex = -1;
-    e.target.blur();
+    if (!e.target.closest || !e.target.closest('#bill-items-table-body')) e.target.blur();
     return;
   }
 }
@@ -657,35 +674,33 @@ window.billingPreviewLine = billingPreviewLine;
 
 // Global click outside to dismiss search dropdown
 document.addEventListener('click', (e) => {
-  const searchBox = document.querySelector('.billing-search-box');
   const dropdown = document.getElementById('bill-search-results-dropdown');
-  if (dropdown && searchBox && !searchBox.contains(e.target)) {
+  const input = document.getElementById('bill-medicine-search-input');
+  if (dropdown && !dropdown.contains(e.target) && e.target !== input) {
     dropdown.style.display = 'none';
   }
 });
 
 // Global listener for keydown on search input
 document.addEventListener('keydown', (e) => {
-  if (e.target && e.target.id === 'bill-medicine-search-input') {
+  // (inside the bill grid the grid's own key handler calls handleSearchKeydown)
+  if (e.target && e.target.id === 'bill-medicine-search-input' && !(e.target.closest && e.target.closest('#bill-items-table-body'))) {
     handleSearchKeydown(e);
   }
 });
 
 function selectMedicineForBill(index, overrides = {}) {
-  const results = window._lastSearchResults || [];
-  const med = results[index];
+  const med = (window._lastSearchResults || [])[index];
   if (!med) return;
+  billAddMedicine(med, overrides);
+}
+window.selectMedicineForBill = selectMedicineForBill;
 
-  const toBatch = (r) => ({
-    productId: r.productId,
-    batchNumber: r.batchNumber || '',
-    expiryDate: r.expiryDate || '',
-    stock: Number(r.stock) || 0,
-    mrp: Number(r.mrp) || 0,
-    pricePerUnit: r.pricePerUnit || null,
-    unitsPerPack: r.unitsPerPack || null,
-    packSize: r.packSize || ''
-  });
+// Adds a medicine line. By default the earliest batch that can really be sold (FEFO); overrides.forceProductId
+// picks one exact batch (the Batch cell's batch-number search), and an expired / empty one is refused.
+function billAddMedicine(med, overrides = {}) {
+  const results = window._lastSearchResults || [];
+  const toBatch = billToBatch;
 
   // Every batch of this medicine we know about (the search results and the inventory cache).
   const seen = new Set();
@@ -698,35 +713,27 @@ function selectMedicineForBill(index, overrides = {}) {
   const nameKey = String(med.name || '').trim().toLowerCase();
   add(toBatch(med));
   results.forEach(r => { if (r && String(r.name || '').trim().toLowerCase() === nameKey) add(toBatch(r)); });
-  if (Array.isArray(availableInventoryCache)) {
-    availableInventoryCache.forEach(p => {
-      if (String(p.product_name || p.name || '').trim().toLowerCase() === nameKey) {
-        add({
-          productId: p.id,
-          batchNumber: p.batch_number || '',
-          expiryDate: p.expiry_date ? String(p.expiry_date).split('T')[0] : '',
-          stock: Number(p.quantity) || 0,
-          mrp: Number(p.unit_price) || 0,
-          pricePerUnit: p.price_per_unit || p.loose_tablet_price || null,
-          unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
-          packSize: p.pack_size_label || ''
-        });
-      }
-    });
-  }
 
   // FEFO: earliest expiry first (a batch without a date goes last)
   allBatches.sort((a, b) => (a.expiryDate || '9999-12-31').localeCompare(b.expiryDate || '9999-12-31'));
   const batchesList = allBatches;
 
   // Default = earliest batch that can really be sold (not expired, in stock)
-  const primaryBatch = batchesList.find(billBatchSellable);
+  let primaryBatch = batchesList.find(billBatchSellable);
+  if (overrides.forceProductId !== undefined) {
+    const chosen = batchesList.find(b => String(b.productId) === String(overrides.forceProductId));
+    if (!chosen || !billBatchSellable(chosen)) {
+      billToast(`Batch ${chosen ? chosen.batchNumber || '-' : ''} is expired or out of stock and cannot be sold.`, true);
+      return;
+    }
+    primaryBatch = chosen;
+  }
   if (!primaryBatch) {
     billToast(`${med.name}: every batch is expired or out of stock, so it cannot be sold.`, true);
     return;
   }
   const pickedState = billBatchState(toBatch(med));
-  if (pickedState === 'expired' || pickedState === 'out') {
+  if (overrides.forceProductId === undefined && (pickedState === 'expired' || pickedState === 'out')) {
     billToast(`Batch ${med.batchNumber || '-'} is ${pickedState === 'expired' ? 'expired' : 'out of stock'}. Added the earliest valid batch ${primaryBatch.batchNumber || '-'} instead.`, false);
   }
 
@@ -752,7 +759,7 @@ function selectMedicineForBill(index, overrides = {}) {
   const requestedQty = (overrides.quantity && overrides.quantity > 0) ? Number(overrides.quantity) : 1;
 
   const newItem = {
-    id: Date.now() + Math.random(),
+    id: (typeof gridNewRowId === 'function') ? gridNewRowId() : Date.now() + Math.random(),
     productId: primaryBatch.productId,
     name: med.name,
     brand: med.brand,
@@ -782,6 +789,15 @@ function selectMedicineForBill(index, overrides = {}) {
   }
   window.__lastBillAdd = { key: addKey, at: Date.now() };
 
+  // The same batch is already on the bill: never a second line (its stock would be counted twice); go to its quantity.
+  const sameAt = activeBillState.items.findIndex(o => String(o.productId) === String(newItem.productId) && String(o.selectedBatch || '') === String(newItem.selectedBatch || ''));
+  if (sameAt >= 0) {
+    clearMedicineSearch(false);
+    billToast(`${med.name} (batch ${newItem.selectedBatch || '-'}) is already on line ${sameAt + 1}. Change its quantity.`, false);
+    billFocusQty(sameAt);
+    return;
+  }
+
   clearMedicineSearch(false);
   activeBillState.items.push(newItem);
   renderBillItemsTable();
@@ -794,11 +810,13 @@ function selectMedicineForBill(index, overrides = {}) {
   if (overrides.quantity > 0) {
     const sInput = document.getElementById('bill-medicine-search-input');
     if (sInput) sInput.focus();
+  } else if (typeof billGridAfterAdd === 'function' && document.getElementById('billing-page')) {
+    billGridAfterAdd(newItem.id);              // spreadsheet screen: on to the Batch cell, its list open
   } else {
     billFocusQty(activeBillState.items.length - 1);
   }
 }
-window.selectMedicineForBill = selectMedicineForBill;
+window.billAddMedicine = billAddMedicine;
 
 // ----------------------------------------------------
 // RUNNING BILL TABLE RENDERING & INLINE EDITING
@@ -813,7 +831,10 @@ function billFocusQty(idx) {
   const rows = document.querySelectorAll('#bill-items-table-body tr[data-row]');
   const row = rows[idx];
   const inp = row ? row.querySelector('.item-qty-input') : null;
-  if (inp) { inp.focus(); inp.select(); }
+  if (inp) {
+    inp.focus(); inp.select();
+    if (window.billGrid && row.getAttribute('data-rid')) billGrid.active = { key: row.getAttribute('data-rid'), col: 'qty' };
+  }
 }
 function billLineKey(e, idx) {
   if (e.key === 'Enter') { e.preventDefault(); billFocusSearch(); return; }
@@ -845,6 +866,12 @@ function billUpdateRow(idx) {
 }
 
 function renderBillItemsTable() {
+  if (typeof billGridRender === 'function' && document.getElementById('billing-page')) { billGridRender(); return; }
+  renderBillItemsTableLegacy();
+}
+
+// The older table (used by the Quick POS pop-up on other pages).
+function renderBillItemsTableLegacy() {
   const tbody = document.getElementById('bill-items-table-body');
   const countBadge = document.getElementById('bill-item-count-badge');
   if (!tbody) return;
@@ -1542,6 +1569,7 @@ function billSyncHeaderInputs() {
   set('bill-doctor-name', activeBillState.doctorName);
   set('bill-doctor-reg', activeBillState.doctorRegNo);
   set('pending-customer-name-input', activeBillState.pendingCustomerName);
+  if (typeof billSyncPartyInput === 'function') billSyncPartyInput();
   const filled = [activeBillState.patientPhone, activeBillState.patientName, activeBillState.doctorName, activeBillState.doctorRegNo]
     .some(v => String(v || '').trim());
   let remembered = false;
@@ -1575,12 +1603,13 @@ function billRefreshFromState() {
   billSyncHeaderInputs();
   renderCustomerDropdown();
   handlePaymentModeChange(activeBillState.paymentMode || 'CASH');
+  if (typeof billClearEntryRow === 'function') billClearEntryRow();
   renderBillItemsTable();
   recalculateTotals();
   updateResumedHeldBanner();
   clearMedicineSearch(false);
   billTabsRender();
-  billFocusSearch();
+  if (typeof billFocusStart === 'function') billFocusStart(); else billFocusSearch();
 }
 
 function billTabSwitch(i) {
@@ -1631,7 +1660,7 @@ window.billTabClose = billTabClose;
 // Clear the bill (asks first when there is something on it).
 function confirmClearBill() {
   if (!activeBillState.items || activeBillState.items.length === 0) { resetBillForm(); return; }
-  const doClear = () => { resetBillForm(); billToast('Bill cleared.', false); billFocusSearch(); };
+  const doClear = () => { resetBillForm(); billToast('Bill cleared.', false); };
   if (typeof window.showConfirmModal === 'function') {
     window.showConfirmModal({
       title: 'Clear this bill?',
@@ -1660,6 +1689,7 @@ function confirmClearBill() {
 window.confirmClearBill = confirmClearBill;
 
 function resetBillForm() {
+  window.__lastBillAdd = null;      // a new bill never inherits the double-Enter guard of the old one
   activeBillState = {
     idempotencyKey: 'df_sale_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
     customer: billingCustomersCache[0] || { id: 'walkin', name: 'Walk-in Customer', phone: 'Cash Sale', gstin: '' },
@@ -1692,6 +1722,7 @@ function resetBillForm() {
 
   renderCustomerDropdown();
   handlePaymentModeChange('CASH');
+  if (typeof billClearEntryRow === 'function') billClearEntryRow();
   renderBillItemsTable();
   recalculateTotals();
   updateResumedHeldBanner();
@@ -1700,9 +1731,10 @@ function resetBillForm() {
 
   clearMedicineSearch(false);
   setBillingSearchMode('name');
-  const searchInput = document.getElementById('bill-medicine-search-input');
-  if (searchInput) {
-    searchInput.focus();
+  if (typeof billFocusStart === 'function' && document.getElementById('billing-page')) billFocusStart();
+  else {
+    const searchInput = document.getElementById('bill-medicine-search-input');
+    if (searchInput) searchInput.focus();
   }
 }
 
@@ -2078,7 +2110,7 @@ function billShortcuts(e) {
   const handled = () => { e.preventDefault(); e.stopPropagation(); };
 
   if (e.key === 'F3' || (e.key === '/' && !typing && !e.ctrlKey && !e.altKey)) { handled(); billFocusSearch(); return; }
-  if (e.key === 'F2') { handled(); const c = document.getElementById('bill-customer-select'); if (c) c.focus(); return; }
+  if (e.key === 'F2') { handled(); if (!(typeof billFocusParty === 'function' && billFocusParty())) { const c = document.getElementById('bill-customer-select'); if (c) c.focus(); } return; }
   if (e.altKey && !e.ctrlKey && ['1', '2', '3', '4'].includes(e.key)) {
     handled();
     handlePaymentModeChange(['CASH', 'UPI', 'CARD', 'CREDIT'][Number(e.key) - 1]);
@@ -2091,6 +2123,7 @@ function billShortcuts(e) {
     billTabSwitch(Math.min(billTabs.length - 1, Math.max(0, billActiveTab + (e.key === 'ArrowRight' ? 1 : -1))));
     return;
   }
+  if (e.key === 'Escape' && typeof billGridEscape === 'function' && billGridEscape(e)) return;   // closes a list / cancels an edit first
   if (e.key === 'Escape' && activeBillState.items.length) {
     const dd = document.getElementById('bill-search-results-dropdown');
     const ddOpen = dd && dd.style.display === 'block';
@@ -2114,7 +2147,7 @@ function billShortcuts(e) {
 document.addEventListener('keydown', billShortcuts, true);
 
 // Start every bill in the search box.
-window.addEventListener('load', () => { if (document.getElementById('billing-page')) setTimeout(billFocusSearch, 400); });
+window.addEventListener('load', () => { if (document.getElementById('billing-page')) setTimeout(() => (typeof billFocusStart === 'function' ? billFocusStart() : billFocusSearch()), 400); });
 
 // ----------------------------------------------------
 // GLOBAL BILLING MODAL DOM INJECTION (Quick POS)

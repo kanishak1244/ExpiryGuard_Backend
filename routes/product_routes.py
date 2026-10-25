@@ -304,6 +304,18 @@ def billing_search_products_endpoint(
     )
 
 
+@router.get("/billing/search-batches")
+def billing_search_batches_endpoint(
+    query: str = Query("", description="Part of the batch number"),
+    product_name: Optional[str] = Query(None, description="Only batches of this medicine"),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Batch cell of the billing grid: batches of one medicine, or batches matching a typed batch number."""
+    return crud.search_billing_batches(db=db, user_id=current_user.id, query=query, product_name=product_name, limit=limit)
+
+
 @router.get("/products/search", response_model=List[schemas.MedicineCatalogResponse])
 @router.get("/catalog/search", response_model=List[schemas.MedicineCatalogResponse])
 def search_medicine_catalog_endpoint(

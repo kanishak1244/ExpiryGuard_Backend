@@ -31,7 +31,7 @@
       color-scheme: light;
     }
   </style>
-  <link rel="stylesheet" href="css/styles.css?v=11.5">
+  <link rel="stylesheet" href="css/styles.css?v=12.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -155,7 +155,8 @@
         <div class="bill-head">
           <div class="bill-head-left">
             <label class="bill-row bill-row-wide"><span>Party Name <kbd>F2</kbd></span>
-              <select id="bill-customer-select" class="form-input" onchange="handleCustomerSelectChange(this.value)"></select>
+              <input type="text" id="bill-party-input" class="form-input" autocomplete="off" spellcheck="false" placeholder="Type a name or mobile number…" aria-label="Party name" autofocus>
+              <select id="bill-customer-select" class="bill-hidden-select" tabindex="-1" aria-hidden="true" onchange="handleCustomerSelectChange(this.value)"></select>
             </label>
             <div class="bill-opt" id="bill-opt">
             <label class="bill-row"><span>Patient Mob./ID</span>
@@ -189,31 +190,9 @@
         </div>
 
         <!-- Section 2: Search Medicine Autocomplete Input & Voice Billing -->
-        <div class="billing-search-box" style="position: relative;">
-          <!-- Search Mode Selector -->
-          <div class="billing-search-mode-bar">
-            <button type="button" class="search-mode-tab active" id="search-mode-name-btn" onclick="setBillingSearchMode('name')">
-              🔎 Search by Medicine Name
-            </button>
-            <button type="button" class="search-mode-tab" id="search-mode-code-btn" onclick="setBillingSearchMode('code')">
-              🏷️ Search by Medicine Code
-            </button>
-          </div>
-
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <div style="position: relative; flex: 1;">
-              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; z-index: 3;">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-              <input type="text" id="bill-medicine-search-input" class="form-input" style="font-size: 14.5px; padding: 12px 64px 12px 42px; border-radius: var(--radius-md); width: 100%; box-sizing: border-box; font-weight: 500;"
-                     placeholder="Search medicine by name, composition or barcode…"
-                     oninput="handleMedicineSearchInput(this.value)" autocomplete="off" autofocus>
-              <button type="button" id="bill-search-clear-btn" class="search-clear-btn" onclick="clearMedicineSearch()" title="Clear search" style="display: none;">&times;</button>
-              <div id="bill-search-loading-spinner" class="search-spinner-inline" style="display: none;"></div>
-              <div id="bill-search-results-dropdown" class="billing-search-dropdown"></div>
-            </div>
-            <!-- Voice Billing Mic Button (Web Speech API) -->
+        <div class="billing-search-box bill-toolbar">
+          <div class="bill-toolbar-row">
+            <span class="bill-hint"><kbd>Tab</kbd>/<kbd>Enter</kbd> next cell · <kbd>↑</kbd><kbd>↓</kbd> rows or list · <kbd>Esc</kbd> close · <kbd>Space</kbd> or <kbd>Alt+↓</kbd> opens Batch / Unit list</span>
             <button type="button" id="voice-billing-mic-btn" class="btn btn-secondary" onclick="toggleVoiceBilling()"
                     title="Speak medicine name or HSN code"
                     style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border-radius: var(--radius-md); transition: all 0.2s ease; cursor: pointer; flex-shrink: 0;">
@@ -275,7 +254,7 @@
               <thead>
                 <tr>
                   <th style="width: 34px; text-align: center;">#</th>
-                  <th style="min-width: 220px;">Product</th>
+                  <th style="min-width: 240px;">Product</th>
                   <th style="width: 78px;">Packing</th>
                   <th style="min-width: 130px;">Batch</th>
                   <th style="width: 118px;">Exp. Date</th>
@@ -452,7 +431,7 @@
   </div>
 
 
-  <script src="js/api.js?v=9.4" defer></script>
+  <script src="js/api.js?v=12.0" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
   <script src="js/nav.js?v=9.4" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
@@ -460,6 +439,8 @@
   <script src="js/add_inventory_flow.js?v=9.4" defer></script>
   <script src="js/voice_command_parser.js?v=9.4" defer></script>
   <script src="js/billing_math.js?v=11.4" defer></script>
-  <script src="js/billing_flow.js?v=11.4" defer></script>
+  <script src="js/billing_grid_core.js?v=12.0" defer></script>
+  <script src="js/billing_flow.js?v=12.0" defer></script>
+  <script src="js/billing_grid.js?v=12.0" defer></script>
 </body>
 </html>

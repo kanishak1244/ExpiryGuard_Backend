@@ -644,6 +644,51 @@ def get_billing_search_products(
     return results
 
 
+def search_billing_batches(db: Session, user_id: int, query: str = "", product_name: Optional[str] = None, limit: int = 20) -> List[dict]:
+    """
+    Batch cell of the billing grid. Batches of ONE medicine (product_name, exact, case-insensitive) optionally narrowed
+    by the typed text, or, without a product, batches whose number contains the typed text (with the medicine name,
+    so the cashier never picks a batch of the wrong medicine). Earliest expiry first; expired batches come last and
+    are flagged (the screen refuses to select them). Read only.
+    """
+    q = (query or "").strip().lower()
+    name = (product_name or "").strip().lower()
+    if not q and not name:
+        return []
+    limit = max(1, min(int(limit or 20), 50))
+    qry = db.query(models.Product).filter(models.Product.user_id == user_id, models.Product.is_deleted == False)
+    if name:
+        qry = qry.filter(func.lower(models.Product.product_name) == name)
+    if q:
+        qry = qry.filter(models.Product.batch_number.ilike(f"%{q}%"))
+    expiry_cut = expiry_cutoff()
+    rows = qry.order_by(
+        case((models.Product.expiry_date < expiry_cut, 2), else_=1),
+        models.Product.expiry_date.asc().nullslast(),
+        models.Product.id.asc(),
+    ).limit(limit).all()
+    return [{
+        "id": r.id,
+        "product_name": r.product_name,
+        "brand": r.brand,
+        "composition": r.composition,
+        "batch_number": r.batch_number,
+        "quantity": r.quantity,
+        "hsn_code": r.hsn_code,
+        "gst_rate": r.gst_rate,
+        "gst_percentage": r.gst_percentage,
+        "unit_price": r.unit_price,
+        "price_per_unit": r.price_per_unit,
+        "units_per_pack": r.units_per_pack,
+        "tablets_per_strip": r.tablets_per_strip,
+        "loose_tablet_price": r.loose_tablet_price,
+        "pack_size_label": r.pack_size_label,
+        "barcode": r.barcode,
+        "expiry_date": safe_date_format(r.expiry_date),
+        "is_expired": is_batch_expired(r.expiry_date),
+    } for r in rows]
+
+
 def get_product(db: Session, product_id: int, user_id: int):
     return (
         db.query(models.Product)

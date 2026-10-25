@@ -1438,6 +1438,12 @@ class ApiClient {
     const res = await this.request(ep, opts);
     return Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []);
   }
+  async searchBillingBatches(query, productName = '', limit = 20, signal = null) {
+    let ep = `/billing/search-batches?query=${encodeURIComponent(query || '')}&limit=${limit}`;
+    if (productName) ep += `&product_name=${encodeURIComponent(productName)}`;
+    const res = await this.request(ep, signal ? { signal } : {});
+    return Array.isArray(res) ? res : [];
+  }
 }
 
 const api = new ApiClient();

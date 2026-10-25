@@ -1938,3 +1938,80 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
   #billing-page .bill-buttons .btn { flex: 1 1 120px; padding: 10px 12px; font-weight: 700; }
   #billing-page .bill-opt-toggle { border: none; background: none; color: var(--color-text-muted); font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 0; text-align: left; }
 }
+
+/* ==========================================================================
+   Create New Bill: spreadsheet grid (billing_grid.js)
+   ========================================================================== */
+#billing-page .bill-hidden-select { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+#billing-page .bill-row { position: relative; }
+
+/* toolbar that replaced the big search bar (the Product cell in the grid is the search box now) */
+#billing-page .bill-toolbar { margin: 0; }
+#billing-page .bill-toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#billing-page .bill-hint { font-size: 11.5px; color: var(--color-text-muted); }
+#billing-page .bill-toolbar #voice-billing-mic-btn { width: 34px !important; height: 30px !important; border-radius: 6px !important; }
+#billing-page .bill-toolbar #voice-billing-mic-btn svg { width: 17px; height: 17px; }
+
+/* all header fields visible on a desktop screen: Party | Bill No | Date on top, patient + doctor under them */
+@media (min-width: 1025px) {
+  #billing-page .bill-head { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 14px; align-items: end; }
+  #billing-page .bill-head-left, #billing-page .bill-head-right, #billing-page .bill-opt { display: contents; }
+  #billing-page .bill-row { display: flex; flex-direction: column; align-items: stretch; gap: 1px; }
+  #billing-page .bill-row > span { flex: none; font-size: 11px; }
+  #billing-page .bill-row .form-input { height: 28px; padding: 2px 8px; }
+  #billing-page .bill-head-left .bill-row-wide { grid-column: 1 / span 2; order: 1; }
+  #billing-page .bill-head-right > .bill-row:nth-of-type(1) { order: 2; }
+  #billing-page .bill-head-right > .bill-row:nth-of-type(2) { order: 3; }
+  #billing-page .bill-opt .bill-row { order: 4; }
+  #billing-page #pending-customer-prompt { grid-column: 1 / -1; order: 9; }
+  #billing-page .bill-opt-toggle { display: none; }
+}
+
+/* the grid */
+#billing-page .bill-grid .data-table { table-layout: fixed; width: 100%; border-collapse: collapse; font-size: 13px; }
+#billing-page .bill-grid .data-table th { border: 1px solid var(--color-border); background: var(--color-surface-bg); font-size: 11.5px; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#billing-page .bill-grid .data-table tbody td { border: 1px solid var(--color-border); padding: 0; height: 30px; position: relative; vertical-align: middle; overflow: visible; }
+#billing-page .bill-grid { scroll-padding-top: 34px; scroll-padding-bottom: 8px; }
+#billing-page .bill-grid td.c-no { text-align: center; color: var(--color-text-muted); font-weight: 700; width: 34px; padding: 0 2px; }
+#billing-page .bill-grid td.c-ro, #billing-page .bill-grid td.c-ro-edit { background: rgba(100, 116, 139, .07); color: var(--color-text-muted); padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#billing-page .bill-grid td.c-ro-edit { padding: 0; color: var(--color-text-primary); }
+#billing-page .bill-grid td.c-edit { background: var(--color-surface-card, #fff); padding: 0; }
+#billing-page .bill-grid td.c-num { text-align: right; font-variant-numeric: tabular-nums; }
+#billing-page .bill-grid td.c-center { text-align: center; }
+#billing-page .bill-grid td.c-amount { font-weight: 700; color: var(--status-safe); }
+#billing-page .bill-grid td.exp-bad { color: #DC2626; font-weight: 700; }
+#billing-page .bill-grid td.exp-warn { color: #B45309; font-weight: 700; }
+#billing-page .bill-grid td.c-act { text-align: center; padding: 0; }
+#billing-page .cell-input { width: 100%; height: 30px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; padding: 0 8px; box-sizing: border-box; text-overflow: ellipsis; }
+#billing-page .cell-input.c-center { text-align: center; }
+#billing-page .cell-input[readonly] { cursor: default; }
+#billing-page td.c-ro-edit .cell-input { font-weight: 600; }
+#billing-page .cell-input::placeholder { color: var(--color-text-muted); opacity: .75; font-weight: 400; }
+#billing-page td.cell-active { outline: 2px solid #10B981; outline-offset: -2px; background: rgba(16, 185, 129, .14) !important; z-index: 1; }
+#billing-page tr.row-selected > td:not(.cell-active) { background-image: linear-gradient(rgba(16, 185, 129, .07), rgba(16, 185, 129, .07)); }
+#billing-page .cell-error { box-shadow: inset 0 0 0 2px #DC2626; background: rgba(220, 38, 38, .08) !important; }
+#billing-page .cell-note { font-size: 11px; line-height: 1.15; padding: 0 8px 2px; }
+#billing-page .cell-note:empty { display: none; }
+#billing-page .cell-del { border: 0; background: none; cursor: pointer; padding: 0 6px; font-size: 13px; opacity: .55; }
+#billing-page tr:hover .cell-del, #billing-page .cell-del:focus { opacity: 1; }
+#billing-page tr.entry-row td.c-edit { background: rgba(16, 185, 129, .04); }
+#billing-page tr.entry-row .search-spinner-inline { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+
+/* dropdowns (fixed to the screen, placed under the active cell by JS) */
+.bill-popup, #billing-page .billing-search-dropdown {
+  background: var(--color-surface-card, #fff); border: 1px solid var(--color-border, #CBD5E1); border-radius: 8px;
+  box-shadow: 0 14px 30px -6px rgba(0, 0, 0, .28); z-index: 3000; font-size: 13px;
+}
+.bill-popup .bp-head { display: flex; gap: 14px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; position: sticky; top: 0; background: var(--color-surface-card, #fff); border-bottom: 1px solid var(--color-border); }
+.bill-popup .bp-opt { display: flex; align-items: baseline; gap: 14px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid var(--color-border); }
+.bill-popup .bp-opt.selected { background: rgba(16, 185, 129, .18); }
+.bill-popup .bp-opt:hover { background: rgba(16, 185, 129, .10); }
+.bill-popup .bp-opt.disabled { opacity: .55; cursor: not-allowed; }
+.bill-popup .bp-main { font-weight: 700; min-width: 100px; }
+.bill-popup .bp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bill-popup .bp-sub { color: var(--color-text-muted); font-size: 12px; white-space: nowrap; }
+.bill-popup .bp-tag { margin-left: auto; font-size: 10.5px; font-weight: 800; }
+.bill-popup .bp-tag.bad { color: #DC2626; }
+.bill-popup .bp-tag.warn { color: #B45309; }
+.bill-popup .bp-empty { padding: 14px 16px; color: var(--color-text-muted); text-align: center; }
+.bill-popup mark, #billing-page .billing-search-dropdown mark { background: #FDE68A; color: #111; padding: 0 1px; border-radius: 2px; }
