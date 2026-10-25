@@ -644,6 +644,50 @@ def get_billing_search_products(
     return results
 
 
+# Columns of the billing catalog, in order. Same names as /billing/search-products so the screen reads both the same way.
+# No purchase price: the catalog is used by billing staff too.
+BILLING_CATALOG_COLUMNS = [
+    "id", "product_name", "brand", "composition", "batch_number", "barcode", "quantity", "unit_price",
+    "price_per_unit", "loose_tablet_price", "units_per_pack", "tablets_per_strip", "pack_size_label",
+    "hsn_code", "gst_percentage", "gst_rate", "expiry_date",
+]
+BILLING_CATALOG_MAX_ROWS = 20000
+
+
+def get_billing_catalog(db: Session, user_id: int) -> dict:
+    """
+    Every live batch of ONE pharmacy in a compact column/row form, for searching on the billing screen without a
+    request per keystroke. Read only. Tenant-scoped by user_id. Stock shown from here is a hint: the screen confirms
+    the live batch with the server when a medicine is added, and the sale itself is checked again on save.
+    When the pharmacy has more rows than BILLING_CATALOG_MAX_ROWS, "complete" is False and the screen keeps using the
+    server search.
+    """
+    M = models.Product
+    cols = [M.id, M.product_name, M.brand, M.composition, M.batch_number, M.barcode, M.quantity, M.unit_price,
+            M.price_per_unit, M.loose_tablet_price, M.units_per_pack, M.tablets_per_strip, M.pack_size_label,
+            M.hsn_code, M.gst_percentage, M.gst_rate, M.expiry_date]
+    rows = (
+        db.query(*cols)
+        .filter(M.user_id == user_id, M.is_deleted == False)
+        .order_by(M.id.asc())
+        .limit(BILLING_CATALOG_MAX_ROWS + 1)
+        .all()
+    )
+    complete = len(rows) <= BILLING_CATALOG_MAX_ROWS
+    out = []
+    for r in rows[:BILLING_CATALOG_MAX_ROWS]:
+        vals = list(r)
+        vals[-1] = safe_date_format(vals[-1])
+        out.append(vals)
+    return {
+        "columns": BILLING_CATALOG_COLUMNS,
+        "rows": out,
+        "count": len(out),
+        "complete": complete,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+    }
+
+
 def search_billing_batches(db: Session, user_id: int, query: str = "", product_name: Optional[str] = None, limit: int = 20) -> List[dict]:
     """
     Batch cell of the billing grid. Batches of ONE medicine (product_name, exact, case-insensitive) optionally narrowed

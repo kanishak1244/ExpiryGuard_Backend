@@ -304,6 +304,24 @@ def billing_search_products_endpoint(
     )
 
 
+@router.get("/billing/catalog")
+def billing_catalog_endpoint(
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compact list of this pharmacy's batches for instant search on the billing screen (gzip when the client accepts it)."""
+    import gzip
+    import json as _json
+    data = crud.get_billing_catalog(db=db, user_id=current_user.id)
+    body = _json.dumps(data, separators=(",", ":"), default=str).encode("utf-8")
+    headers = {"Cache-Control": "private, no-store", "Vary": "Accept-Encoding, Authorization"}
+    if "gzip" in (request.headers.get("accept-encoding") or "").lower() and len(body) > 1024:
+        body = gzip.compress(body, compresslevel=6)
+        headers["Content-Encoding"] = "gzip"
+    return Response(content=body, media_type="application/json", headers=headers)
+
+
 @router.get("/billing/search-batches")
 def billing_search_batches_endpoint(
     query: str = Query("", description="Part of the batch number"),

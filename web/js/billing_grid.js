@@ -81,11 +81,50 @@
       p = document.createElement('div');
       p.id = 'bill-cell-popup';
       p.className = 'bill-popup';
+      p.setAttribute('role', 'listbox');
+      p.setAttribute('tabindex', '-1');
+      p.setAttribute('aria-label', 'Selection options');
       p.style.display = 'none';
       p.addEventListener('mousedown', (e) => e.preventDefault());       // keep the cursor in the cell
       p.addEventListener('click', (e) => {
         const o = e.target.closest('[data-i]');
         if (o) popupPick(Number(o.getAttribute('data-i')));
+      });
+      p.addEventListener('keydown', (e) => {
+        if (!billGrid.popup) return;
+        const kind = billGrid.popup.kind;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          e.stopPropagation();
+          popupMove(e.key === 'ArrowDown' ? 1 : -1);
+          return;
+        }
+        if (e.key === 'Enter' || (e.key === ' ' && kind === 'unit')) {
+          e.preventDefault();
+          e.stopPropagation();
+          popupPick(billGrid.popup.index);
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          const anchor = billGrid.popup.anchor;
+          popupClose();
+          if (anchor && typeof anchor.focus === 'function') anchor.focus();
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (kind === 'unit') {
+            popupPick(billGrid.popup.index);
+          } else {
+            const anchor = billGrid.popup.anchor;
+            popupClose();
+            if (anchor && typeof anchor.focus === 'function') anchor.focus();
+          }
+          return;
+        }
       });
       document.body.appendChild(p);
     }
@@ -115,11 +154,17 @@
     const el = popupEl();
     if (!p) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const rows = p.options.map((o, i) =>
-      '<div class="bp-opt' + (i === p.index ? ' selected' : '') + (o.selectable ? '' : ' disabled') + '" data-i="' + i + '" id="bp-opt-' + i + '">' + o.html + '</div>').join('');
+      '<div class="bp-opt' + (i === p.index ? ' selected' : '') + (o.selectable ? '' : ' disabled') +
+      '" data-i="' + i + '" id="bp-opt-' + i + '" role="option" aria-selected="' + (i === p.index ? 'true' : 'false') +
+      '">' + o.html + '</div>').join('');
     el.innerHTML = (p.head ? '<div class="bp-head">' + p.head + '</div>' : '') +
       (p.options.length ? rows : '<div class="bp-empty">' + (p.empty || 'Nothing found') + '</div>');
     el.style.display = 'block';
     placeAt(el, p.anchor, p.width || 420, Math.min(el.scrollHeight + 4, 360));
+    if (p.anchor && p.anchor.setAttribute) {
+      p.anchor.setAttribute('aria-expanded', 'true');
+      p.anchor.setAttribute('aria-activedescendant', 'bp-opt-' + p.index);
+    }
     const sel = el.querySelector('.selected');
     if (sel) sel.scrollIntoView({ block: 'nearest' });
   }
@@ -130,6 +175,10 @@
     popupDraw();
   }
   function popupClose() {
+    if (billGrid.popup && billGrid.popup.anchor && billGrid.popup.anchor.setAttribute) {
+      billGrid.popup.anchor.setAttribute('aria-expanded', 'false');
+      billGrid.popup.anchor.removeAttribute('aria-activedescendant');
+    }
     billGrid.popup = null;
     const el = $('bill-cell-popup');
     if (el) { el.style.display = 'none'; el.innerHTML = ''; }
@@ -145,8 +194,14 @@
   function popupMove(dir) {
     const p = billGrid.popup;
     if (!p || !p.options.length) return;
-    p.index = Math.min(p.options.length - 1, Math.max(0, p.index + dir));
-    popupDraw();
+    let next = p.index + dir;
+    while (next >= 0 && next < p.options.length && !p.options[next].selectable) {
+      next += dir;
+    }
+    if (next >= 0 && next < p.options.length && p.options[next].selectable) {
+      p.index = next;
+      popupDraw();
+    }
   }
   function popupPick(i) {
     const p = billGrid.popup;
@@ -170,11 +225,12 @@
 
   // ---------- party (customer) ----------
   function partyLabel(c) { return c ? c.name + (c.phone ? ' (' + c.phone + ')' : '') : ''; }
-  window.billSyncPartyInput = function () {
+  function billSyncPartyInput() {
     const inp = $('bill-party-input');
     if (!inp || document.activeElement === inp) return;
     inp.value = partyLabel(activeBillState.customer || billingCustomersCache.find((c) => c.id === 'walkin') || null);
-  };
+  }
+  window.billSyncPartyInput = billSyncPartyInput;
   function partyOptions(query) {
     const list = gridFilterParties(billingCustomersCache, query);
     const opts = list.map((c) => ({
@@ -257,7 +313,7 @@
       kind: 'batch', key, anchor, query: query || '', width: 520, options: opts, index: cur >= 0 && !query ? cur : undefined,
       head: '<span>Batch</span><span>Expiry</span><span>Stock</span><span>MRP</span>',
       empty: 'No batch matches “' + esc(query || '') + '”',
-      onPick: (o) => { const i = indexOfId(key); billApplyBatch(i, o.value); renderBillItemsTable(); recalculateTotals(); focusPos({ row: i, col: 'unit' }); },
+      onPick: (o) => { const i = indexOfId(key); billApplyBatch(i, o.value); if (typeof renderBillItemsTable === 'function') renderBillItemsTable(); else render(); recalculateTotals(); focusPos({ row: i, col: 'unit' }); },
     });
   }
   const entryBatchGate = billMakeLatestGate();
@@ -273,6 +329,21 @@
       popupOpen({ kind: 'entrybatch', anchor, query: q, width: 520, options: [], empty: 'Type at least 2 characters of the batch number', onPick: () => {} });
       return;
     }
+    const showRows = (rows) => {
+      const opts = rows.map((r) => {
+        const f = billFormatProductRow(r);
+        const b = billToBatch(f);
+        const st = billBatchState(b);
+        return { selectable: st === 'ok' || st === 'near', why: batchWhy(st), value: f, html: batchOptionHtml({ ...b, name: f.name }, st, q, true) };
+      });
+      popupOpen({
+        kind: 'entrybatch', anchor, query: q, width: 640, options: opts,
+        head: '<span>Batch</span><span>Medicine</span><span>Expiry</span><span>Stock</span><span>MRP</span>',
+        empty: 'No batch matches “' + esc(q) + '”',
+        onPick: (o) => { billAddMedicine(o.value, { forceProductId: o.value.productId }); },
+      });
+    };
+    if (window.billCatalog && billCatalog.ready()) { showRows(billCatalog.batchSearch(q, 20)); return; }   // instant
     popupOpen({ kind: 'entrybatch', anchor, query: q, width: 520, options: [], empty: 'Searching…', onPick: () => {} });
     entryBatchTimer = setTimeout(async () => {
       entryBatchAbort = new AbortController();
@@ -306,24 +377,39 @@
     if (!item || !anchor) return;
     const units = gridUnitOptions(item);
     const opts = units.map((u) => ({
-      selectable: u.selectable, value: u.value,
+      selectable: u.selectable, value: u.value, label: u.label,
       html: u.value === 'strip'
-        ? '<span class="bp-main">Strip</span><span class="bp-sub">full pack · ₹' + Number(item.packPrice || 0).toFixed(2) + ' each</span>'
+        ? '<span class="bp-main">Strip</span><span class="bp-sub">full pack · ₹' + Number(item.packPrice || item.mrp || 0).toFixed(2) + ' each</span>'
         : '<span class="bp-main">Loose</span><span class="bp-sub">per tablet · ₹' + Number(item.loosePrice).toFixed(2) + ' each</span>',
     }));
     const at = typed ? gridMatchUnit(units, typed) : -1;
-    const cur = Math.max(0, units.findIndex((u) => u.value === (item.unitType === 'loose' ? 'loose' : 'strip')));
+    const curUnit = item.unitType === 'loose' ? 'loose' : 'strip';
+    const cur = Math.max(0, units.findIndex((u) => u.value === curUnit));
+    const activeIndex = at >= 0 ? at : cur;
+
+    setActive(key, 'unit');
+    if (document.activeElement !== anchor && typeof anchor.focus === 'function') {
+      anchor.focus();
+    }
+
     popupOpen({
-      kind: 'unit', key, anchor, width: 300, options: opts, index: at >= 0 ? at : cur,
-      onPick: (o) => { const i = indexOfId(key); billSetUnit(i, o.value); renderBillItemsTable(); recalculateTotals(); focusPos({ row: i, col: 'qty' }); },
+      kind: 'unit', key, anchor, width: 300, options: opts, index: activeIndex,
+      onPick: (o) => {
+        const i = indexOfId(key);
+        billSetUnit(i, o.value);
+        if (typeof renderBillItemsTable === 'function') renderBillItemsTable(); else render();
+        recalculateTotals();
+        focusPos({ row: i, col: 'qty' });
+      },
     });
   }
   // Switching Strip/Loose keeps the quantity inside what the stock allows.
   function billSetUnit(i, unitType) {
     const item = items()[i];
-    if (!item || item.unitType === unitType) return;
+    if (!item) return;
+    const changed = item.unitType !== unitType;
     item.unitType = unitType;
-    if (item.rateOverride) { item.rateOverride = null; billToast('The selling price was reset to the MRP of the new unit.', false); }
+    if (changed && item.rateOverride) { item.rateOverride = null; billToast('The selling price was reset to the MRP of the new unit.', false); }
     item.rate = gridEffectiveRate(item);
     const v = gridValidateQty(String(item.quantity), item);
     if (!v.ok && v.limit >= 1) { item.quantity = v.limit; billToast('Quantity changed to ' + v.limit + ' (all that is in stock in this unit).', false); }
@@ -373,7 +459,7 @@
       roCell('packing', esc(item.packSize || '-')) +
       '<td class="c-edit"><input class="cell-input" data-cell="batch" value="' + esc(item.selectedBatch || '') + '" autocomplete="off" title="Type to filter the batches · Space or Alt+↓ shows them all"></td>' +
       roCell('expiry', esc(item.expiryDate || '-'), expClass) +
-      '<td class="c-edit"><input class="cell-input c-center" data-cell="unit" readonly value="' + (item.unitType === 'loose' ? 'Loose' : 'Strip') + '" title="Enter or Space opens the list"></td>' +
+      '<td class="c-edit"><input class="cell-input c-center" data-cell="unit" readonly value="' + (item.unitType === 'loose' ? 'Loose' : 'Strip') + '" title="Enter or Space opens the list" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="bill-cell-popup" aria-label="Billing unit"></td>' +
       '<td class="c-edit"><input class="cell-input c-center item-qty-input" data-cell="qty" inputmode="numeric" autocomplete="off" value="' + esc(item.quantity) + '"></td>' +
       roCell('mrp', '₹' + mrp.toFixed(2), 'c-num') +
       '<td class="c-edit"><input class="cell-input c-num item-rate-input" data-cell="rate" inputmode="decimal" autocomplete="off" value="' + Number(item.rate).toFixed(2) + '" title="Selling price per unit. The MRP is the most you can charge."></td>' +
@@ -463,6 +549,7 @@
       (live.batches || []).concat(fresh).forEach((b) => { if (b && b.productId !== undefined) byId.set(String(b.productId), b); });
       fresh.forEach((b) => byId.set(String(b.productId), b));
       live.batches = [...byId.values()].sort((a, b) => (a.expiryDate || '9999-12-31').localeCompare(b.expiryDate || '9999-12-31'));
+      reconcileWithServer(rowId, fresh);
       const p = billGrid.popup;
       if (p && p.kind === 'batch' && p.key === rowId) {
         const q = p.query || '';
@@ -476,6 +563,38 @@
     }
   }
   function billLoadBatches(rowId) { return billLoadBatchesImpl(rowId); }
+
+  // The search list is a hint; the server's batches are the truth. If the chosen batch is gone, expired or empty now,
+  // say so and take the next valid batch (never silently); if none is left, the line shows the problem and saving is blocked.
+  function reconcileWithServer(rowId, fresh) {
+    const i = indexOfId(rowId);
+    const item = items()[i];
+    if (!item) return;
+    const cur = fresh.find((b) => String(b.productId) === String(item.productId));
+    if (cur && billBatchSellable(cur)) {
+      if (Number(cur.stock) !== Number(item.availableStock) || cur.expiryDate !== item.expiryDate) {
+        item.availableStock = cur.stock;
+        item.expiryDate = cur.expiryDate;
+        billUpdateRow(i);
+        if (item.unitType !== 'loose' && Number(item.quantity) > Number(cur.stock)) billToast(item.name + ': only ' + cur.stock + ' in stock now.', true);
+      }
+      return;
+    }
+    const next = fresh.find((b) => billBatchSellable(b) && !items().some((o, j) => j !== i && gridSameLine(o, { productId: b.productId, selectedBatch: b.batchNumber })));
+    const was = item.selectedBatch || '-';
+    if (next) {
+      billApplyBatch(i, next);
+      billToast(item.name + ': batch ' + was + ' is no longer available. Batch ' + next.batchNumber + ' was taken instead.', true);
+    } else {
+      item.availableStock = 0;
+      billToast(item.name + ': no stock left on the server. Remove this line.', true);
+    }
+    const keep = billGrid.active;
+    popupClose();
+    renderBillItemsTable();
+    recalculateTotals();
+    if (keep) { const r = indexOfId(keep.key); if (r >= 0) focusPos({ row: r, col: keep.col }); }
+  }
 
   // ---------- cell commit / revert ----------
   function showCellError(el, msg) {
@@ -550,23 +669,82 @@
 
   function onGridKeydown(e) {
     const el = e.target && e.target.closest ? e.target.closest('[data-cell]') : null;
+    const key = e.key;
+    const n = items().length;
+
+    // ----- CRITICAL: While the Unit dropdown is open, ArrowUp and ArrowDown must control its options, not move between billing rows. -----
+    // Use preventDefault() and stopPropagation() to prevent the parent grid from intercepting dropdown navigation.
+    const isUnitPopupOpen = billGrid.popup && billGrid.popup.kind === 'unit';
+    if (isUnitPopupOpen) {
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        popupMove(key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (key === 'Enter' || key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        popupPick(billGrid.popup.index);
+        return;
+      }
+      if (key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        const anchor = billGrid.popup.anchor;
+        popupClose();
+        if (anchor && typeof anchor.focus === 'function') anchor.focus();
+        else if (el) { const pos = posOfEl(el); if (pos) focusPos({ row: pos.row, col: 'unit' }); }
+        return;
+      }
+      if (key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        popupPick(billGrid.popup.index);
+        return;
+      }
+      if (key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const at = gridMatchUnit(billGrid.popup.options, key);
+        if (at >= 0) {
+          billGrid.popup.index = at;
+          popupDraw();
+        }
+        return;
+      }
+    }
+
     if (!el) return;
     const pos = posOfEl(el);
     if (!pos) return;
     setActive(pos.key, pos.col);
-    const key = e.key;
-    const n = items().length;
     const entry = pos.key === 'entry';
     const item = itemOfKey(pos.key);
     const popupHere = billGrid.popup && (billGrid.popup.anchor === el);
     const prodOpen = pos.col === 'product' && productDropdownOpen();
 
-    // Alt+Down / F4 / Space show the list of a Batch cell; Unit also opens with Enter
-    if (!entry && !popupHere && (pos.col === 'batch' || pos.col === 'unit') &&
-        ((key === 'ArrowDown' && e.altKey) || key === 'F4' || (key === ' ' && (pos.col === 'unit' || (el.selectionStart === el.selectionEnd && el.value === (item.selectedBatch || '')))))) {
-      e.preventDefault();
-      if (pos.col === 'batch') openBatchPopupFor(pos.key, ''); else openUnitPopupFor(pos.key);
-      return;
+    // Alt+Down / F4 / Space show the list of a Batch cell; Unit also opens with Enter or Space
+    if (!entry && !popupHere && (pos.col === 'batch' || pos.col === 'unit')) {
+      if ((key === 'ArrowDown' && e.altKey) || key === 'F4' || (key === ' ' && pos.col === 'unit') ||
+          (key === ' ' && pos.col === 'batch' && el.selectionStart === el.selectionEnd && el.value === (item ? item.selectedBatch || '' : ''))) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (pos.col === 'batch') openBatchPopupFor(pos.key, ''); else openUnitPopupFor(pos.key);
+        return;
+      }
+      if (pos.col === 'unit' && key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        openUnitPopupFor(pos.key);
+        return;
+      }
+      if (pos.col === 'unit' && key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && /^[a-zA-Z]$/.test(key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openUnitPopupFor(pos.key, key);
+        return;
+      }
     }
     if (e.ctrlKey || e.altKey || e.metaKey) return;                   // the screen's shortcuts handle these
 
@@ -574,16 +752,19 @@
     if (popupHere || prodOpen) {
       if (key === 'ArrowDown' || key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         if (prodOpen) handleSearchKeydown(e); else popupMove(key === 'ArrowDown' ? 1 : -1);
         return;
       }
       if (key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         if (prodOpen) handleSearchKeydown(e); else popupPick(billGrid.popup.index);
         return;
       }
       if (key === 'Tab') {
         e.preventDefault();
+        e.stopPropagation();
         if (popupHere && billGrid.popup.kind === 'unit') {              // a Unit choice is always a valid one: Tab confirms it
           const i = billGrid.popup.index;
           popupPick(i);
@@ -601,15 +782,31 @@
         e.preventDefault();
         if (pos.col === 'product' && productDirty(el, pos, item)) {
           if (billSearchPending) { billPendingEnter = true; return; }  // scanner: add as soon as the answer arrives
+          billPendingEnter = true;                                    // instant search uses it at once ...
           handleMedicineSearchInput(el.value.trim());
-          billPendingEnter = true;
+          billPendingEnter = billSearchPending;                       // ... the server search when its answer comes
           return;
         }
         if (entry && pos.col === 'batch') { if (!el.value.trim()) focusPos({ row: n, col: 'product' }); return; }
-        if (!entry && pos.col === 'unit') { openUnitPopupFor(pos.key); return; }
+        if (!entry && pos.col === 'unit') {
+          e.stopPropagation();
+          openUnitPopupFor(pos.key);
+          return;
+        }
         if (!commitCell(el)) return;
         focusPos(gridEnter(pos, n));
         return;
+      }
+      case 'Escape': {
+        if (billGrid.popup) {
+          e.preventDefault();
+          e.stopPropagation();
+          const anchor = billGrid.popup.anchor;
+          popupClose();
+          if (anchor && typeof anchor.focus === 'function') anchor.focus();
+          return;
+        }
+        break;
       }
       case 'Tab': {
         if (entry && pos.col === 'batch' && !e.shiftKey && !el.value.trim()) {
@@ -652,6 +849,7 @@
         // type-ahead in the Unit cell: "l" opens the list on Loose
         if (!entry && pos.col === 'unit' && key.length === 1 && !e.ctrlKey && !e.altKey && key !== ' ') {
           e.preventDefault();
+          e.stopPropagation();
           openUnitPopupFor(pos.key, key);
         }
         break;
@@ -734,7 +932,10 @@
     const pos = posOfEl(el);
     if (!pos || pos.key === 'entry') return;
     if (pos.col === 'batch') openBatchPopupFor(pos.key, '');
-    else if (pos.col === 'unit') openUnitPopupFor(pos.key);
+    else if (pos.col === 'unit') {
+      if (typeof el.focus === 'function') el.focus();
+      openUnitPopupFor(pos.key);
+    }
   }
 
   // True when the cell the cursor is in holds a valid value (or nothing was being edited). A bad value keeps the cursor there.
@@ -754,8 +955,10 @@
     if (t && (t.id === 'bill-discount-input' || t.id === 'bill-discount-mode')) { consume(); focusEntryProduct(); return true; }
     if (billGrid.popup) {
       const wasParty = billGrid.popup.kind === 'party';
+      const anchor = billGrid.popup.anchor;
       popupClose();
       if (wasParty) billSyncPartyInput();
+      else if (anchor && typeof anchor.focus === 'function') anchor.focus();
       else if (t && t.getAttribute && t.getAttribute('data-cell')) revertCell(t);
       consume();
       return true;

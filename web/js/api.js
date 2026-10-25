@@ -1438,6 +1438,11 @@ class ApiClient {
     const res = await this.request(ep, opts);
     return Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []);
   }
+  // Compact list of this pharmacy's batches for instant search on the billing screen (one download, then local search).
+  async getBillingCatalog() {
+    return this.request('/billing/catalog');
+  }
+
   async searchBillingBatches(query, productName = '', limit = 20, signal = null) {
     let ep = `/billing/search-batches?query=${encodeURIComponent(query || '')}&limit=${limit}`;
     if (productName) ep += `&product_name=${encodeURIComponent(productName)}`;

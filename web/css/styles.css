@@ -2004,7 +2004,7 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
 }
 .bill-popup .bp-head { display: flex; gap: 14px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; position: sticky; top: 0; background: var(--color-surface-card, #fff); border-bottom: 1px solid var(--color-border); }
 .bill-popup .bp-opt { display: flex; align-items: baseline; gap: 14px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid var(--color-border); }
-.bill-popup .bp-opt.selected { background: rgba(16, 185, 129, .18); }
+.bill-popup .bp-opt.selected { background: rgba(16, 185, 129, .22); outline: 2px solid var(--color-primary, #10B981); outline-offset: -2px; font-weight: 600; }
 .bill-popup .bp-opt:hover { background: rgba(16, 185, 129, .10); }
 .bill-popup .bp-opt.disabled { opacity: .55; cursor: not-allowed; }
 .bill-popup .bp-main { font-weight: 700; min-width: 100px; }
@@ -2046,3 +2046,9 @@ html[data-theme="dark"] .nav-item:not(.active):hover svg { stroke: #F8FAFC; }
 #billing-page .bill-disc input.form-input.cell-error { box-shadow: inset 0 0 0 2px #DC2626; }
 #billing-page .bill-foot .bill-invoice-value { min-width: 260px; flex: 0 0 auto; padding: 4px 18px; }
 @media (max-width: 1024px) { #billing-page .bill-foot { flex-direction: column; } #billing-page .bill-foot .bill-invoice-value { min-width: 0; } }
+
+/* ---- instant search status in the toolbar ---- */
+#billing-page .bill-catalog { display: inline-flex; align-items: center; gap: 4px; margin-right: auto; padding-right: 12px; }
+#billing-page .bill-hint-warn { color: #B45309; font-weight: 600; }
+#billing-page .bill-catalog-refresh { border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); border-radius: 4px; padding: 0 6px; height: 20px; line-height: 18px; cursor: pointer; font-size: 12px; }
+#billing-page .bill-catalog-refresh:hover, #billing-page .bill-catalog-refresh:focus-visible { color: #10B981; border-color: #10B981; outline: none; }

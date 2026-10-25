@@ -358,6 +358,17 @@ async function handleMedicineSearchInput(val) {
     return;
   }
 
+  // Instant search: the pharmacy's list is in memory, so the answer is shown at once (no request, no waiting).
+  if (window.billCatalog && billCatalog.ready()) {
+    clearTimeout(searchDebounceTimer);
+    if (searchAbortController) { searchAbortController.abort(); searchAbortController = null; }
+    searchGate.next();                 // a server answer still on its way must not replace this one
+    billSearchPending = false;
+    showSearchSpinner(false);
+    renderSearchResultsDropdown(billCatalog.search(cleanQ, 15), cleanQ, false);
+    return;
+  }
+
   // Cancel prior timer & abort prior in-flight request
   clearTimeout(searchDebounceTimer);
   if (searchAbortController) {
@@ -442,7 +453,9 @@ function billFormatProductRow(p) {
     unitsPerPack: Number(p.units_per_pack || p.tablets_per_strip) || null,
     packSize: p.pack_size_label || '',
     // 0% is a real GST rate: only a missing value is "unknown"
-    gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? null
+    gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? null,
+    totalStock: (p.total_stock !== undefined && p.total_stock !== null) ? Number(p.total_stock) : null,   // instant search: all valid batches
+    allBatches: Array.isArray(p._all_batches) ? p._all_batches : null
   };
 }
 function billToBatch(r) {
@@ -506,7 +519,7 @@ function renderSearchResultsDropdown(rawItems, query, isError = false) {
             ${r.hsnCode ? `<span>Code: <strong>${escapeHtml(r.hsnCode)}</strong></span>` : ''}
             <span>Batch: <strong style="color: var(--status-safe);">${billHl(r.batchNumber || '-', query)}</strong></span>
             <span>Exp: <strong>${escapeHtml(r.expiryDate || '-')}</strong> ${billBatchBadge(r)}</span>
-            <span>Stock: <strong style="${r.stock <= 0 ? 'color: #DC2626;' : 'color: #10B981;'}">${r.stock}</strong></span>
+            <span>Stock: <strong style="${(r.totalStock ?? r.stock) <= 0 ? 'color: #DC2626;' : 'color: #10B981;'}">${r.totalStock ?? r.stock}</strong></span>
           </div>
         </div>
         <div style="text-align: right; flex-shrink: 0; margin-left: 8px;">
@@ -651,6 +664,7 @@ function billAddMedicine(med, overrides = {}) {
   };
   const nameKey = String(med.name || '').trim().toLowerCase();
   add(toBatch(med));
+  (med.allBatches || []).forEach(b => add(toBatch(billFormatProductRow(b))));
   results.forEach(r => { if (r && String(r.name || '').trim().toLowerCase() === nameKey) add(toBatch(r)); });
 
   // FEFO: earliest expiry first (a batch without a date goes last)
@@ -1501,6 +1515,8 @@ async function commitBillTransaction(printPdf = false, saveAndNew = false) {
       saveBtn.disabled = false;
       saveBtn.innerHTML = originalText;
     }
+
+    if (window.billCatalog) { billCatalog.applySale(payloadItems); setTimeout(() => billCatalog.refresh(), 50); }
 
     const invoiceNum = saleRes.bill_number || activeBillState.invoiceNumber;
     const grandTotalVal = (saleRes.total_amount || (activeBillState.calculated && activeBillState.calculated.grandTotal) || 0).toFixed(2);

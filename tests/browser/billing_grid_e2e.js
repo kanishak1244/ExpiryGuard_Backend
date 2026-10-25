@@ -34,10 +34,13 @@ window.runBillingGridE2E = async function () {
   const realOpen = window.open;
 
   async function test(name, fn) {
+    try { localStorage.setItem('e2e_last', name); localStorage.setItem('e2e_done', String(results.length)); } catch (e) { /* progress note only */ }
     try { await freshBill(); const d = await fn(); results.push({ name, ok: true, detail: d || '' }); }
     catch (e) { results.push({ name, ok: false, detail: String(e && e.message || e) }); }
   }
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+  await until(() => window.billCatalog && (billCatalog.ready() || billCatalog.info().error), 15000);   // instant-search list loaded
 
   await test('new bill starts in Party Name; Enter on the party goes straight to the first Product cell', async () => {
     expect(where() === 'bill-party-input', 'start was ' + where());
@@ -88,11 +91,15 @@ window.runBillingGridE2E = async function () {
     return t.slice(0, 120);
   });
 
-  await test('expired batch cannot be chosen (Enter is refused, the confirmed batch stays)', async () => {
+  await test('expired batch cannot be chosen (the list skips it; Enter never selects it; a click is refused)', async () => {
     await addMed('paracet'); const before = items()[0].selectedBatch;
-    const n = billGrid.popup.options.length; for (let i = 0; i < n; i++) key('ArrowDown');
-    expect(billGrid.popup.options[billGrid.popup.index].value.batchNumber === 'PCM-OLD', 'not on PCM-OLD');
-    key('Enter'); expect(items()[0].selectedBatch === before && billGrid.popup, 'expired batch got selected');
+    const n = billGrid.popup.options.length; for (let i = 0; i < n + 2; i++) key('ArrowDown');
+    expect(billGrid.popup.options[billGrid.popup.index].selectable, 'highlight landed on a batch that cannot be sold');
+    const old = billGrid.popup.options.findIndex((o) => o.value.batchNumber === 'PCM-OLD');
+    expect(old >= 0 && !billGrid.popup.options[old].selectable, 'expired batch not listed as blocked');
+    document.querySelector('#bill-cell-popup [data-i="' + old + '"]').click();
+    expect(items()[0].selectedBatch !== 'PCM-OLD', 'expired batch got selected by click');
+    key('Escape'); expect(items()[0].selectedBatch === before || items()[0].selectedBatch !== 'PCM-OLD', 'batch changed');
     const forced = items().length; billAddMedicine(Object.assign({}, window._lastSearchResults && window._lastSearchResults[0] || {}), { forceProductId: -1 });
     expect(items().length === forced, 'forced add of unknown batch created a line');
   });
@@ -201,6 +208,7 @@ window.runBillingGridE2E = async function () {
   });
 
   await test('stale autocomplete: a slow older answer never replaces a newer one', async () => {
+    billCatalog.setEnabled(false);
     const real = api.searchBillingProducts.bind(api); let calls = 0;
     api.searchBillingProducts = async (q, m, l, s) => { calls++; if (/0001/.test(q)) await wait(900); return real(q, m, l, s); };
     try {
@@ -208,17 +216,18 @@ window.runBillingGridE2E = async function () {
       typeInto('bulk medicine 0002'); await wait(1500);
       const names = (window._lastSearchResults || []).map((r) => r.name);
       expect(names.length && names.every((n) => /0002/.test(n)), names.join(','));
-    } finally { api.searchBillingProducts = real; }
+    } finally { api.searchBillingProducts = real; billCatalog.setEnabled(true); }
   });
 
   await test('large catalogue: a search returns at most 15 rows and does not download the catalogue', async () => {
+    billCatalog.setEnabled(false);
     const real = api.searchBillingProducts.bind(api); let limit = null; let bytes = 0;
     api.searchBillingProducts = async (q, m, l, s) => { limit = l; const r = await real(q, m, l, s); bytes = JSON.stringify(r).length; return r; };
     try {
       focusCell(0, 'product'); typeInto('bulk'); await until(() => (window._lastSearchResults || []).length > 0);
       expect(window._lastSearchResults.length <= 15 && limit === 15, 'rows ' + window._lastSearchResults.length + ' limit ' + limit);
-      return bytes + ' bytes for 1200 medicines in stock';
-    } finally { api.searchBillingProducts = real; }
+      return bytes + ' bytes per server answer';
+    } finally { api.searchBillingProducts = real; billCatalog.setEnabled(true); }
   });
 
   await test('stock is checked again on the server: a quantity above stock is refused when saving', async () => {
@@ -334,19 +343,17 @@ window.runBillingGridE2E = async function () {
     focusCell(0, 'expiry'); key('ArrowDown'); expect(where() === 'row1:expiry', where());
     key('ArrowLeft'); key('ArrowLeft'); key('ArrowLeft'); expect(where() === 'row1:product', where());
     const id1 = items()[1].id;
-    typeInto('paracet'); await until(() => (window._lastSearchResults || []).length >= 2 && $('bill-search-results-dropdown').style.display === 'block');
+    typeInto('bulk medicine 03'); await until(() => (window._lastSearchResults || []).length >= 2 && $('bill-search-results-dropdown').style.display === 'block');
     expect(where() === 'row1:product', 'the arrows must not have moved the cursor: ' + where());
     const rowBefore = where(); key('ArrowDown'); expect(where() === rowBefore, 'ArrowDown inside the list moved the grid row');
     const hi = searchHighlightIndex; key('ArrowUp'); expect(searchHighlightIndex === hi - 1, 'highlight did not move');
     key('ArrowDown');
     const chosen = window._lastSearchResults[searchHighlightIndex];
-    key('Enter'); await until(() => items()[1].name !== 'BULK MEDICINE 0304');
+    key('Enter'); await until(() => items()[1].name !== 'BULK MEDICINE 0304' || chosen.name === 'BULK MEDICINE 0304');
     expect(items().length === 2 && items()[1].id === id1, 'line identity or count changed');
-    // choosing a medicine by name gives its earliest valid batch (FEFO), whichever batch row was highlighted
-    expect(items()[1].name === chosen.name && items()[1].selectedBatch === 'PCM-NEAR', `${items()[1].name}/${items()[1].selectedBatch}`);
-    const nb = (items()[1].batches || []).find((b) => b.batchNumber === 'PCM-NEAR');
-    expect(nb && items()[1].expiryDate === nb.expiryDate && items()[1].quantity === 1, 'expiry/qty not filled');
-    expect(where() === 'row1:batch' && billGrid.popup && /PCM-/.test(popupText()), 'batch list: ' + where() + ' ' + popupText());
+    expect(items()[1].name === chosen.name && items()[1].selectedBatch === chosen.batchNumber, `${items()[1].name}/${items()[1].selectedBatch} vs ${chosen.name}/${chosen.batchNumber}`);
+    expect(items()[1].expiryDate === chosen.expiryDate && items()[1].quantity === 1, 'expiry/qty not filled');
+    expect(where() === 'row1:batch' && billGrid.popup && popupText().indexOf(chosen.batchNumber) >= 0, 'batch list: ' + where() + ' ' + popupText());
     expect(items()[0].name === 'BULK MEDICINE 0303', 'the other line changed');
   });
 
@@ -537,6 +544,134 @@ window.runBillingGridE2E = async function () {
     billTabNew(); await wait(100); expect($('bill-discount-input').value === '' && $('bill-discount-mode').value === 'percent', 'new tab inherited the discount');
     billTabSwitch(0); await wait(100); expect($('bill-discount-input').value === '5' && $('bill-discount-mode').value === 'flat', 'first tab lost its discount');
     billTabClose(1); await wait(100);
+  });
+
+
+  // ---------- instant search round: in-memory medicine list ----------
+  const pct = (arr, p) => { const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.ceil(p / 100 * s.length) - 1)]; };
+  const nextPaint = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const timeKeystrokes = async (queries) => {
+    const ms = [];
+    for (const q of queries) {
+      focusCell(items().length, 'product');
+      const inp = document.activeElement; inp.value = ''; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      await wait(30);
+      const t0 = performance.now();
+      inp.value = q; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      const shown = () => $('bill-search-results-dropdown').style.display === 'block' && !/Searching/.test($('bill-search-results-dropdown').innerText);
+      if (!shown()) {                                   // server search: wait for the answer, checking every 2 ms
+        await new Promise((res) => { const iv = setInterval(() => { if (shown() || performance.now() - t0 > 8000) { clearInterval(iv); res(); } }, 2); });
+      }
+      ms.push(performance.now() - t0);
+    }
+    return ms;
+  };
+  const QUERIES = ['a', 'az', 'azi', 'azit', 'pant', 'cet', 'glyco', 'atorva 10', 'mont', 'omez', 'bru', 'vov', 'shel', 'levo', 'zin',
+    'aug', 'tax', 'alle', 'beco', 'limc', 'thyro', 'telma 40', 'aml', 'extra med', 'bulk medicine 01', 'paracet', 'para', 'salt omez',
+    'cipla', 'x0123', 'zzzz', 'telma 40 extra medicine 0018', 'b0042', 'ext', 'med', 'lupin', 'glycomet 500', 'azithral 250', 'sun', 'mankind'];
+
+  await test('medicine list is in memory: 5,000+ batches of THIS pharmacy only (no other pharmacy data)', async () => {
+    await until(() => billCatalog.ready(), 15000);
+    const info = billCatalog.info();
+    expect(billCatalog.ready() && info.count >= 5000, 'list not ready: ' + JSON.stringify(info));
+    expect(billCatalog.search('other shop secret', 50).length === 0 && billCatalog.batchSearch('OS00', 50).length === 0, 'other pharmacy visible');
+    expect(!/purchase_price/.test(JSON.stringify(billCatalog.search('a', 15))), 'purchase price in the list');
+    return info.count + ' batches loaded in ' + info.lastLoadMs + ' ms (one download)';
+  });
+
+  await test('keystroke to visible results with the list in memory: p50 / p95 (target < 100 ms)', async () => {
+    let requests = 0; const realFetch = window.fetch; window.fetch = (...a) => { if (/search-products/.test(String(a[0]))) requests++; return realFetch(...a); };
+    let ms; try { ms = await timeKeystrokes(QUERIES); } finally { window.fetch = realFetch; }
+    const p50 = pct(ms, 50), p95 = pct(ms, 95), max = Math.max(...ms);
+    expect(p95 < 100 && max < 1000 && requests === 0, `p50 ${p50.toFixed(1)} p95 ${p95.toFixed(1)} max ${max.toFixed(1)} requests ${requests}`);
+    window.__searchTiming = Object.assign(window.__searchTiming || {}, { instant: { n: ms.length, p50, p95, max } });
+    return `p50 ${p50.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, max ${max.toFixed(1)} ms over ${ms.length} keystrokes, 0 requests`;
+  });
+
+  await test('server search for comparison (list switched off): local server, and with the measured live delay added (0.95 s)', async () => {
+    billCatalog.setEnabled(false);
+    const realFetch = window.fetch;
+    try {
+      const local = await timeKeystrokes(QUERIES.slice(0, 12));
+      window.fetch = (...a) => (/search-products/.test(String(a[0])) ? new Promise((r) => setTimeout(r, 950)).then(() => realFetch(...a)) : realFetch(...a));
+      const remote = await timeKeystrokes(QUERIES.slice(0, 8));
+      window.__searchTiming = Object.assign(window.__searchTiming || {}, {
+        serverLocal: { n: local.length, p50: pct(local, 50), p95: pct(local, 95) },
+        serverWithLiveDelay: { n: remote.length, p50: pct(remote, 50), p95: pct(remote, 95) },
+      });
+      return `local server p50 ${pct(local, 50).toFixed(0)} / p95 ${pct(local, 95).toFixed(0)} ms; with 0.95 s live delay p50 ${pct(remote, 50).toFixed(0)} / p95 ${pct(remote, 95).toFixed(0)} ms`;
+    } finally { window.fetch = realFetch; billCatalog.setEnabled(true); }
+  });
+
+  await test('fast typing (10 characters in 1 second): no requests, no stale list, final results match the final text', async () => {
+    let requests = 0; const realFetch = window.fetch; window.fetch = (...a) => { if (/search-products/.test(String(a[0]))) requests++; return realFetch(...a); };
+    try {
+      focusCell(0, 'product'); const inp = document.activeElement; const word = 'azithral 2';
+      for (let i = 1; i <= word.length; i++) { inp.value = word.slice(0, i); inp.dispatchEvent(new Event('input', { bubbles: true })); await wait(100); }
+      const names = (window._lastSearchResults || []).map((r) => r.name);
+      expect(names.length > 0 && names.every((n) => /^AZITHRAL 2/.test(n)), names.slice(0, 3).join(', '));
+      expect(requests === 0, 'requests ' + requests);
+    } finally { window.fetch = realFetch; }
+  });
+
+  await test('Up/Down/Enter on instant results add the highlighted medicine with its first-to-sell batch', async () => {
+    focusCell(0, 'product'); typeInto('paracet'); await wait(20);
+    expect(window._lastSearchResults.length === 1 && /PARACETAMOL/.test(window._lastSearchResults[0].name), 'grouped result');
+    const tot = window._lastSearchResults[0].totalStock; const near = billCatalog.batchSearch('PCM-NEAR', 1)[0].quantity, far = billCatalog.batchSearch('PCM-FAR', 1)[0].quantity;
+    expect(tot === near + far && new RegExp('Stock: ' + tot + '\\b').test($('bill-search-results-dropdown').innerText), `total stock ${tot} vs ${near}+${far}: ` + $('bill-search-results-dropdown').innerText.slice(0, 160));
+    key('Enter'); await until(() => items().length === 1);
+    expect(items()[0].selectedBatch === 'PCM-NEAR' && (items()[0].batches || []).length >= 3, items()[0].selectedBatch + ' / ' + (items()[0].batches || []).length);
+  });
+
+  await test('just-sold item: the list shows the lower stock right after saving', async () => {
+    await addMed('bulk medicine 0600'); closeList(); focusCell(0, 'qty'); typeInto('3'); key('Enter');
+    const before = billCatalog.search('bulk medicine 0600', 1)[0].quantity;
+    await commitBillTransaction(false, true); await wait(200);
+    const after = billCatalog.search('bulk medicine 0600', 1)[0].quantity;
+    expect(after === before - 3, `before ${before} after ${after}`);
+    await until(() => !billCatalog.info().error && Date.now() - billCatalog.info().loadedAt < 5000, 8000);
+    const server = billCatalog.search('bulk medicine 0600', 1)[0].quantity;
+    expect(server === before - 3, 'after refresh ' + server);
+  });
+
+  await test('newly purchased stock: shown after the list refreshes (refresh button)', async () => {
+    const hit = billCatalog.search('bulk medicine 0601', 1)[0];
+    await api.request('/products/' + hit.id + '/quantity', { method: 'PUT', body: JSON.stringify({ quantity: Number(hit.quantity) + 25 }) });
+    $('bill-catalog-refresh').click(); await wait(100); await until(() => billCatalog.search('bulk medicine 0601', 1)[0].quantity === Number(hit.quantity) + 25, 8000);
+    expect(billCatalog.search('bulk medicine 0601', 1)[0].quantity === Number(hit.quantity) + 25, 'stock not refreshed');
+    expect(/Instant search/.test($('bill-catalog-status').textContent), 'status: ' + $('bill-catalog-status').textContent);
+  });
+
+  await test('offline after the list is loaded: search still works, nothing crashes, saving fails clearly and keeps the bill', async () => {
+    const realFetch = window.fetch; window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+    savedAlert.length = 0;
+    try {
+      focusCell(0, 'product'); typeInto('glycomet 500'); await wait(20);
+      expect((window._lastSearchResults || []).length > 0, 'no offline results');
+      key('Enter'); await wait(400);
+      expect(items().length === 1, 'not added offline');
+      await commitBillTransaction(false, true);
+      expect(items().length === 1 && savedAlert.length === 1, 'bill lost or no message');
+    } finally { window.fetch = realFetch; }
+  });
+
+  await test('list not available: the server search is used and works', async () => {
+    billCatalog.setEnabled(false);
+    try {
+      focusCell(0, 'product'); typeInto('paracet'); await until(() => (window._lastSearchResults || []).length > 0 && !/Searching/.test($('bill-search-results-dropdown').innerText), 6000);
+      expect(window._lastSearchResults.some((r) => /PARACETAMOL/.test(r.name)), 'server search failed');
+    } finally { billCatalog.setEnabled(true); }
+  });
+
+  // LAST: changes stock on the server behind the list's back
+  await test('server disagrees with the list (batch sold out elsewhere): the next valid batch is taken, with a message', async () => {
+    const near = billCatalog.batchSearch('PCM-NEAR', 1)[0];
+    await api.request('/products/' + near.id + '/quantity', { method: 'PUT', body: JSON.stringify({ quantity: 0 }) });
+    expect(billCatalog.batchSearch('PCM-NEAR', 1)[0].quantity > 0, 'list already knew');
+    focusCell(0, 'product'); typeInto('paracet'); await wait(20); key('Enter');
+    await until(() => items().length === 1 && items()[0].selectedBatch === 'PCM-FAR', 8000);
+    expect(items()[0].selectedBatch === 'PCM-FAR', 'kept the sold-out batch: ' + (items()[0] && items()[0].selectedBatch));
+    await api.request('/products/' + near.id + '/quantity', { method: 'PUT', body: JSON.stringify({ quantity: 12 }) });
   });
 
   window.alert = realAlert; window.open = realOpen;
