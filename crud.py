@@ -1816,180 +1816,6 @@ def create_sale_transaction(
 # SALE RETURNS
 # ===========================
 
-def create_sale_return(
-    db: Session,
-    sale_id: int,
-    return_data: schemas.SaleReturnCreate,
-    user_id: int,
-):
-    sale = (
-        db.query(models.Sale)
-        .filter(
-            models.Sale.id == sale_id,
-            models.Sale.user_id == user_id,
-        )
-        .with_for_update()
-        .first()
-    )
-
-    if sale is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sale bill not found for this shop.",
-        )
-
-    if sale.return_status == "returned":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This bill is already fully returned.",
-        )
-
-    total_refund = 0.0
-    return_items = []
-
-    try:
-        for item in return_data.items:
-            sale_item = (
-                db.query(models.SaleItem)
-                .filter(
-                    models.SaleItem.id == item.sale_item_id,
-                    models.SaleItem.sale_id == sale.id,
-                )
-                .with_for_update()
-                .first()
-            )
-
-            if sale_item is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Sale item ID {item.sale_item_id} not found.",
-                )
-
-            already_returned_quantity = (
-                db.query(func.coalesce(func.sum(models.SaleReturnItem.quantity), 0))
-                .filter(models.SaleReturnItem.sale_item_id == sale_item.id)
-                .scalar()
-            )
-
-            remaining_returnable = sale_item.quantity - already_returned_quantity
-
-            if item.quantity <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Return quantity must be greater than 0.",
-                )
-
-            if item.quantity > remaining_returnable:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Cannot return {item.quantity} units of "
-                        f"{sale_item.product_name}. Returnable quantity: "
-                        f"{remaining_returnable}."
-                    ),
-                )
-
-            product = (
-                db.query(models.Product)
-                .filter(
-                    models.Product.id == sale_item.product_id,
-                    models.Product.user_id == user_id,
-                )
-                .with_for_update()
-                .first()
-            )
-
-            if product is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Product for {sale_item.product_name} not found.",
-                )
-
-            if sale_item.unit_type == "loose_tablet":
-                product.loose_tablet_stock += item.quantity
-            else:
-                product.quantity += item.quantity
-
-            refund_amount = round(
-                sale_item.total_price * item.quantity / sale_item.quantity,
-                2,
-            )
-
-            total_refund += refund_amount
-
-            return_items.append(
-                models.SaleReturnItem(
-                    sale_item_id=sale_item.id,
-                    product_id=product.id,
-                    quantity=item.quantity,
-                    unit_price=sale_item.unit_price,
-                    return_total=refund_amount,
-                )
-            )
-
-        sale_return = models.SaleReturn(
-            sale_id=sale.id,
-            user_id=user_id,
-            reason=return_data.reason,
-            return_amount=round(total_refund, 2),
-            items=return_items,
-        )
-
-        db.add(sale_return)
-
-        total_sold_quantity = sum(item.quantity for item in sale.items)
-
-        total_returned_quantity = (
-            db.query(func.coalesce(func.sum(models.SaleReturnItem.quantity), 0))
-            .join(models.SaleReturn)
-            .filter(models.SaleReturn.sale_id == sale.id)
-            .scalar()
-        ) + sum(item.quantity for item in return_data.items)
-
-        if total_returned_quantity >= total_sold_quantity:
-            sale.return_status = "returned"
-        else:
-            sale.return_status = "partially_returned"
-
-        # Reconcile customer khata if original sale had credit allocation
-        if sale.customer_id:
-            customer = (
-                db.query(models.Customer)
-                .filter(models.Customer.id == sale.customer_id, models.Customer.user_id == user_id)
-                .with_for_update()
-                .first()
-            )
-            if customer:
-                credit_allocated = 0.0
-                if sale.payment_method in ["CREDIT", "PENDING"]:
-                    credit_allocated = float(sale.total_amount or 0.0)
-                elif sale.is_split_payment:
-                    credit_sp = db.query(func.sum(models.SalePayment.amount)).filter(
-                        models.SalePayment.sale_id == sale.id,
-                        models.SalePayment.payment_method == "CREDIT"
-                    ).scalar()
-                    credit_allocated = float(credit_sp or 0.0)
-
-                if credit_allocated > 0:
-                    reduction = min(round(total_refund, 2), float(customer.pending_amount or 0.0))
-                    customer.pending_amount = max(0.0, round(float(customer.pending_amount or 0.0) - reduction, 2))
-                    invalidate_customers_cache(user_id)
-
-        invalidate_products_cache(user_id)
-        db.commit()
-        db.refresh(sale_return)
-
-        return sale_return
-
-    except HTTPException:
-        db.rollback()
-        raise
-
-    except Exception:
-        db.rollback()
-        raise
-
-
 def get_todays_returns(
     db: Session,
     user_id: int,
@@ -2761,100 +2587,31 @@ def get_customers(db: Session, user_id: int):
 # ===========================
 
 def process_sale_return(db: Session, return_data: schemas.SaleReturnCreate, user_id: int):
-    sale = (
-        db.query(models.Sale)
-        .filter(models.Sale.id == return_data.sale_id, models.Sale.user_id == user_id)
+    """
+    POST /billing/returns (mobile app). Same rules as every other return: it only translates the request and the
+    answer, the work is done by process_sale_return_atomic (one return path: lock, cumulative check, stock, balance).
+    """
+    if not return_data.sale_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="sale_id is required.")
+    try:
+        res = process_sale_return_atomic(
+            db=db,
+            user_id=user_id,
+            sale_id=return_data.sale_id,
+            return_items=[{"sale_item_id": i.sale_item_id, "return_quantity": i.quantity} for i in return_data.items],
+            reason=return_data.reason,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        code = status.HTTP_404_NOT_FOUND if "not found" in msg.lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=msg)
+    sale_return = (
+        db.query(models.SaleReturn)
+        .options(joinedload(models.SaleReturn.items))
+        .filter(models.SaleReturn.id == res["return_id"])
         .first()
     )
-    if not sale:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sale bill not found.",
-        )
-
-    if getattr(sale, "return_status", None) == "returned":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This bill is already fully returned.",
-        )
-
-    total_return_amount = 0.0
-    return_items = []
-
-    for item_req in return_data.items:
-        sale_item = (
-            db.query(models.SaleItem)
-            .filter(
-                models.SaleItem.id == item_req.sale_item_id,
-                models.SaleItem.sale_id == sale.id,
-            )
-            .first()
-        )
-        if not sale_item:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Sale item ID {item_req.sale_item_id} not found in bill.",
-            )
-
-        if item_req.quantity > sale_item.quantity:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot return {item_req.quantity} of '{sale_item.product_name}'. Maximum sold: {sale_item.quantity}.",
-            )
-
-        # Calculate prorated refund amount per unit using total_price safely
-        item_total = getattr(sale_item, "total_price", None)
-        if item_total is None:
-            item_total = getattr(sale_item, "total_amount", None) or (sale_item.unit_price * sale_item.quantity)
-        
-        unit_refund = (item_total / sale_item.quantity) if sale_item.quantity > 0 else sale_item.unit_price
-        item_return_total = round(unit_refund * item_req.quantity, 2)
-        total_return_amount += item_return_total
-
-        # Restore inventory stock
-        product = db.query(models.Product).filter(
-            models.Product.id == sale_item.product_id,
-            models.Product.user_id == user_id
-        ).first()
-        if product:
-            if getattr(sale_item, "unit_type", "strip") == "strip":
-                product.quantity = (product.quantity or 0) + item_req.quantity
-            else:
-                product.loose_tablet_stock = (product.loose_tablet_stock or 0) + item_req.quantity
-
-        return_item = models.SaleReturnItem(
-            sale_item_id=sale_item.id,
-            product_id=sale_item.product_id,
-            quantity=item_req.quantity,
-            unit_price=round(unit_refund, 2),
-            return_total=item_return_total,
-        )
-        return_items.append(return_item)
-
-    sale_return = models.SaleReturn(
-        sale_id=sale.id,
-        user_id=user_id,
-        reason=return_data.reason or "Patient Return",
-        return_amount=round(total_return_amount, 2),
-        items=return_items,
-    )
-    db.add(sale_return)
-
-    sale.return_status = "partially_returned"
-
-    # Adjust customer outstanding credit if applicable
-    if sale.customer_id and sale.payment_method in ["CREDIT", "PENDING"]:
-        customer = db.query(models.Customer).filter(
-            models.Customer.id == sale.customer_id,
-            models.Customer.user_id == user_id
-        ).first()
-        if customer:
-            customer.pending_amount = max(0.0, customer.pending_amount - total_return_amount)
-
-    db.commit()
-    db.refresh(sale_return)
-    invalidate_products_cache(user_id)
-    invalidate_customers_cache(user_id)
+    sale_return.bill_number = res.get("bill_number")
     return sale_return
 
 
@@ -6422,6 +6179,29 @@ def search_sales_by_medicine(db: Session, user_id: int, query: str, limit: int =
     return results
 
 
+def _return_line_refund(sale_item: models.SaleItem, qty: int, refunded_before: float) -> float:
+    """
+    Refund for `qty` units of one bill line: that line's own total (taxable value after discounts + GST) shared per unit.
+    The return that completes the line gets the exact remainder, so the refunds of one line always add up to its total
+    (no lost or extra paisa). Old rows without a stored line total fall back to unit price x quantity.
+    """
+    r = _round_half_up
+    orig = int(sale_item.quantity or 1)
+    total = float(sale_item.total_with_tax or 0.0)
+    if total <= 0:
+        total = float(sale_item.taxable_value or 0.0) + float(sale_item.gst_amount or 0.0)
+    if total <= 0:
+        total = float(sale_item.total_price or 0.0)
+    if total <= 0:
+        total = float(sale_item.unit_price or 0.0) * orig
+    already = int(sale_item.returned_quantity or 0)
+    if already + qty >= orig:
+        refund = total - refunded_before
+    else:
+        refund = r(total * qty / orig, 2)
+    return max(0.0, r(refund, 2))
+
+
 def process_sale_return_atomic(
     db: Session,
     user_id: int,
@@ -6431,147 +6211,174 @@ def process_sale_return_atomic(
     staff_id: Optional[int] = None,
 ):
     """
-    Processes a sales return in an atomic database transaction.
-    1. Validates sale and sale items belong to user.
-    2. Validates return quantity <= available returnable quantity.
-    3. Creates SaleReturn and SaleReturnItem records.
-    4. Updates sale_item.returned_quantity.
-    5. Restores stock in Product inventory (batch preserved).
-    6. Updates Sale total_returned_amount and return_status.
-    7. Keeps original bill intact for audit integrity.
+    THE sales-return path (every return route ends here). One database transaction:
+      1. Locks the bill row (FOR UPDATE on Postgres), so two returns of the same bill are handled one after the other.
+      2. Per line: the quantity returned now plus everything returned before must not exceed what was sold.
+      3. Refund = the line's own total (with GST) shared per unit; the last unit gets the exact remainder.
+      4. Stock goes back to the SAME batch row it was sold from: strips to `quantity`, loose tablets to
+         `loose_tablet_stock` (never loose tablets into strips).
+      5. Credit bills: the refund first reduces what the customer still owes (only while the bill is unsettled).
+      6. return_status is "returned" only when every line is fully returned, else "partially_returned".
+    Any problem (bad quantity, over-return, unknown line) cancels the whole return: nothing is written. ValueError = the
+    caller's mistake (HTTP 400/404); the original bill is never edited except its returned counters and status.
     """
-    sale = db.query(models.Sale).filter(
-        models.Sale.id == sale_id,
-        models.Sale.user_id == user_id
-    ).with_for_update().first()
-
-    if not sale:
-        raise ValueError("Sale bill not found or access denied.")
-
-    if not return_items:
-        raise ValueError("No items provided for return.")
-
-    sale_return = models.SaleReturn(
-        sale_id=sale.id,
-        user_id=user_id,
-        reason=reason,
-        return_amount=0.0
-    )
-    db.add(sale_return)
-    db.flush()
-
-    total_refund_amount = 0.0
-    processed_items_summary = []
-
-    for item_req in return_items:
-        sale_item_id = item_req.get("sale_item_id")
-        return_qty = item_req.get("return_quantity")
-
-        if not sale_item_id or not return_qty or return_qty <= 0:
-            continue
-
-        sale_item = db.query(models.SaleItem).filter(
-            models.SaleItem.id == sale_item_id,
-            models.SaleItem.sale_id == sale.id
-        ).with_for_update().first()
-
-        if not sale_item:
-            raise ValueError(f"Sale item #{sale_item_id} not found in bill {sale.bill_number}.")
-
-        orig_qty = sale_item.quantity or 1
-        already_ret = sale_item.returned_quantity or 0
-        avail_qty = orig_qty - already_ret
-
-        if avail_qty <= 0:
-            raise ValueError(f"Item '{sale_item.product_name}' in bill {sale.bill_number} has already been fully returned.")
-
-        if return_qty > avail_qty:
-            raise ValueError(
-                f"Cannot return {return_qty} units of '{sale_item.product_name}'. "
-                f"Max available return quantity is {avail_qty} (Sold: {orig_qty}, Already Returned: {already_ret})."
-            )
-
-        unit_price = float(sale_item.unit_price or 0.0)
-        item_refund = round(return_qty * unit_price, 2)
-        total_refund_amount += item_refund
-
-        sale_item.returned_quantity = already_ret + return_qty
-
-        ret_item = models.SaleReturnItem(
-            sale_return_id=sale_return.id,
-            sale_item_id=sale_item.id,
-            product_id=sale_item.product_id or 0,
-            quantity=return_qty,
-            unit_price=unit_price,
-            return_total=item_refund
+    r = _round_half_up
+    try:
+        sale = (
+            db.query(models.Sale)
+            .filter(models.Sale.id == sale_id, models.Sale.user_id == user_id)
+            .with_for_update()
+            .first()
         )
-        db.add(ret_item)
+        if not sale:
+            raise ValueError("Sale bill not found or access denied.")
+        if not return_items:
+            raise ValueError("No items provided for return.")
+
+        # validate the whole request first: a half-valid request is refused, never half-applied
+        for req in return_items:
+            qty = req.get("return_quantity")
+            if not req.get("sale_item_id") or not isinstance(qty, int) or isinstance(qty, bool) or qty <= 0:
+                raise ValueError("Every returned line needs a sale_item_id and a whole return quantity of 1 or more.")
+
+        sale_return = models.SaleReturn(sale_id=sale.id, user_id=user_id, reason=reason, return_amount=0.0)
+        db.add(sale_return)
         db.flush()
 
-        product = None
-        if sale_item.product_id:
-            product = db.query(models.Product).filter(
-                models.Product.id == sale_item.product_id,
-                models.Product.user_id == user_id
-            ).first()
+        total_refund = 0.0
+        summary = []
 
-        if not product and sale_item.product_name:
-            prod_query = db.query(models.Product).filter(
-                models.Product.user_id == user_id,
-                models.Product.product_name == sale_item.product_name,
-                models.Product.is_deleted == False
+        for req in return_items:
+            sale_item = (
+                db.query(models.SaleItem)
+                .filter(models.SaleItem.id == req["sale_item_id"], models.SaleItem.sale_id == sale.id)
+                .with_for_update()
+                .first()
             )
-            if sale_item.batch_number:
-                prod_query = prod_query.filter(models.Product.batch_number == sale_item.batch_number)
-            product = prod_query.first()
+            if not sale_item:
+                raise ValueError(f"Sale item #{req['sale_item_id']} not found in bill {sale.bill_number}.")
 
-        if product:
-            product.quantity += return_qty
+            qty = req["return_quantity"]
+            orig_qty = int(sale_item.quantity or 1)
+            already_ret = int(sale_item.returned_quantity or 0)
+            avail = orig_qty - already_ret
+            if avail <= 0:
+                raise ValueError(f"Item '{sale_item.product_name}' in bill {sale.bill_number} has already been fully returned.")
+            if qty > avail:
+                raise ValueError(
+                    f"Cannot return {qty} units of '{sale_item.product_name}'. Max available return quantity is {avail} "
+                    f"(Sold: {orig_qty}, Already Returned: {already_ret})."
+                )
 
-            txn = models.InventoryTransaction(
-                transaction_id=f"RET-{sale_return.id}-{ret_item.id}",
-                shop_id=user_id,
-                product_id=product.id,
-                transaction_type="return",
-                quantity=return_qty,
-                unit_price=unit_price,
-                purchase_price=product.purchase_price or 0.0,
-                total_price=item_refund,
-                final_price=item_refund,
+            refunded_before = float(
+                db.query(func.coalesce(func.sum(models.SaleReturnItem.return_total), 0.0))
+                .filter(models.SaleReturnItem.sale_item_id == sale_item.id)
+                .scalar() or 0.0
             )
-            db.add(txn)
+            refund = _return_line_refund(sale_item, qty, refunded_before)
+            unit_refund = r(refund / qty, 2) if qty else 0.0
+            total_refund += refund
+            sale_item.returned_quantity = already_ret + qty
 
-        processed_items_summary.append({
-            "return_item_id": ret_item.id,
-            "sale_item_id": sale_item.id,
-            "product_id": sale_item.product_id,
-            "product_name": sale_item.product_name,
-            "batch_number": sale_item.batch_number,
-            "returned_quantity": return_qty,
-            "unit_price": unit_price,
-            "return_total": item_refund,
-        })
+            ret_item = models.SaleReturnItem(
+                sale_return_id=sale_return.id,
+                sale_item_id=sale_item.id,
+                product_id=sale_item.product_id or 0,
+                quantity=qty,
+                unit_price=unit_refund,
+                return_total=refund,
+            )
+            db.add(ret_item)
+            db.flush()
 
-    sale_return.return_amount = round(total_refund_amount, 2)
-    sale.total_returned_amount = round((sale.total_returned_amount or 0.0) + total_refund_amount, 2)
+            product = None
+            if sale_item.product_id:
+                product = db.query(models.Product).filter(
+                    models.Product.id == sale_item.product_id, models.Product.user_id == user_id
+                ).with_for_update().first()
+            if not product and sale_item.product_name:
+                q = db.query(models.Product).filter(
+                    models.Product.user_id == user_id,
+                    models.Product.product_name == sale_item.product_name,
+                    models.Product.is_deleted == False,
+                )
+                if sale_item.batch_number:
+                    q = q.filter(models.Product.batch_number == sale_item.batch_number)
+                product = q.first()
 
-    all_fully_returned = all(
-        (item.returned_quantity or 0) >= (item.quantity or 1)
-        for item in sale.items
-    )
-    sale.return_status = "returned" if all_fully_returned else "partially_returned"
+            stock_restored = False
+            if product:
+                is_loose = str(sale_item.unit_type or "strip").lower() not in ("strip", "pack")
+                if is_loose:
+                    product.loose_tablet_stock = int(product.loose_tablet_stock or 0) + qty
+                else:
+                    product.quantity = int(product.quantity or 0) + qty
+                stock_restored = True
+                db.add(models.InventoryTransaction(
+                    transaction_id=f"RET-{sale_return.id}-{ret_item.id}",
+                    shop_id=user_id,
+                    product_id=product.id,
+                    transaction_type="return",
+                    quantity=qty,
+                    unit_price=float(sale_item.unit_price or 0.0),
+                    purchase_price=product.purchase_price or 0.0,
+                    total_price=refund,
+                    final_price=refund,
+                ))
 
-    db.commit()
-    db.refresh(sale_return)
+            summary.append({
+                "return_item_id": ret_item.id,
+                "sale_item_id": sale_item.id,
+                "product_id": sale_item.product_id,
+                "product_name": sale_item.product_name,
+                "batch_number": sale_item.batch_number,
+                "returned_quantity": qty,
+                "unit_price": float(sale_item.unit_price or 0.0),
+                "return_total": refund,
+                "stock_restored": stock_restored,
+            })
 
+        total_refund = r(total_refund, 2)
+        sale_return.return_amount = total_refund
+        returned_before_total = float(sale.total_returned_amount or 0.0)
+        sale.total_returned_amount = r(returned_before_total + total_refund, 2)
+        db.flush()
+        sale.return_status = (
+            "returned"
+            if all(int(i.returned_quantity or 0) >= int(i.quantity or 1) for i in sale.items)
+            else "partially_returned"
+        )
+
+        # credit bill not yet paid: the refund first lowers what the customer still owes
+        if sale.customer_id and str(sale.payment_status or "").upper() == "PENDING":
+            credit_total = sum(float(p.amount or 0.0) for p in (sale.payments or []) if str(p.payment_method).upper() in ("CREDIT", "PENDING"))
+            if credit_total <= 0 and str(sale.payment_method or "").upper() in ("CREDIT", "PENDING"):
+                credit_total = float(sale.total_amount or 0.0)
+            relieved_before = min(returned_before_total, credit_total)
+            relief = max(0.0, min(total_refund, credit_total - relieved_before))
+            if relief > 0:
+                customer = db.query(models.Customer).filter(
+                    models.Customer.id == sale.customer_id, models.Customer.user_id == user_id
+                ).with_for_update().first()
+                if customer:
+                    customer.pending_amount = max(0.0, r(float(customer.pending_amount or 0.0) - relief, 2))
+
+        db.commit()
+        db.refresh(sale_return)
+    except Exception:
+        db.rollback()                       # nothing of a refused / failed return stays in the session
+        raise
+
+    invalidate_products_cache(user_id)
+    invalidate_customers_cache(user_id)
     return {
         "success": True,
-        "message": f"Successfully processed return of {len(processed_items_summary)} item(s) for Bill #{sale.bill_number}.",
+        "message": f"Successfully processed return of {len(summary)} item(s) for Bill #{sale.bill_number}.",
         "return_id": sale_return.id,
         "sale_id": sale.id,
         "bill_number": sale.bill_number,
-        "total_refund_amount": round(total_refund_amount, 2),
-        "returned_items": processed_items_summary,
+        "total_refund_amount": total_refund,
+        "returned_items": summary,
         "processed_at": sale_return.created_at or datetime.utcnow(),
     }
 
@@ -7156,11 +6963,22 @@ def get_sale_returns(db: Session, user_id: int, skip: int = 0, limit: int = 50) 
 
 
 def process_customer_return(db: Session, user_id: int, data: dict):
+    """POST /returns and /sale-returns: same return path; accepts `quantity` or `return_quantity` per line."""
     sale_id = data.get("sale_id")
     if not sale_id:
         raise HTTPException(status_code=400, detail="sale_id is required")
-    return process_sale_return(db=db, user_id=user_id, return_payload=data)
-
+    items = []
+    for it in data.get("items") or []:
+        qty = it.get("return_quantity", it.get("quantity"))
+        items.append({"sale_item_id": it.get("sale_item_id"), "return_quantity": qty})
+    try:
+        res = process_sale_return_atomic(
+            db=db, user_id=user_id, sale_id=sale_id, return_items=items, reason=data.get("reason") or "Customer Return",
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        raise HTTPException(status_code=404 if "not found" in msg.lower() else 400, detail=msg)
+    return res
 
 # ==============================================================================
 # STAFF & USER MANAGEMENT CRUD

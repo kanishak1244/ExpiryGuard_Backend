@@ -636,9 +636,12 @@ def process_sale_return_endpoint(
         )
         return res
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
+        raise HTTPException(status_code=404 if "not found" in str(ve).lower() else 400, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process return: {str(e)}")
+        logger.exception("Sale return failed")
+        raise HTTPException(status_code=500, detail="Failed to process return.")
 
 
 @router.get("/api/sales/returns")
