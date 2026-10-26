@@ -4141,9 +4141,6 @@ def create_purchase_invoice(db: Session, obj_in: schemas.PurchaseInvoiceCreate, 
     db.add(db_invoice)
     db.flush()
 
-    if obj_in.payment_status and obj_in.payment_status.upper() in ["PENDING", "CREDIT"]:
-        supplier.outstanding_payable = round((supplier.outstanding_payable or 0.0) + obj_in.total_amount, 2)
-
     # MRP is mandatory on every purchase line and never taken from the purchase price.
     for item in obj_in.items:
         validate_mrp(
@@ -4220,13 +4217,16 @@ def get_purchase_dashboard(db: Session, user_id: int):
         models.Supplier.user_id == user_id
     ).scalar() or 0
 
-    # Owed to suppliers = everything purchased minus everything paid (Supplier has no stored balance column).
+    # Owed to suppliers: same rule as the supplier ledger (PAID invoices owe nothing; payments and returns reduce it).
     total_purchased = db.query(func.sum(models.PurchaseInvoice.total_amount)).filter(
-        models.PurchaseInvoice.user_id == user_id
+        models.PurchaseInvoice.user_id == user_id,
+        func.upper(func.coalesce(models.PurchaseInvoice.payment_status, "")) != "PAID",
     ).scalar() or 0.0
-    total_paid = db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
+    total_paid = (db.query(func.sum(models.SupplierPayment.amount_paid)).filter(
         models.SupplierPayment.user_id == user_id
-    ).scalar() or 0.0
+    ).scalar() or 0.0) + (db.query(func.sum(models.PurchaseReturn.total_returned_value)).filter(
+        models.PurchaseReturn.user_id == user_id
+    ).scalar() or 0.0)
     pending_supplier_payables = max(0.0, float(total_purchased) - float(total_paid))
 
     return {
@@ -4483,6 +4483,9 @@ def create_supplier_payment(db: Session, obj_in: schemas.SupplierPaymentCreate, 
     ).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found or access denied.")
+
+    if not obj_in.amount_paid or obj_in.amount_paid <= 0:
+        raise HTTPException(status_code=400, detail="Payment amount must be greater than zero.")
 
     db_payment = models.SupplierPayment(
         user_id=user_id,
@@ -7270,11 +7273,72 @@ def record_customer_payment(db: Session, user_id: int, customer_id: int, amount:
 def get_purchases_dashboard(db: Session, user_id: int) -> dict:
     return get_purchase_dashboard(db, user_id)
 
-def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
-    return get_supplier_detail(db, user_id, supplier_id)
+def _supplier_ledger_rows(db: Session, user_id: int, supplier_id: int) -> list:
+    """
+    Supplier account built from the existing tables (no stored balance, so it can never drift):
+    a purchase invoice owes money (credit), a payment or a purchase return reduces it (debit).
+    An invoice marked PAID was settled when it was entered, so it adds no balance. UNPAID, PARTIAL and any
+    other status count in full; PARTIAL needs a paid-amount column to be exact (not available yet).
+    """
+    rows = []
+    for inv in db.query(models.PurchaseInvoice).filter(
+        models.PurchaseInvoice.user_id == user_id, models.PurchaseInvoice.supplier_id == supplier_id
+    ).all():
+        owed = 0.0 if str(inv.payment_status or "").upper() == "PAID" else float(inv.total_amount or 0.0)
+        rows.append({"date": inv.created_at, "type": "PURCHASE", "ref": inv.invoice_number, "id": inv.id,
+                     "credit": round(owed, 2), "debit": 0.0, "amount": round(float(inv.total_amount or 0.0), 2),
+                     "note": inv.payment_status})
+    for pay in db.query(models.SupplierPayment).filter(
+        models.SupplierPayment.user_id == user_id, models.SupplierPayment.supplier_id == supplier_id
+    ).all():
+        rows.append({"date": pay.created_at, "type": "PAYMENT", "ref": pay.payment_method, "id": pay.id,
+                     "credit": 0.0, "debit": round(float(pay.amount_paid or 0.0), 2),
+                     "amount": round(float(pay.amount_paid or 0.0), 2), "note": pay.notes})
+    for ret in db.query(models.PurchaseReturn).filter(
+        models.PurchaseReturn.user_id == user_id, models.PurchaseReturn.supplier_id == supplier_id
+    ).all():
+        rows.append({"date": ret.created_at, "type": "RETURN", "ref": ret.purchase_invoice_id, "id": ret.id,
+                     "credit": 0.0, "debit": round(float(ret.total_returned_value or 0.0), 2),
+                     "amount": round(float(ret.total_returned_value or 0.0), 2), "note": ret.reason})
+    rows.sort(key=lambda r: (r["date"] or datetime.min, r["type"], r["id"]))
+    balance = 0.0
+    for r in rows:
+        balance = round(balance + r["credit"] - r["debit"], 2)
+        r["balance"] = balance
+        r["date"] = r["date"].isoformat() if r["date"] else None
+    return rows
 
-def record_supplier_payment(db: Session, user_id: int, supplier_id: int, amount: float, payment_method: str = "CASH", reference_no: Optional[str] = None, notes: Optional[str] = None):
-    return create_supplier_payment(db, user_id, supplier_id, amount, payment_method, reference_no, notes)
+
+def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
+    """GET /suppliers/{id}/ledger: the supplier's details plus every purchase, payment and return with a running balance."""
+    supplier = get_supplier_detail(db, supplier_id, user_id)
+    rows = _supplier_ledger_rows(db, user_id, supplier_id)
+    return {
+        "supplier_id": supplier.id,
+        "name": supplier.name,
+        "gstin": supplier.gstin,
+        "phone": supplier.phone,
+        "payment_terms": supplier.payment_terms,
+        "status": supplier.status,
+        "total_purchased": round(sum(r["amount"] for r in rows if r["type"] == "PURCHASE"), 2),
+        "total_paid": round(sum(r["debit"] for r in rows if r["type"] == "PAYMENT"), 2),
+        "total_returned": round(sum(r["debit"] for r in rows if r["type"] == "RETURN"), 2),
+        "balance_payable": rows[-1]["balance"] if rows else 0.0,
+        "entries": rows,
+    }
+
+def record_supplier_payment(db: Session, user_id: int, data: dict):
+    """POST /supplier-payments (dict body). Same rules as create_supplier_payment."""
+    try:
+        payload = schemas.SupplierPaymentCreate(
+            supplier_id=data.get("supplier_id"),
+            amount_paid=data.get("amount_paid", data.get("amount")),
+            payment_method=str(data.get("payment_method") or "CASH").upper(),
+            notes=data.get("notes") or data.get("reference_no"),
+        )
+    except Exception:
+        raise HTTPException(status_code=400, detail="supplier_id and a numeric amount_paid are required.")
+    return create_supplier_payment(db, payload, user_id)
 
 
 # ==============================================================================

@@ -78,7 +78,7 @@ def create_supplier(
     db: Session = Depends(get_db),
 ):
     """Register a new distributor/supplier."""
-    created = crud.create_supplier(db, supplier, current_user.id)
+    created = crud.create_supplier(db, current_user.id, supplier)
     fast_cache.invalidate_user(current_user.id)
     return created
 
@@ -86,12 +86,12 @@ def create_supplier(
 @router.put("/suppliers/{supplier_id}")
 def update_supplier(
     supplier_id: int,
-    supplier: schemas.SupplierCreate,
+    supplier: schemas.SupplierUpdate,
     current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
     db: Session = Depends(get_db),
 ):
     """Update supplier profile details."""
-    updated = crud.update_supplier(db, supplier_id, supplier, current_user.id)
+    updated = crud.update_supplier(db, supplier_id, current_user.id, supplier)
     if not updated:
         raise HTTPException(status_code=404, detail="Supplier not found")
     fast_cache.invalidate_user(current_user.id)
