@@ -122,6 +122,9 @@
   // How the total was calculated and where it differs from the bill: shown only when it does not reconcile.
   function drReconHtml(v) {
     const r = v.reconciliation;
+    if (r && r.state === 'MISSING_PRINTED_TOTAL') return `<div class="dr-note warn"><b>Printed total not read.</b> Calculated ₹${money(r.calculated_total)}. Enter the supplier's printed total from the bill (Edit Bill Details); the calculated total is not used in its place.</div>`;
+    if (r && r.state === 'MISSING_TAX_INFO') return `<div class="dr-note warn"><b>Missing tax information.</b> ${(r.likely_causes || []).map(esc).join(' ')}</div>`;
+    if (r && r.state === 'CALCULATION_ERROR') return `<div class="dr-note warn"><b>Calculation error.</b> ${(r.likely_causes || []).map(esc).join(' ')}</div>`;
     if (!r || r.status !== 'REVIEW') return '';
     const rows = (r.components || []).map(c => `<tr class="${c.ok ? '' : 'dr-rowbad'}"><td>${esc(c.label)}</td><td class="num">${money(c.printed)}</td>
       <td class="num">${money(c.calculated)}</td><td class="num">${c.difference > 0 ? '+' : ''}${money(c.difference)}</td></tr>`).join('');
@@ -306,8 +309,10 @@
       if (!reason || reason.trim().length < 5) return;
       reason = reason.trim();
     }
-    if (belowCost) {
-      if (!window.confirm('Some MRPs are lower than the purchase rate. Check the bill. Confirm and add to stock anyway?')) return;
+    const gstUnverified = v.lines.filter(l => l.gst_needs_ack);
+    if (belowCost || gstUnverified.length) {
+      const why = (belowCost ? 'Some MRPs are lower than the purchase rate. ' : '') + (gstUnverified.length ? 'GST rate is not verified on the bill for row(s) ' + gstUnverified.map(l => l.row).join(', ') + '. ' : '');
+      if (!window.confirm(why + 'Check the bill. Confirm and add to stock anyway?')) return;
       ack = true;
     } else if (v.total_differs) {
       // already confirmed through the reason above

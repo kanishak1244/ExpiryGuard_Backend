@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import models
+import gst_resolver
 import purchase_calc
 import purchase_entry
 from ai import invoice_validation as val
@@ -38,6 +39,15 @@ def parse_ocr(doc: models.Document) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _printed(*candidates) -> Optional[float]:
+    """The supplier's printed total: the first value that is a positive number. Missing / unreadable / 0 = unknown (None), never ₹0.00."""
+    for c in candidates:
+        n = val.to_float(c)
+        if n is not None and n > 0:
+            return n
+    return None
+
+
 def effective(doc: models.Document) -> dict:
     """What the review shows: the user's corrections where saved, otherwise the OCR reading."""
     ocr = parse_ocr(doc)
@@ -46,7 +56,7 @@ def effective(doc: models.Document) -> dict:
     return {
         "invoice_number": (cor.get("invoice_number") if cor else None) or doc.invoice_number or ocr.get("invoice_number"),
         "invoice_date": (cor.get("invoice_date") if cor else None) or (doc.invoice_date.isoformat() if doc.invoice_date else None) or ocr.get("invoice_date"),
-        "printed_total": doc.total_amount if doc.total_amount else ocr.get("total_amount"),
+        "printed_total": _printed(cor.get("total_amount") if cor else None, doc.total_amount, ocr.get("total_amount")),
         "items": [i for i in items if isinstance(i, dict)],
         "corrected": bool(cor),
         "corrected_at": cor.get("saved_at") if cor else None,
@@ -58,35 +68,14 @@ def _num(v) -> Optional[float]:
     return val.to_float(v)
 
 
-def fill_hsn_gst(hsn, gst):
-    """
-    HSN and GST rate describe the same thing, so one can be filled from the other when a bill printed only one:
-    GST from the HSN table, or the usual HSN for that rate. Returns (hsn, gst, note); note says what was filled in.
-    Both missing -> (None, None, None): the user must give at least one.
-    """
-    import crud
-    clean = str(hsn or "").strip().replace(".", "")
-    table = crud.DEFAULT_HSN_TAX_MAPPINGS
-    if clean and gst is None:
-        for key in (clean, clean[:6], clean[:4]):
-            m = next((x for x in table if x["hsn_code"] == key), None)
-            if m:
-                return hsn, float(m["gst_rate"]), f"GST {m['gst_rate']:g}% filled in from HSN {key}"
-        return hsn, None, None
-    if gst is not None and not clean:
-        m = next((x for x in table if float(x["gst_rate"]) == float(gst) and x.get("category", "medicine") != "service"), None)
-        if m:
-            return m["hsn_code"], gst, f"HSN {m['hsn_code']} filled in from GST {gst:g}%"
-    return hsn, gst, None
-
-
 def _line_view(n: int, item: dict) -> dict:
     gst = _num(item.get("gst_rate") if item.get("gst_rate") is not None else item.get("gst_percentage"))
-    hsn, gst, filled = fill_hsn_gst(item.get("hsn_code"), gst)
+    hsn = item.get("hsn_code") or None
     return {
         "row": n,
         "product_name": (item.get("product_name") or "").strip() or None,
-        "hsn_code": hsn, "gst_rate": gst, "tax_filled": filled,
+        "hsn_code": hsn, "gst_rate": gst, "gst_verified": bool(item.get("gst_verified")),
+        "uncertain_fields": [str(f) for f in (item.get("uncertain_fields") or [])],
         "batch_number": (str(item.get("batch_number") or "").strip() or None),
         "expiry_date": item.get("expiry_date"),
         "quantity": _num(item.get("quantity")), "free_qty": _num(item.get("free_qty")),
@@ -169,10 +158,13 @@ def calculate_document(eff: dict, lines: List[dict]) -> Optional[dict]:
     if not priced:
         return None
     inp = invoice_inputs(eff, lines)
+    unresolved = [l["row"] for l in priced if l["gst_rate"] is None]
+    if unresolved:
+        return {"unresolved_tax_rows": unresolved, "inputs": inp}
     try:
         calc = purchase_calc.calc_invoice(
             [{"qty": l["quantity"], "free": l["free_qty"] or 0, "rate": l["purchase_price"], "disc_percent": l["discount_percent"] or 0,
-              "gst_rate": l["gst_rate"] or 0} for l in priced],
+              "gst_rate": l["gst_rate"]} for l in priced],
             invoice_discount_amount=inp["invoice_discount_amount"], other_charges=inp["other_charges"], interstate=inp["interstate"],
             prices_include_gst=inp["prices_include_gst"], round_to_rupee=inp["round_to_rupee"])
     except purchase_calc.CalcError as exc:
@@ -180,6 +172,17 @@ def calculate_document(eff: dict, lines: List[dict]) -> Optional[dict]:
     calc["reconciliation"] = purchase_calc.reconcile(calc, inp["printed"])
     calc["inputs"] = inp
     return calc
+
+
+def build_lines(db: Session, user_id: int, eff: dict, invoice_date=None) -> List[dict]:
+    """The document's lines with GST resolved from a named source (gst_resolver); an unresolved rate stays None with an error."""
+    on = invoice_date or eff.get("invoice_date")
+    lines = [_line_view(n, it) for n, it in enumerate(eff["items"], 1)]
+    for ln in lines:
+        res = gst_resolver.resolve(db, user_id, ln, on)
+        ln["gst_rate"], ln["gst_source"] = res["rate"], res["source"]
+        ln["gst_note"], ln["gst_needs_ack"], ln["gst_error"] = res["note"], res["needs_ack"], res["error"]
+    return lines
 
 
 def _line_problems(db: Session, user_id: int, line: dict, today: date) -> dict:
@@ -206,14 +209,10 @@ def _line_problems(db: Session, user_id: int, line: dict, today: date) -> dict:
         add("purchase_price", "Purchase rate is missing.")
     if not line["mrp"] or line["mrp"] <= 0:
         add("mrp", "MRP is missing.")
-    if line["gst_rate"] is None and not line["hsn_code"]:
-        add("gst_rate", "Neither HSN nor GST rate was read: enter at least one (the other is filled in from it).")
-    elif line["gst_rate"] is None:
-        add("gst_rate", "GST rate is missing and this HSN is not in the rate table: enter the GST rate.")
-    elif not (0 <= line["gst_rate"] <= 28):
-        add("gst_rate", "GST rate must be between 0 and 28.")
-    if line.get("tax_filled"):
-        warnings.append({"field": "gst_rate" if line["tax_filled"].startswith("GST") else "hsn_code", "message": line["tax_filled"] + " (check against the bill)."})
+    if line.get("gst_error"):
+        add("gst_rate", line["gst_error"])
+    elif line.get("gst_note"):
+        warnings.append({"field": "gst_rate", "message": line["gst_note"]})
     if line["discount_percent"] is not None and not (0 <= line["discount_percent"] <= 100):
         add("discount_percent", "Discount must be between 0 and 100%.")
     for f, why in (line["field_flags"] or {}).items():
@@ -278,7 +277,12 @@ def _active_draft(db: Session, user_id: int, document_id: int) -> Optional[dict]
 def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
     eff = effective(doc)
     today = date.today()
-    lines = [_line_view(n, it) for n, it in enumerate(eff["items"], 1)]
+    inv_on = None
+    try:
+        inv_on = datetime.strptime(str(eff["invoice_date"])[:10], "%Y-%m-%d").date() if eff["invoice_date"] else None
+    except ValueError:
+        inv_on = None
+    lines = build_lines(db, user_id, eff, inv_on)
     for ln in lines:
         ln.update(_line_problems(db, user_id, ln, today))
     header_block = []
@@ -307,17 +311,29 @@ def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
     calc = calculate_document(eff, lines)
     notes = []
     printed = _num(eff["printed_total"])
+    if printed is not None and printed <= 0:
+        printed = None                                          # an unread total is unknown, never a genuine ₹0.00
     total_differs = False
     totals = None
     recon = None
-    if calc and calc.get("error"):
+    if printed is None:
+        hb("printed_total", "The supplier's printed invoice total was not read. Enter it from the bill (Edit Bill Details): the calculated total is never used in its place.")
+    if calc and calc.get("unresolved_tax_rows"):
+        rows = ", ".join(str(r) for r in calc["unresolved_tax_rows"])
+        recon = {"state": "MISSING_TAX_INFO", "status": "MISSING_TAX_INFO", "printed_total": printed, "calculated_total": None, "difference": None,
+                 "tolerance": float(purchase_calc.tolerance()), "components": [], "likely_causes": [f"GST rate is unresolved on row(s) {rows}, so a total cannot be calculated yet."]}
+    elif calc and calc.get("error"):
+        recon = {"state": "CALCULATION_ERROR", "status": "CALCULATION_ERROR", "printed_total": printed, "calculated_total": None, "difference": None,
+                 "tolerance": float(purchase_calc.tolerance()), "components": [], "likely_causes": [calc["error"]]}
         hb("total", "The invoice figures cannot be calculated: " + calc["error"])
     elif calc:
         ct = calc["totals"]
         totals = {"total": ct["payable"], "taxable": ct["taxable"], "gst": ct["tax"], "discount": ct["discount"], "gross": ct["gross"],
                   "cgst": ct["cgst"], "sgst": ct["sgst"], "igst": ct["igst"], "other_charges": ct["other_charges"], "round_off": ct["round_off"]}
         recon = calc["reconciliation"]
-        total_differs = recon["status"] == "REVIEW"
+        if printed is None:
+            recon = dict(recon, state="MISSING_PRINTED_TOTAL", status="NO_PRINTED_TOTAL", printed_total=None, difference=None)
+        total_differs = recon["state"] == "MISMATCH"
         notes.extend(calc["inputs"]["notes"])
         if total_differs:
             notes.insert(0, f"Calculated total ₹{recon['calculated_total']:.2f} differs from the printed total ₹{recon['printed_total']:.2f} by ₹{abs(recon['difference']):.2f}.")
@@ -341,8 +357,8 @@ def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
         "invoice_number": inv_no or None, "invoice_date": inv_date.isoformat() if inv_date else (eff["invoice_date"] or None),
         "printed_total": printed, "computed": totals, "total_differs": total_differs, "notes": notes,
         "reconciliation": recon, "header_figures": {k: v for k, v in header_figures(eff).items() if k in ("discount_amount", "other_amount", "discount")},
-        "calculation_policy": calc["policy"] if calc and not calc.get("error") else None,
-        "tax_groups": calc["tax_groups"] if calc and not calc.get("error") else [],
+        "calculation_policy": calc["policy"] if calc and "policy" in calc else None,
+        "tax_groups": calc["tax_groups"] if calc and "tax_groups" in calc else [],
         "line_count": len(lines), "lines": lines, "raw_items": eff["items"], "blocking": blocking, "blocking_count": len(blocking),
         "can_confirm": not blocking and not verified and not failed, "can_edit": not verified,
         "verified": verified, "failed": failed, "draft": _active_draft(db, user_id, doc.id),
@@ -415,11 +431,16 @@ def confirm_document(db: Session, user_id: int, doc: models.Document, acknowledg
             f"(difference ₹{recon['difference']:+.2f}, tolerance ₹{recon['tolerance']:.2f}). " + " ".join(recon["likely_causes"]) +
             " Correct the bill details, or confirm with an override reason."))
     below_cost = [f"row {l['row']} {l['product_name']}" for l in view["lines"] if any(w["field"] == "mrp" and "lower than the purchase rate" in w["message"] for w in l["warnings"])]
-    if below_cost and not acknowledge_warnings:
-        raise HTTPException(status_code=409, detail="NEEDS_ACKNOWLEDGEMENT: MRP is below the purchase rate for: " + ", ".join(below_cost) +
-                                                    ". Check the bill, then confirm again to accept.")
+    unverified = [f"row {l['row']} {l['product_name']} ({l['gst_rate']:g}% from {l['gst_source'].replace('_', ' ')})" for l in view["lines"] if l.get("gst_needs_ack")]
+    if (below_cost or unverified) and not acknowledge_warnings:
+        parts = []
+        if below_cost:
+            parts.append("MRP is below the purchase rate for: " + ", ".join(below_cost) + ".")
+        if unverified:
+            parts.append("GST rate not verified on the bill for: " + ", ".join(unverified) + ".")
+        raise HTTPException(status_code=409, detail="NEEDS_ACKNOWLEDGEMENT: " + " ".join(parts) + " Check the bill, then confirm again to accept.")
     eff = effective(doc)
-    lines = [_line_view(n, it) for n, it in enumerate(eff["items"], 1)]
+    lines = build_lines(db, user_id, eff, view["invoice_date"])
     payload = _to_purchase(doc, doc.supplier_id, {"invoice_number": view["invoice_number"], "invoice_date": view["invoice_date"]}, lines,
                            expected_total=view["computed"]["total"] if view["computed"] else None, allow_below_cost=bool(below_cost), raw_eff=eff)
     res = purchase_entry.post_manual_purchase(db, user_id, payload, document_id=doc.id, override_reason=reason if view["total_differs"] else None)

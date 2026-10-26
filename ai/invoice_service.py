@@ -459,7 +459,9 @@ def _header_and_reconciliation(result: dict, items: List[dict]) -> dict:
     if raw_cgst > 0 or raw_sgst > 0 or raw_igst > 0:
         raw_tax = round(raw_cgst + raw_sgst + raw_igst, 2)
     raw_other = _safe_float(result.get("other_amount"))
-    raw_total = _safe_float(result.get("total_amount"))
+    raw_total = _safe_float_nullable(result.get("total_amount"))          # missing stays None: never a genuine 0.00
+    if raw_total is not None and raw_total <= 0:
+        raw_total = None
     label = str(result.get("total_amount_label") or "").strip()
 
     calculated_subtotal = round(sum((it.get("total_price") or 0.0) for it in items), 2)
@@ -467,7 +469,7 @@ def _header_and_reconciliation(result: dict, items: List[dict]) -> dict:
     calculated_taxable = round(max(0.0, raw_subtotal - effective_discounts), 2) if raw_subtotal else 0.0
     calculated_net_total = round(raw_taxable + raw_tax + raw_other, 2) if raw_taxable else 0.0
     subtotal_match = (not raw_subtotal) or abs(raw_subtotal - calculated_subtotal) <= max(2.0, 0.02 * raw_subtotal)
-    net_match = (not raw_total or not calculated_net_total) or abs(raw_total - calculated_net_total) <= 1.0
+    net_match = (raw_total is None or not calculated_net_total) or abs(raw_total - calculated_net_total) <= 1.0
 
     reconciliation = {
         "subtotal_status": "PASS" if subtotal_match else "REVIEW",
@@ -489,7 +491,8 @@ def _header_and_reconciliation(result: dict, items: List[dict]) -> dict:
         "net_total_status": "PASS" if net_match else "REVIEW",
         "calculated_net_total": calculated_net_total,
         "printed_net_total": raw_total,
-        "net_total_diff": round(raw_total - calculated_net_total, 2),
+        "printed_total_status": "READ" if raw_total is not None else "MISSING",
+        "net_total_diff": round(raw_total - calculated_net_total, 2) if raw_total is not None else None,
         "total_amount_label": label,
         "overall_status": "PASS" if (subtotal_match and net_match) else "REVIEW",
     }

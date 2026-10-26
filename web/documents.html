@@ -891,14 +891,15 @@
         const flags = item.field_flags || {};
         const fl = (k) => (flags[k] ? 'flagged' : '');
         const tt = (k) => (flags[k] ? `title="${esc(flags[k])}"` : '');
-        const hsn = item.hsn_code || (flags.hsn_code ? '' : '3004');
-        const gst = item.gst_rate || item.gst_percentage || (flags.gst_rate ? '' : getGstRateFromHsn(hsn || '3004'));
+        const hsn = item.hsn_code || '';                 // never invent an HSN
+        const gstRaw = item.gst_rate != null ? item.gst_rate : item.gst_percentage;
+        const gst = gstRaw == null ? '' : gstRaw;      // blank = not read; the server resolves or blocks it, no silent default
         const extra = esc(JSON.stringify({ brand: item.brand, free_qty: item.free_qty, discount_percent: item.discount_percent, total_price: item.total_price, manufacturing_date: item.manufacturing_date }));
         return `
           <tr data-extra="${extra}">
             <td><input type="text" class="form-input item-name ${fl('product_name')}" ${tt('product_name')} value="${esc(item.product_name || '')}" style="padding: 4px;"></td>
             <td><input type="text" class="form-input item-hsn ${fl('hsn_code')}" ${tt('hsn_code')} value="${hsn}" oninput="this.classList.remove('flagged'); handleHsnInputChange(this)" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.5" class="form-input item-gst ${fl('gst_rate')}" ${tt('gst_rate')} value="${gst}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 65px;"></td>
+            <td><input type="number" step="0.5" class="form-input item-gst ${fl('gst_rate')}" ${tt('gst_rate')} value="${gst}" data-orig="${gst}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 65px;"></td>
             <td><input type="text" class="form-input item-batch ${fl('batch_number')}" ${tt('batch_number')} value="${esc(item.batch_number || '')}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 85px;"></td>
             <td><input type="number" class="form-input item-qty ${fl('quantity')}" ${tt('quantity')} value="${item.quantity || ''}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 55px;"></td>
             <td><input type="number" step="0.01" class="form-input item-pprice ${fl('purchase_price')}" ${tt('purchase_price')} value="${item.purchase_price || ''}" placeholder="Purchase" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 75px;"></td>
@@ -943,6 +944,7 @@
           product_name: name || null,
           hsn_code: r.querySelector('.item-hsn')?.value.trim() || null,
           gst_rate: num(r.querySelector('.item-gst')?.value),
+          gst_verified: (() => { const g = r.querySelector('.item-gst'); return !!g && g.value !== '' && g.value !== g.dataset.orig; })(),   // true only when the user typed this rate
           batch_number: batch || null,
           quantity: qty === '' || qty == null ? null : parseInt(qty, 10),
           purchase_price: num(r.querySelector('.item-pprice')?.value),
@@ -1030,6 +1032,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.6" defer></script>
-  <script src="js/doc_review.js?v=1.5" defer></script>
+  <script src="js/doc_review.js?v=1.6" defer></script>
 </body>
 </html>

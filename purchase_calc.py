@@ -236,7 +236,9 @@ def reconcile(calc: dict, printed: Optional[dict], tol: Optional[Decimal] = None
             causes.insert(0, f"The bill shows a discount of {float(pd_):.2f} but none was applied in the calculation.")
         if not causes:
             causes.append("The printed components agree with the calculation, so a line amount, a rate or a missing/extra charge on the bill is the likely source: check the lines against the bill.")
+    state = "MISSING_PRINTED_TOTAL" if pt is None else ("MATCHED" if ok else "MISMATCH")
     return {
+        "state": state,
         "status": "NO_PRINTED_TOTAL" if pt is None else ("PASS" if ok else "REVIEW"),
         "printed_total": float(pt) if pt is not None else None, "calculated_total": t["payable"],
         "difference": float(diff) if diff is not None else None, "tolerance": float(tol),

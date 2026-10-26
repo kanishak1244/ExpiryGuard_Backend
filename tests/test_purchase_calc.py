@@ -381,7 +381,7 @@ class TestInvoiceWorkflow(unittest.TestCase):
         doc = self.doc([ocr_line(100.0, gst=12, name="OVR")], total=999.0, invoice_no="J-5")
         too_short = self.c.post("/documents/%d/confirm-review" % doc, json={"override_reason": "ok"})
         self.assertEqual(too_short.status_code, 409)
-        ok = self.c.post("/documents/%d/confirm-review" % doc, json={"override_reason": "Supplier confirmed the printed total is wrong"})
+        ok = self.c.post("/documents/%d/confirm-review" % doc, json={"override_reason": "Supplier confirmed the printed total is wrong", "acknowledge_warnings": True})
         self.assertEqual(ok.status_code, 200, ok.text)
         self.assertEqual(ok.json()["total_amount"], 112.0)                                   # the calculated total is posted, not the printed one
         d = self.S()

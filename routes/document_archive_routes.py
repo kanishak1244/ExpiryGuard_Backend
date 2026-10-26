@@ -206,8 +206,9 @@ def trigger_document_ocr(
                 doc.invoice_date = datetime.strptime(data.get("invoice_date").strip(), "%Y-%m-%d").date()
             except Exception as d_err:
                 logger.info("[OCR:ENDPOINT] Could not parse invoice date %r: %s", data.get("invoice_date"), d_err)
-        if data.get("total_amount") is not None:
-            doc.total_amount = float(data.get("total_amount") or 0.0)
+        # the printed total, exactly as read; when the bill's total could not be read it stays unknown (None), not 0.00
+        printed = data.get("total_amount")
+        doc.total_amount = float(printed) if printed not in (None, "") and float(printed) > 0 else None
         if data.get("items"):
             doc.item_count = len(data.get("items"))
 
