@@ -274,10 +274,10 @@
   <!-- JavaScript -->
   <script src="js/api.js?v=9.4" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
-  <script src="js/nav.js?v=9.4" defer></script>
+  <script src="js/nav.js?v=9.5" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
-  <script src="js/add_inventory_flow.js?v=9.4" defer></script>
+  <script src="js/add_inventory_flow.js?v=9.5" defer></script>
 
   <script>
     let allRecommendations = [];
@@ -594,9 +594,8 @@
     }
 
     function addToPurchaseDraft(productId, productName, qty, supplierId) {
-      if (typeof openAddInventoryModal === 'function') {
-        openAddInventoryModal();
-        showSearchMedicineStep();
+      if (typeof openAddInventoryWorkflow === 'function') {
+        openAddInventoryWorkflow('search');
         const searchBox = document.getElementById('inv-flow-search');
         if (searchBox) {
           searchBox.value = productName;
@@ -614,7 +613,6 @@
     function createSupplierPurchaseDraft() {
       if (typeof openAddInventoryModal === 'function') {
         openAddInventoryModal();
-        showChoiceStep();
       }
     }
   </script>

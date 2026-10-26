@@ -4,6 +4,7 @@ Handles purchase bill entry, stock intake, supplier catalog CRUD, ledger balance
 """
 
 import logging
+from datetime import date
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -50,6 +51,40 @@ def get_purchase_invoices(
 ):
     """Get historical purchase invoices with optional supplier filter."""
     return crud.get_purchase_invoices(db, current_user.id, skip=skip, limit=limit, supplier_id=supplier_id)
+
+
+@router.get("/purchases/list")
+def list_purchase_documents(
+    q: Optional[str] = Query(None, max_length=80),
+    supplier_id: Optional[int] = Query(None, ge=1),
+    status: Optional[str] = Query(None, pattern="^(?i:PAID|UNPAID|PARTIAL)$"),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Purchase Management list: saved purchase invoices of this shop (read-only, server-side paging) + summary."""
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must not be after date_to.")
+    return crud.list_purchase_documents(
+        db, current_user.id, q=q, supplier_id=supplier_id, status=status,
+        date_from=date_from, date_to=date_to, page=page, page_size=page_size,
+    )
+
+
+@router.get("/purchases/detail/{purchase_id}")
+def get_purchase_document_detail(
+    purchase_id: int,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    """One saved purchase with supplier and medicine names (read-only)."""
+    doc = crud.get_purchase_document_detail(db, current_user.id, purchase_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Purchase not found.")
+    return doc
 
 
 @router.get("/purchases/dashboard")

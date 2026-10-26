@@ -353,7 +353,16 @@ function createAddInventoryModalDOM() {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
+/**
+ * "+ Add Inventory" everywhere in the app opens the Purchase Management screen (purchase list + the three ways to add
+ * stock). The step windows below (search / import) open from there through openAddInventoryWorkflow.
+ */
 function openAddInventoryModal() {
+  if (/purchases\.html$/i.test(window.location.pathname)) return;
+  window.location.href = 'purchases.html';
+}
+
+function openAddInventoryWorkflow(step) {
   if (!document.getElementById('add-inventory-modal')) {
     createAddInventoryModalDOM();
   }
@@ -363,10 +372,13 @@ function openAddInventoryModal() {
   refreshFlowSuppliers();
   const modal = document.getElementById('add-inventory-modal');
   if (modal) modal.classList.add('active');
+  if (step === 'search') showSearchMedicineStep();
+  else if (step === 'import') showBulkImportStep();
 }
 
 function closeAddInventoryModal() {
-  document.getElementById('add-inventory-modal').classList.remove('active');
+  const modal = document.getElementById('add-inventory-modal');
+  if (modal) modal.classList.remove('active');
 }
 
 function showChoiceStep() {

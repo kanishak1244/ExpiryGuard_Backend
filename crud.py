@@ -4244,6 +4244,147 @@ def get_purchase_invoices(db: Session, user_id: int, skip: int = 0, limit: int =
     return query.offset(skip).limit(limit).all()
 
 
+def purchase_voucher_no(purchase_id: int) -> str:
+    """Internal purchase reference shown to staff. Derived from the row id (no stored column), so it is stable and unique."""
+    return f"PUR-{int(purchase_id):05d}"
+
+
+def list_purchase_documents(
+    db: Session,
+    user_id: int,
+    q: Optional[str] = None,
+    supplier_id: Optional[int] = None,
+    status: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> dict:
+    """
+    Read-only purchase list for the Purchase Management screen: one page of saved purchase invoices of this shop with
+    supplier name and item count, plus a summary. Never changes stock or ledgers.
+    paid_amount / outstanding_amount are given only where the schema makes them certain: PAID -> paid in full,
+    UNPAID -> nothing paid; PARTIAL (and anything else) has no stored paid amount, so they are null, not guessed.
+    """
+    PI, PItem, Sup = models.PurchaseInvoice, models.PurchaseItem, models.Supplier
+    page = max(1, int(page or 1))
+    page_size = min(100, max(1, int(page_size or 25)))
+
+    def apply_filters(query):
+        query = query.filter(PI.user_id == user_id)
+        if supplier_id:
+            query = query.filter(PI.supplier_id == supplier_id)
+        if status:
+            query = query.filter(func.upper(PI.payment_status) == status.strip().upper())
+        if date_from:
+            query = query.filter(PI.invoice_date >= date_from)
+        if date_to:
+            query = query.filter(PI.invoice_date <= date_to)
+        term = (q or "").strip()
+        if term:
+            like = f"%{term.lower()}%"
+            conds = [func.lower(PI.invoice_number).like(like), func.lower(Sup.name).like(like)]
+            digits = "".join(ch for ch in term if ch.isdigit())
+            if term.upper().startswith("PUR") and digits:
+                conds.append(PI.id == int(digits))
+            query = query.filter(or_(*conds))
+        return query
+
+    base = apply_filters(db.query(PI).join(Sup, Sup.id == PI.supplier_id))
+    total = base.with_entities(func.count(PI.id)).scalar() or 0
+    total_value = base.with_entities(func.coalesce(func.sum(PI.total_amount), 0.0)).scalar() or 0.0
+
+    item_counts = (
+        db.query(PItem.purchase_invoice_id.label("pid"), func.count(PItem.id).label("n"))
+        .group_by(PItem.purchase_invoice_id).subquery()
+    )
+    rows = (
+        apply_filters(
+            db.query(PI, Sup.name, func.coalesce(item_counts.c.n, 0))
+            .join(Sup, Sup.id == PI.supplier_id)
+            .outerjoin(item_counts, item_counts.c.pid == PI.id)
+        )
+        .order_by(PI.invoice_date.desc(), PI.id.desc())
+        .offset((page - 1) * page_size).limit(page_size).all()
+    )
+
+    items = []
+    for inv, supplier_name, n_items in rows:
+        st = str(inv.payment_status or "").upper()
+        amount = round(float(inv.total_amount or 0.0), 2)
+        paid = amount if st == "PAID" else (0.0 if st == "UNPAID" else None)
+        items.append({
+            "id": inv.id,
+            "voucher_no": purchase_voucher_no(inv.id),
+            "invoice_number": inv.invoice_number,
+            "supplier_id": inv.supplier_id,
+            "supplier_name": supplier_name,
+            "invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
+            "items_count": int(n_items or 0),
+            "total_amount": amount,
+            "tax_amount": round(float(inv.tax_amount or 0.0), 2),
+            "payment_status": st or None,
+            "paid_amount": paid,
+            "outstanding_amount": None if paid is None else round(amount - paid, 2),
+        })
+
+    # shop-wide payables, same rule as the supplier ledger (PAID owes nothing; payments and returns reduce it)
+    owed = dict(db.query(PI.supplier_id, func.coalesce(func.sum(PI.total_amount), 0.0)).filter(
+        PI.user_id == user_id, func.upper(func.coalesce(PI.payment_status, "")) != "PAID").group_by(PI.supplier_id).all())
+    paid_by = dict(db.query(models.SupplierPayment.supplier_id, func.coalesce(func.sum(models.SupplierPayment.amount_paid), 0.0)).filter(
+        models.SupplierPayment.user_id == user_id).group_by(models.SupplierPayment.supplier_id).all())
+    ret_by = dict(db.query(models.PurchaseReturn.supplier_id, func.coalesce(func.sum(models.PurchaseReturn.total_returned_value), 0.0)).filter(
+        models.PurchaseReturn.user_id == user_id).group_by(models.PurchaseReturn.supplier_id).all())
+    balances = [round(float(owed.get(sid, 0.0)) - float(paid_by.get(sid, 0.0)) - float(ret_by.get(sid, 0.0)), 2)
+                for sid in set(owed) | set(paid_by) | set(ret_by)]
+    positive = [b for b in balances if b > 0]
+
+    return {
+        "items": items,
+        "total": int(total),
+        "page": page,
+        "page_size": page_size,
+        "summary": {
+            "documents": int(total),
+            "total_value": round(float(total_value), 2),
+            "outstanding_payables": round(sum(positive), 2),
+            "suppliers_with_balance": len(positive),
+        },
+    }
+
+
+def get_purchase_document_detail(db: Session, user_id: int, purchase_id: int) -> Optional[dict]:
+    """Read-only detail of one saved purchase (header, supplier, lines with medicine names). None if not this shop's."""
+    inv = db.query(models.PurchaseInvoice).filter(
+        models.PurchaseInvoice.id == purchase_id, models.PurchaseInvoice.user_id == user_id).first()
+    if not inv:
+        return None
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == inv.supplier_id, models.Supplier.user_id == user_id).first()
+    lines = (
+        db.query(models.PurchaseItem, models.Product.product_name)
+        .outerjoin(models.Product, models.Product.id == models.PurchaseItem.product_id)
+        .filter(models.PurchaseItem.purchase_invoice_id == inv.id)
+        .order_by(models.PurchaseItem.id).all()
+    )
+    st = str(inv.payment_status or "").upper()
+    return {
+        "id": inv.id,
+        "voucher_no": purchase_voucher_no(inv.id),
+        "invoice_number": inv.invoice_number,
+        "invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
+        "supplier_id": inv.supplier_id,
+        "supplier_name": supplier.name if supplier else None,
+        "total_amount": round(float(inv.total_amount or 0.0), 2),
+        "tax_amount": round(float(inv.tax_amount or 0.0), 2),
+        "payment_status": st or None,
+        "items": [{
+            "id": it.id, "product_id": it.product_id, "product_name": name, "batch_number": it.batch_number,
+            "quantity": it.quantity, "purchase_price": it.purchase_price, "mrp": it.mrp, "gst_rate": it.gst_rate,
+            "expiry_date": it.expiry_date.isoformat() if it.expiry_date else None,
+        } for it, name in lines],
+    }
+
+
 def get_purchase_invoice(db: Session, purchase_id: int, user_id: int):
     return db.query(models.PurchaseInvoice).filter(
         models.PurchaseInvoice.id == purchase_id,

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purchase Management — DawaiFlow Web App</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=10.9">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container layout-pinned" id="purchases-page">
+    
+    <!-- Sidebar -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item active" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Returns & Refunds</span>
+        </a>
+        <a href="gst_filing.html" class="nav-item" data-nav-id="gst-filing">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">GST Filing</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Purchase Management</h1>
+        </div>
+        <div class="live-indicator">
+          <div class="pulse-dot"></div>
+          <span>REAL-TIME SYNC</span>
+        </div>
+      </header>
+
+
+
+      <main class="content-body">
+        <style>
+          .pm-sub { margin: 0 0 14px 0; font-size: 13px; color: var(--muted-text); }
+          .pm-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+          .pm-action { display: flex; align-items: center; gap: 12px; text-align: left; padding: 14px 16px; cursor: pointer;
+            border: 1.5px solid var(--border-color); border-radius: var(--radius-md); background-color: var(--color-surface-card); color: var(--dark-text);
+            font: inherit; transition: border-color .15s ease, box-shadow .15s ease; }
+          .pm-action:hover, .pm-action:focus-visible { border-color: var(--primary-green); box-shadow: 0 2px 10px rgba(13,148,136,.12); outline: none; }
+          .pm-action .pm-ico { font-size: 28px; line-height: 1; flex: 0 0 auto; }
+          .pm-action .pm-t { display: block; font-size: 14.5px; font-weight: 700; color: var(--dark-text); }
+          .pm-action .pm-d { display: block; font-size: 12px; color: var(--muted-text); margin-top: 2px; line-height: 1.35; }
+          .pm-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+          .pm-kpi { padding: 10px 14px; }
+          .pm-kpi .l { font-size: 11.5px; color: var(--muted-text); text-transform: uppercase; letter-spacing: .03em; }
+          .pm-kpi .v { font-size: 19px; font-weight: 700; color: var(--dark-text); margin-top: 2px; }
+          .pm-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+          .pm-filters label { display: flex; flex-direction: column; font-size: 11.5px; color: var(--muted-text); gap: 3px; }
+          .pm-filters .form-input { min-width: 130px; padding: 7px 9px; font-size: 13px; }
+          .pm-filters .pm-q { min-width: 240px; flex: 1 1 240px; }
+          .pm-state { padding: 34px 16px; text-align: center; color: var(--muted-text); font-size: 13.5px; }
+          .pm-state strong { display: block; color: var(--dark-text); font-size: 15px; margin-bottom: 4px; }
+          .pm-pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px; font-size: 12.5px; color: var(--muted-text); flex-wrap: wrap; }
+          .pm-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: #E2E8F0; color: #334155; }
+          .pm-badge.PAID { background: #DCFCE7; color: #166534; }
+          .pm-badge.UNPAID { background: #FEE2E2; color: #991B1B; }
+          .pm-badge.PARTIAL { background: #FEF3C7; color: #92400E; }
+          .pm-na { color: var(--muted-text); }
+          .pm-note { font-size: 12px; color: var(--muted-text); margin-top: 8px; }
+          @media (max-width: 1000px) { .pm-actions { grid-template-columns: 1fr; } .pm-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+          @media (max-width: 520px) { .pm-summary { grid-template-columns: 1fr; } .pm-filters .form-input, .pm-filters .pm-q { min-width: 0; width: 100%; } .pm-filters label { flex: 1 1 100%; } }
+        </style>
+
+        <p class="pm-sub">Manage supplier invoices, add medicines to inventory, and track purchase history.</p>
+
+        <div class="pm-actions" role="group" aria-label="Add stock">
+          <button type="button" class="pm-action" id="pm-act-scan" onclick="pmScanBill()">
+            <span class="pm-ico">📄</span>
+            <span><span class="pm-t">Scan / Upload Bill</span><span class="pm-d">Scan a supplier invoice or upload an existing bill.</span></span>
+          </button>
+          <button type="button" class="pm-action" id="pm-act-search" onclick="pmSearchMedicine()">
+            <span class="pm-ico">🔎</span>
+            <span><span class="pm-t">Search Medicine</span><span class="pm-d">Search medicines and enter purchase details manually.</span></span>
+          </button>
+          <button type="button" class="pm-action" id="pm-act-import" onclick="pmImportSheet()">
+            <span class="pm-ico">📊</span>
+            <span><span class="pm-t">Direct Excel / CSV Import</span><span class="pm-d">Import purchase or inventory data from a spreadsheet.</span></span>
+          </button>
+        </div>
+
+        <div class="pm-summary" id="pm-summary" style="display:none;">
+          <div class="card pm-kpi"><div class="l">Purchase documents</div><div class="v" id="pm-k-docs">–</div></div>
+          <div class="card pm-kpi"><div class="l">Purchase value</div><div class="v" id="pm-k-value">–</div></div>
+          <div class="card pm-kpi"><div class="l">Supplier payables</div><div class="v" id="pm-k-pay">–</div></div>
+          <div class="card pm-kpi"><div class="l">Suppliers with balance</div><div class="v" id="pm-k-sup">–</div></div>
+        </div>
+
+        <div class="card" style="padding: 14px 16px;">
+          <form class="pm-filters" id="pm-filters" onsubmit="pmApplyFilters(event)">
+            <label class="pm-q">Search
+              <input type="search" id="pm-f-q" class="form-input" placeholder="Supplier, invoice no. or PUR-00012" autocomplete="off">
+            </label>
+            <label>Supplier
+              <select id="pm-f-supplier" class="form-input"><option value="">All suppliers</option></select>
+            </label>
+            <label>Status
+              <select id="pm-f-status" class="form-input">
+                <option value="">All</option><option value="PAID">Paid</option><option value="UNPAID">Unpaid</option><option value="PARTIAL">Partial</option>
+              </select>
+            </label>
+            <label>From <input type="date" id="pm-f-from" class="form-input"></label>
+            <label>To <input type="date" id="pm-f-to" class="form-input"></label>
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="pmClearFilters()">Clear filters</button>
+          </form>
+
+          <div id="pm-state" class="pm-state" style="display:none;"></div>
+          <div class="table-responsive" id="pm-table-wrap" style="display:none;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Purchase no.</th><th>Supplier invoice</th><th>Supplier</th><th>Date</th>
+                  <th class="numeric">Items</th><th class="numeric">Amount (₹)</th><th class="numeric">Paid (₹)</th>
+                  <th class="numeric">Outstanding (₹)</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="pm-tbody"></tbody>
+            </table>
+          </div>
+          <div class="pm-pager" id="pm-pager" style="display:none;">
+            <span id="pm-range"></span>
+            <span>
+              <button type="button" class="btn btn-secondary btn-sm" id="pm-prev" onclick="pmGoto(-1)">‹ Previous</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="pm-next" onclick="pmGoto(1)">Next ›</button>
+            </span>
+          </div>
+          <p class="pm-note">Shows purchases saved with a supplier invoice. Stock added by Search Medicine or Excel import is recorded in inventory only and does not create a purchase document here yet.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Purchase detail (read-only) -->
+  <div id="pm-detail-modal" class="modal-overlay" onclick="if(event.target===this)pmCloseDetail()">
+    <div class="modal-card" style="max-width: 860px; max-height: 88vh; overflow-y: auto; padding: 20px;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
+        <h2 id="pm-d-title" style="margin:0; font-size:18px; font-weight:700;">Purchase</h2>
+        <button class="close-btn" onclick="pmCloseDetail()" aria-label="Close">&times;</button>
+      </div>
+      <div id="pm-d-body"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.4" defer></script>
+  <script src="js/app_preloader.js?v=9.4" defer></script>
+  <script src="js/nav.js?v=9.5" defer></script>
+  <script src="js/confirm_modal.js?v=9.4" defer></script>
+  <script src="js/app.js?v=10.0" defer></script>
+  <script src="js/add_inventory_flow.js?v=9.5" defer></script>
+  <script src="js/purchases_page.js?v=1.0" defer></script>
+</body>
+</html>

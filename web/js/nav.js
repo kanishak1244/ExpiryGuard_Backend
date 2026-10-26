@@ -119,6 +119,7 @@ window.ExpiryNav = {
   getActiveId() {
     const p = window.location.pathname.toLowerCase();
     const s = window.location.search.toLowerCase();
+    if (p.includes('purchases')) return 'add-inventory';
     if (p.includes('billing')) return 'billing';
     if (p.includes('sales')) return 'sales';
     if (p.includes('smart_restock') || p.includes('smart-restock')) return 'smart-restock';
