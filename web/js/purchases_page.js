@@ -129,7 +129,39 @@
   window.pmGoto = function (dir) { state.page = Math.max(1, state.page + dir); load(); };
 
   // ---- the three actions: each opens an existing workflow
-  window.pmScanBill = function () { window.location.href = 'documents.html'; };
+  // Scan / Upload Bill: ask for the bill photo (or PDF) right here, upload it, read it, then open the review screen.
+  window.pmScanBill = function () { $('pm-scan-input').value = ''; $('pm-scan-input').click(); };
+
+  window.pmScanChosen = async function (input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const note = $('pm-scan-status');
+    const show = (html, bad) => { note.style.display = 'block'; note.className = 'pm-note' + (bad ? ' pm-scan-bad' : ''); note.innerHTML = html; };
+    if (!/\.(jpe?g|png|webp|pdf)$/i.test(file.name)) { show('Please choose a JPG, PNG, WEBP or PDF of the supplier bill.', true); return; }
+    if (file.size > 10 * 1024 * 1024) { show('That file is larger than 10 MB. Please choose a smaller photo.', true); return; }
+    $('pm-act-scan').disabled = true;
+    let docId = null;
+    try {
+      show('Uploading ' + esc(file.name) + '…');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('doc_type', 'purchase_invoice');
+      fd.append('title', file.name);
+      const doc = await api.uploadDocument(fd);
+      docId = doc.id;
+      show('Reading the medicines from the bill… this can take a few seconds.');
+      await api.triggerDocumentOcr(docId);
+    } catch (e) {
+      if (docId) {   // the bill is saved even if reading failed: open it so it can be retried or entered by hand
+        window.location.href = 'documents.html?review=' + docId;
+        return;
+      }
+      show('Could not upload the bill: ' + esc(String((e && e.message) || e).slice(0, 200)), true);
+      $('pm-act-scan').disabled = false;
+      return;
+    }
+    window.location.href = 'documents.html?review=' + docId;
+  };
   window.pmSearchMedicine = function () { openAddInventoryWorkflow('search'); };
   window.pmImportSheet = function () { openAddInventoryWorkflow('import'); };
   window.pmAddManually = function () { window.location.href = 'purchase_entry.html'; };

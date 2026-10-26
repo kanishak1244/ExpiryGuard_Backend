@@ -158,6 +158,7 @@
           .pm-tab { border: 0; background: transparent; color: var(--muted-text); font: inherit; font-weight: 600; padding: 8px 14px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
           .pm-tab.active { color: var(--dark-text); border-bottom-color: var(--primary-green); }
           .pm-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--primary-green); color: #fff; font-size: 11px; text-align: center; }
+          .pm-scan-bad { color: #DC2626; }
           .pm-note { font-size: 12px; color: var(--muted-text); margin-top: 8px; }
           @media (max-width: 1250px) { .pm-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
           @media (max-width: 1000px) { .pm-actions { grid-template-columns: 1fr; } .pm-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -184,6 +185,8 @@
             <span><span class="pm-t">Add Manually</span><span class="pm-d">Enter supplier invoice and medicine details manually in a spreadsheet-style form.</span></span>
           </button>
         </div>
+        <input type="file" id="pm-scan-input" accept="image/*,.pdf,application/pdf" style="display:none" onchange="pmScanChosen(this)">
+        <div id="pm-scan-status" class="pm-note" style="display:none; margin: -6px 0 12px 2px;"></div>
         <div class="pm-tabs" role="tablist" aria-label="Purchases">
           <button type="button" class="pm-tab active" id="pm-tab-all" role="tab" onclick="pmTab('all')">All Purchases</button>
           <button type="button" class="pm-tab" id="pm-tab-drafts" role="tab" onclick="pmTab('drafts')">Drafts <span class="pm-count" id="pm-draft-count">0</span></button>
@@ -297,6 +300,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=10.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.6" defer></script>
-  <script src="js/purchases_page.js?v=1.2" defer></script>
+  <script src="js/purchases_page.js?v=1.3" defer></script>
 </body>
 </html>
