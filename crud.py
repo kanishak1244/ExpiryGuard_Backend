@@ -3444,16 +3444,15 @@ def get_suppliers(db: Session, user_id: int, query: Optional[str] = None, status
     
     suppliers = q.order_by(models.Supplier.name.asc()).all()
     
-    # Eager-load aggregate stats for all documents of this user grouped by supplier_id in a single database query to fix the N+1 loop query issue
+    # Purchase figures come from the saved purchase invoices (the same source as the supplier ledger), one grouped query.
     doc_stats = db.query(
-        models.Document.supplier_id,
-        func.sum(models.Document.total_amount).label("total_purchases"),
-        func.count(models.Document.id).label("purchase_count"),
-        func.max(models.Document.created_at).label("last_purchase_date")
+        models.PurchaseInvoice.supplier_id,
+        func.sum(models.PurchaseInvoice.total_amount).label("total_purchases"),
+        func.count(models.PurchaseInvoice.id).label("purchase_count"),
+        func.max(models.PurchaseInvoice.invoice_date).label("last_purchase_date")
     ).filter(
-        models.Document.user_id == user_id,
-        models.Document.supplier_id.isnot(None)
-    ).group_by(models.Document.supplier_id).all()
+        models.PurchaseInvoice.user_id == user_id
+    ).group_by(models.PurchaseInvoice.supplier_id).all()
 
     stats_map = {
         row.supplier_id: {
@@ -4366,35 +4365,82 @@ def list_purchase_documents(
     }
 
 
-def get_purchase_document_detail(db: Session, user_id: int, purchase_id: int) -> Optional[dict]:
-    """Read-only detail of one saved purchase (header, supplier, lines with medicine names). None if not this shop's."""
-    inv = db.query(models.PurchaseInvoice).filter(
-        models.PurchaseInvoice.id == purchase_id, models.PurchaseInvoice.user_id == user_id).first()
+def _source_document(db: Session, user_id: int, inv: "models.PurchaseInvoice") -> Optional[dict]:
+    """
+    The scanned bill this purchase was confirmed from, when that can be told without guessing:
+    first the draft that was finalized with this purchase, else the single Verified bill of the same supplier with the same
+    invoice number. Two candidates means the link is ambiguous, so none is returned.
+    """
+    D = models.PurchaseDraft
+    link = db.query(D.document_id).filter(D.user_id == user_id, D.purchase_invoice_id == inv.id, D.document_id.isnot(None)).first()
+    docs = []
+    if link:
+        docs = db.query(models.Document).filter(models.Document.id == link[0], models.Document.user_id == user_id).all()
+    if not docs and inv.invoice_number:
+        docs = db.query(models.Document).filter(
+            models.Document.user_id == user_id, models.Document.supplier_id == inv.supplier_id,
+            func.lower(func.trim(models.Document.invoice_number)) == inv.invoice_number.strip().lower(),
+            func.lower(models.Document.ocr_status) == "verified").all()
+    if len(docs) != 1:
+        return None
+    d = docs[0]
+    return {"id": d.id, "title": d.title, "file_type": d.file_type, "uploaded_at": d.created_at.isoformat() if d.created_at else None}
+
+
+def get_purchase_document_detail(db: Session, user_id: int, purchase_id: int, supplier_id: Optional[int] = None) -> Optional[dict]:
+    """
+    Read-only detail of one saved purchase: header, supplier, every line with medicine / batch / expiry, totals, payment
+    figures that are certain, and the original bill when it can be identified. None if it is not this shop's (or, when
+    supplier_id is given, not this supplier's).
+    """
+    q = db.query(models.PurchaseInvoice).filter(models.PurchaseInvoice.id == purchase_id, models.PurchaseInvoice.user_id == user_id)
+    if supplier_id is not None:
+        q = q.filter(models.PurchaseInvoice.supplier_id == supplier_id)
+    inv = q.first()
     if not inv:
         return None
     supplier = db.query(models.Supplier).filter(models.Supplier.id == inv.supplier_id, models.Supplier.user_id == user_id).first()
     lines = (
-        db.query(models.PurchaseItem, models.Product.product_name)
+        db.query(models.PurchaseItem, models.Product.product_name, models.Product.brand)
         .outerjoin(models.Product, models.Product.id == models.PurchaseItem.product_id)
         .filter(models.PurchaseItem.purchase_invoice_id == inv.id)
         .order_by(models.PurchaseItem.id).all()
     )
+    r = _round_half_up
+    out_lines, taxable_sum, gst_sum = [], 0.0, 0.0
+    for it, name, brand in lines:
+        taxable = r(float(it.quantity or 0) * float(it.purchase_price or 0.0), 2)
+        gst = r(taxable * float(it.gst_rate or 0.0) / 100.0, 2)
+        taxable_sum += taxable
+        gst_sum += gst
+        out_lines.append({
+            "id": it.id, "product_id": it.product_id, "product_name": name, "company": brand, "batch_number": it.batch_number,
+            "quantity": it.quantity, "purchase_price": it.purchase_price, "mrp": it.mrp, "gst_rate": it.gst_rate,
+            "expiry_date": it.expiry_date.isoformat() if it.expiry_date else None,
+            "taxable": taxable, "gst": gst, "line_total": r(taxable + gst, 2),
+        })
     st = str(inv.payment_status or "").upper()
+    total = round(float(inv.total_amount or 0.0), 2)
+    paid = total if st == "PAID" else (0.0 if st == "UNPAID" else None)
+    calc_total = r(taxable_sum + gst_sum, 2)
     return {
         "id": inv.id,
         "voucher_no": purchase_voucher_no(inv.id),
         "invoice_number": inv.invoice_number,
         "invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
+        "entered_on": inv.created_at.isoformat() if inv.created_at else None,
         "supplier_id": inv.supplier_id,
         "supplier_name": supplier.name if supplier else None,
-        "total_amount": round(float(inv.total_amount or 0.0), 2),
+        "purchase_status": "Posted",                                   # a saved purchase is posted; drafts live in their own table
+        "total_amount": total,
         "tax_amount": round(float(inv.tax_amount or 0.0), 2),
         "payment_status": st or None,
-        "items": [{
-            "id": it.id, "product_id": it.product_id, "product_name": name, "batch_number": it.batch_number,
-            "quantity": it.quantity, "purchase_price": it.purchase_price, "mrp": it.mrp, "gst_rate": it.gst_rate,
-            "expiry_date": it.expiry_date.isoformat() if it.expiry_date else None,
-        } for it, name in lines],
+        "paid_amount": paid,
+        "outstanding_amount": None if paid is None else round(total - paid, 2),
+        "totals": {"subtotal": r(taxable_sum, 2), "gst": r(gst_sum, 2), "discount": None, "calculated_total": calc_total,
+                   "matches_stored_total": abs(calc_total - total) <= 1.0},
+        "source_document": _source_document(db, user_id, inv),
+        "items": out_lines,
     }
 
 
@@ -7463,10 +7509,25 @@ def _supplier_ledger_rows(db: Session, user_id: int, supplier_id: int) -> list:
     return rows
 
 
-def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
-    """GET /suppliers/{id}/ledger: the supplier's details plus every purchase, payment and return with a running balance."""
+def get_supplier_ledger(db: Session, user_id: int, supplier_id: int, page: int = 1, page_size: int = 0,
+                        entry_type: Optional[str] = None, newest_first: bool = False) -> dict:
+    """
+    GET /suppliers/{id}/ledger: the supplier's details plus purchases, payments and returns with a running balance.
+    The balance of every row is computed over the whole history; page_size > 0 then returns just one page
+    (entry_type PURCHASE / PAYMENT / RETURN filters, newest_first reverses the order).
+    """
     supplier = get_supplier_detail(db, supplier_id, user_id)
     rows = _supplier_ledger_rows(db, user_id, supplier_id)
+    total_rows = len(rows)
+    shown = rows
+    if entry_type:
+        shown = [r for r in shown if r["type"] == entry_type.strip().upper()]
+    filtered_total = len(shown)
+    if newest_first:
+        shown = list(reversed(shown))
+    if page_size and page_size > 0:
+        page = max(1, int(page or 1))
+        shown = shown[(page - 1) * page_size: page * page_size]
     return {
         "supplier_id": supplier.id,
         "name": supplier.name,
@@ -7478,7 +7539,11 @@ def get_supplier_ledger(db: Session, user_id: int, supplier_id: int) -> dict:
         "total_paid": round(sum(r["debit"] for r in rows if r["type"] == "PAYMENT"), 2),
         "total_returned": round(sum(r["debit"] for r in rows if r["type"] == "RETURN"), 2),
         "balance_payable": rows[-1]["balance"] if rows else 0.0,
-        "entries": rows,
+        "entries": shown,
+        "entries_total": filtered_total,
+        "history_total": total_rows,
+        "page": page if page_size else 1,
+        "page_size": page_size or total_rows,
     }
 
 def record_supplier_payment(db: Session, user_id: int, data: dict):

@@ -23,6 +23,7 @@ import schemas
 import crud
 import purchase_entry
 import purchase_drafts
+import supplier_profile
 
 logger = logging.getLogger("expiryguard.routes.purchases")
 
@@ -79,11 +80,12 @@ def list_purchase_documents(
 @router.get("/purchases/detail/{purchase_id}")
 def get_purchase_document_detail(
     purchase_id: int,
+    supplier_id: Optional[int] = Query(None, ge=1),
     current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
     db: Session = Depends(get_db),
 ):
     """One saved purchase with supplier and medicine names (read-only)."""
-    doc = crud.get_purchase_document_detail(db, current_user.id, purchase_id)
+    doc = crud.get_purchase_document_detail(db, current_user.id, purchase_id, supplier_id=supplier_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase not found.")
     return doc
@@ -230,14 +232,42 @@ def delete_supplier(
     return {"message": "Supplier deleted successfully"}
 
 
-@router.get("/suppliers/{supplier_id}/ledger")
-def get_supplier_ledger(
+@router.get("/suppliers/{supplier_id}/profile")
+def get_supplier_profile(
     supplier_id: int,
     current_user: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Supplier details + purchase / payment / return figures (same rule as the ledger and dashboard). 404 if not this shop's."""
+    return supplier_profile.profile(db, current_user.id, supplier_id)
+
+
+@router.get("/suppliers/{supplier_id}/stock")
+def get_supplier_stock(
+    supplier_id: int,
+    q: Optional[str] = Query(None, max_length=80),
+    status: Optional[str] = Query(None, pattern="^(?i:In Stock|Partially Sold|Sold Out|Expired|Returned|Unavailable)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Linked medicine stock per batch with an evidence-based stock status (read-only, paged)."""
+    return supplier_profile.stock(db, current_user.id, supplier_id, q=q, status=status, page=page, page_size=page_size)
+
+
+@router.get("/suppliers/{supplier_id}/ledger")
+def get_supplier_ledger(
+    supplier_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    type: Optional[str] = Query(None, pattern="^(?i:PURCHASE|PAYMENT|RETURN)$"),
+    newest_first: bool = False,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Get ledger transaction history and outstanding balance for a supplier."""
-    ledger = crud.get_supplier_ledger(db, current_user.id, supplier_id)
+    ledger = crud.get_supplier_ledger(db, current_user.id, supplier_id, page=page, page_size=page_size, entry_type=type, newest_first=newest_first)
     if ledger is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
     return ledger

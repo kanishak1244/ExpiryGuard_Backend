@@ -994,7 +994,7 @@ class ApiClient {
   }
 
   async getSupplierDetail(supplierId) {
-    return await this.request(`/suppliers/${supplierId}`);
+    return await this.request(`/suppliers/${supplierId}/profile`);
   }
 
   async matchSupplier(name, gstin = '') {

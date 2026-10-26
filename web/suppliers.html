@@ -48,6 +48,41 @@
     }
     .tab-content-panel { display: none; }
     .tab-content-panel.active { display: block; }
+
+    /* ---- supplier profile / bill viewer ---- */
+    .sup-name-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--primary-green); cursor: pointer; text-align: left; }
+    .sup-name-link:hover { text-decoration: underline; }
+    #suppliers-table-body tr[data-sup-id] { cursor: pointer; }
+    #suppliers-table-body tr[data-sup-id]:hover { background: rgba(13,148,136,.08); }
+    .sp-state { padding: 18px 14px; border-radius: 8px; font-size: 13px; text-align: center; }
+    .sp-state.loading { color: var(--muted-text); } .sp-state.bad { border: 1px solid #DC2626; background: rgba(220,38,38,.08); }
+    .sp-empty { padding: 24px 12px; text-align: center; color: var(--muted-text); font-size: 13px; }
+    .sp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .sp-table th { text-align: left; padding: 7px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; color: var(--muted-text); border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+    .sp-table td { padding: 7px 6px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+    .sp-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; } .sp-table .n { width: 24px; color: var(--muted-text); }
+    .sp-table td small { display: block; color: var(--muted-text); font-size: 11px; }
+    .sp-row { cursor: pointer; } .sp-row:hover { background: rgba(13,148,136,.08); }
+    .sp-na { color: var(--muted-text); }
+    .sp-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #E2E8F0; color: #334155; white-space: nowrap; }
+    .sp-badge.ok { background: #DCFCE7; color: #166534; } .sp-badge.info { background: #DBEAFE; color: #1E40AF; } .sp-badge.bad { background: #FEE2E2; color: #991B1B; }
+    .sp-badge.warn { background: #FEF3C7; color: #92400E; } .sp-badge.purple { background: #EDE9FE; color: #5B21B6; } .sp-badge.muted { background: #E2E8F0; color: #475569; }
+    .sp-tag { font-size: 10px; padding: 0 5px; border-radius: 4px; background: rgba(100,116,139,.2); color: var(--muted-text); }
+    .sp-detail-box { padding: 8px 10px; background: rgba(100,116,139,.08); border-radius: 6px; font-size: 12px; line-height: 1.5; }
+    .sp-pager { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; font-size: 12px; color: var(--muted-text); }
+    .sp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+    .sp-chip { border: 1px solid var(--border-color); background: transparent; color: inherit; border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+    .sp-chip.on { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
+    .sp-notes { font-size: 11.5px; color: var(--muted-text); margin: 8px 0 0 16px; padding: 0; }
+    .sp-bill-head { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 14px; margin-bottom: 10px; }
+    .sp-f { display: flex; flex-direction: column; font-size: 11px; color: var(--muted-text); min-width: 0; } .sp-f b { font-size: 13px; color: var(--dark-text); font-weight: 600; overflow-wrap: anywhere; }
+    .sp-totals { margin: 10px 0 0 auto; max-width: 320px; } .sp-totals div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+    .sp-totals .big { border-top: 1px solid var(--border-color); margin-top: 4px; padding-top: 6px; font-size: 16px; font-weight: 800; } .sp-warn { font-size: 11.5px; color: #B45309; display: block !important; }
+    .sp-bill-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+    .sp-bill-orig { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+    .sp-bill-orig-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border-color); font-size: 12px; font-weight: 600; }
+    .sp-img { display: block; width: 100%; height: auto; } .sp-pdf { width: 100%; height: 60vh; border: 0; background: #fff; }
+    @media (max-width: 900px) { .sp-bill-grid { grid-template-columns: 1fr; } .sp-bill-head { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   </style>
 </head>
 <body>
@@ -154,6 +189,8 @@
           </div>
         </div>
 
+        <div id="suppliers-error" class="sp-state bad" style="display:none; margin-bottom:12px;"></div>
+
         <!-- Supplier Data Table -->
         <div class="card">
           <div class="card-header">
@@ -259,90 +296,89 @@
 
   <!-- SUPPLIER PROFILE DRAWER MODAL -->
   <div id="supplier-profile-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-card" style="max-width: 1000px; width: 96%; max-height: 92vh; overflow-y: auto;">
       <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
         <div>
           <h2 id="prof-modal-name" style="margin: 0; color: var(--primary-green);">Supplier Name</h2>
           <p id="prof-modal-gstin" style="font-size: 13px; color: var(--muted-text); margin: 0;">GSTIN: N/A</p>
         </div>
-        <button class="close-btn" onclick="closeProfileModal()">&times;</button>
+        <button class="close-btn" onclick="closeProfileModal()" aria-label="Close">&times;</button>
       </div>
 
-      <!-- Financial Metrics Summary -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 20px 0;">
-        <div class="card" style="padding: 12px; background: var(--bg-main);">
-          <span style="font-size: 12px; color: var(--muted-text);">Total Purchases</span>
-          <h3 id="prof-metric-total" style="margin-top: 4px; color: var(--primary-green);">₹0.00</h3>
+      <div id="sp-state" class="sp-state loading" style="display:none; margin-top: 16px;"></div>
+
+      <div id="sp-body" style="display:none;">
+        <!-- Financial summary: the same figures as the supplier ledger and the dashboard payables -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0;">
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Balance payable</span><h3 id="prof-metric-balance" style="margin-top: 4px; color: var(--primary-green);">₹0.00</h3></div>
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Total purchases</span><h3 id="prof-metric-total" style="margin-top: 4px;">₹0.00</h3></div>
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Paid</span><h3 id="prof-metric-paid" style="margin-top: 4px;">₹0.00</h3></div>
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Returned to supplier</span><h3 id="prof-metric-returned" style="margin-top: 4px;">₹0.00</h3></div>
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Purchase bills</span><h3 id="prof-metric-count" style="margin-top: 4px;">0</h3></div>
+          <div class="card" style="padding: 10px 12px; background: var(--bg-main); margin: 0;"><span style="font-size: 12px; color: var(--muted-text);">Last purchase</span><h3 id="prof-metric-date" style="margin-top: 4px; font-size: 16px;">N/A</h3></div>
         </div>
-        <div class="card" style="padding: 12px; background: var(--bg-main);">
-          <span style="font-size: 12px; color: var(--muted-text);">Invoices Count</span>
-          <h3 id="prof-metric-count" style="margin-top: 4px;">0</h3>
+
+        <div class="supplier-tabs">
+          <button class="supplier-tab-btn active" data-tab="overview" onclick="switchSupplierTab('overview')">Overview</button>
+          <button class="supplier-tab-btn" data-tab="purchases" onclick="switchSupplierTab('purchases')">Purchase History</button>
+          <button class="supplier-tab-btn" data-tab="ledger" onclick="switchSupplierTab('ledger')">Ledger</button>
+          <button class="supplier-tab-btn" data-tab="medicines" onclick="switchSupplierTab('medicines')">Linked Medicine Stock</button>
         </div>
-        <div class="card" style="padding: 12px; background: var(--bg-main);">
-          <span style="font-size: 12px; color: var(--muted-text);">Last Purchase</span>
-          <h3 id="prof-metric-date" style="margin-top: 4px; font-size: 16px;">N/A</h3>
+
+        <div id="sup-tab-overview" class="tab-content-panel active">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; font-size: 14px;">
+            <div><strong>Contact Person:</strong> <span id="prof-info-contact">N/A</span></div>
+            <div><strong>Phone:</strong> <span id="prof-info-phone">N/A</span></div>
+            <div><strong>Email:</strong> <span id="prof-info-email">N/A</span></div>
+            <div><strong>State:</strong> <span id="prof-info-state">N/A</span></div>
+            <div><strong>Payment Terms:</strong> <span id="prof-info-terms">N/A</span></div>
+            <div><strong>Status:</strong> <span id="prof-info-status">N/A</span></div>
+            <div style="grid-column: span 2;"><strong>Address:</strong> <span id="prof-info-address">N/A</span></div>
+          </div>
+        </div>
+
+        <div id="sup-tab-purchases" class="tab-content-panel">
+          <div class="table-responsive" id="sp-history"></div>
+          <div class="sp-pager" id="sp-history-pager"></div>
+        </div>
+
+        <div id="sup-tab-ledger" class="tab-content-panel">
+          <div class="sp-chips">
+            <button type="button" class="sp-chip on" onclick="spLedgerType('')">All</button>
+            <button type="button" class="sp-chip" onclick="spLedgerType('PURCHASE')">Purchases</button>
+            <button type="button" class="sp-chip" onclick="spLedgerType('PAYMENT')">Payments</button>
+            <button type="button" class="sp-chip" onclick="spLedgerType('RETURN')">Returns</button>
+          </div>
+          <div class="table-responsive" id="sp-ledger"></div>
+          <div class="sp-pager" id="sp-ledger-pager"></div>
+        </div>
+
+        <div id="sup-tab-medicines" class="tab-content-panel">
+          <div class="sp-chips" id="sp-stock-chips"></div>
+          <input type="search" class="form-input" placeholder="Search medicine, company or batch" oninput="spStockSearch(this.value)" style="max-width: 320px; margin-bottom: 8px; padding: 6px 9px; font-size: 13px;">
+          <div class="table-responsive" id="sp-stock"></div>
+          <div class="sp-pager" id="sp-stock-pager"></div>
+          <ul class="sp-notes" id="sp-stock-notes"></ul>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Tabs Navigation -->
-      <div class="supplier-tabs">
-        <button class="supplier-tab-btn active" onclick="switchSupplierTab('overview')">Overview</button>
-        <button class="supplier-tab-btn" onclick="switchSupplierTab('purchases')">Purchase History</button>
-        <button class="supplier-tab-btn" onclick="switchSupplierTab('medicines')">Linked Medicine Stock</button>
+  <!-- PURCHASE BILL (read-only) -->
+  <div id="sup-bill-modal" class="modal-overlay" style="z-index: 1100;">
+    <div class="modal-card" style="max-width: 1100px; width: 96%; max-height: 92vh; overflow-y: auto;">
+      <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px;">
+        <h2 id="sup-bill-title" style="margin: 0; font-size: 18px;">Purchase</h2>
+        <button class="close-btn" onclick="closeBillModal()" aria-label="Close">&times;</button>
       </div>
-
-      <!-- Tab Content Panels -->
-      <div id="sup-tab-overview" class="tab-content-panel active">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 14px;">
-          <div><strong>Contact Person:</strong> <span id="prof-info-contact">N/A</span></div>
-          <div><strong>Phone:</strong> <span id="prof-info-phone">N/A</span></div>
-          <div><strong>Email:</strong> <span id="prof-info-email">N/A</span></div>
-          <div><strong>State:</strong> <span id="prof-info-state">Delhi</span></div>
-          <div><strong>Payment Terms:</strong> <span id="prof-info-terms">Net 30</span></div>
-          <div><strong>Status:</strong> <span id="prof-info-status">Active</span></div>
-          <div style="grid-column: span 2;"><strong>Address:</strong> <span id="prof-info-address">N/A</span></div>
+      <div class="sp-bill-grid">
+        <div id="sup-bill-body"></div>
+        <div class="sp-bill-orig" id="sup-bill-orig" style="display:none;">
+          <div class="sp-bill-orig-head"><span>Original supplier bill</span><button type="button" class="btn btn-secondary btn-sm" id="sup-bill-open">Open larger</button></div>
+          <div id="sup-bill-orig-view"></div>
         </div>
       </div>
-
-      <div id="sup-tab-purchases" class="tab-content-panel">
-        <div class="table-responsive">
-          <table class="data-table" style="font-size: 13px;">
-            <thead>
-              <tr>
-                <th>Document Title</th>
-                <th>Invoice #</th>
-                <th>Date</th>
-                <th>Total Amount</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="prof-purchases-tbody">
-              <!-- Rendered dynamically -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div id="sup-tab-medicines" class="tab-content-panel">
-        <div class="table-responsive">
-          <table class="data-table" style="font-size: 13px;">
-            <thead>
-              <tr>
-                <th>Product Name</th>
-                <th>Batch Number</th>
-                <th>Quantity</th>
-                <th>Purchase Price</th>
-                <th>Expiry Date</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="prof-medicines-tbody">
-              <!-- Rendered dynamically -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+      <p class="sp-notes" style="margin-left:0">Read-only. Opening a purchase never changes stock, balances or the ledger.</p>
     </div>
   </div>
 
@@ -380,10 +416,28 @@
           localStorage.setItem('expiryguard_cached_suppliers', JSON.stringify(allSuppliers));
         }
         renderSuppliersTable(allSuppliers);
+        document.getElementById('suppliers-error').style.display = 'none';
       } catch (err) {
         console.error("Failed to load suppliers:", err);
+        const box = document.getElementById('suppliers-error');
+        box.style.display = 'block';
+        box.innerHTML = '<b>Could not load suppliers</b><div>' + escapeHtml(String(err.message || err).slice(0, 200)) + '</div><div style="margin-top:8px"><button type="button" class="btn btn-primary btn-sm" onclick="loadSuppliers()">Retry</button></div>';
       }
     }
+
+    // One delegated handler: a click on the row, the name, or the Profile button opens THAT supplier's profile by id.
+    document.addEventListener('DOMContentLoaded', () => {
+      const tbody = document.getElementById('suppliers-table-body');
+      tbody.addEventListener('click', (e) => {
+        const edit = e.target.closest('[data-edit-id]');
+        if (edit) { e.stopPropagation(); openEditSupplierModal(Number(edit.dataset.editId)); return; }
+        const row = e.target.closest('[data-sup-id]');
+        if (row) openSupplierProfile(Number(row.dataset.supId));
+      });
+      tbody.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.matches('tr[data-sup-id]')) openSupplierProfile(Number(e.target.dataset.supId));
+      });
+    });
 
     function renderSuppliersTable(suppliers) {
       const tbody = document.getElementById('suppliers-table-body');
@@ -407,8 +461,8 @@
         const supStatus = escapeHtml(s.status);
 
         return `
-          <tr>
-            <td><strong>${supName}</strong></td>
+          <tr data-sup-id="${Number(s.id)}" tabindex="0" title="Open ${supName}'s profile">
+            <td><button type="button" class="sup-name-link" data-sup-id="${Number(s.id)}">${supName}</button></td>
             <td>${supGstin}</td>
             <td>${supContact}</td>
             <td style="font-size: 13px;">${supContactInfo}</td>
@@ -417,8 +471,8 @@
             <td><span class="badge ${statusBadge}">${supStatus}</span></td>
             <td>
               <div style="display: flex; gap: 6px; justify-content: flex-end;">
-                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openSupplierProfile(${Number(s.id)})">👁️ Profile</button>
-                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openEditSupplierModal(${Number(s.id)})">✏️ Edit</button>
+                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" data-sup-id="${Number(s.id)}">👁️ Profile</button>
+                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" data-edit-id="${Number(s.id)}">✏️ Edit</button>
               </div>
             </td>
           </tr>
@@ -433,9 +487,12 @@
       document.getElementById('supplier-modal').classList.add('active');
     }
 
-    function openEditSupplierModal(supId) {
-      const sup = allSuppliers.find(s => s.id === supId);
-      if (!sup) return;
+    async function openEditSupplierModal(supId) {
+      let sup = allSuppliers.find(s => s.id === supId);
+      if (!sup) {
+        try { sup = await api.request('/suppliers/' + supId + '/profile'); }
+        catch (err) { alert('This supplier could not be loaded: ' + err.message); return; }
+      }
 
       document.getElementById('edit-supplier-id').value = sup.id;
       document.getElementById('supplier-modal-title').textContent = `Edit Supplier: ${sup.name}`;
@@ -487,82 +544,7 @@
       }
     }
 
-    async function openSupplierProfile(supId) {
-      currentProfileSupplierId = supId;
-      const sup = allSuppliers.find(s => s.id === supId);
-      if (!sup) return;
-
-      document.getElementById('prof-modal-name').textContent = sup.name;
-      document.getElementById('prof-modal-gstin').textContent = `GSTIN: ${sup.gstin || 'N/A'}`;
-      document.getElementById('prof-metric-total').textContent = `₹${(sup.total_purchases || 0).toFixed(2)}`;
-      document.getElementById('prof-metric-count').textContent = sup.purchase_count || 0;
-      document.getElementById('prof-metric-date').textContent = sup.last_purchase_date || 'N/A';
-
-      document.getElementById('prof-info-contact').textContent = sup.contact_person || 'N/A';
-      document.getElementById('prof-info-phone').textContent = sup.phone || 'N/A';
-      document.getElementById('prof-info-email').textContent = sup.email || 'N/A';
-      document.getElementById('prof-info-state').textContent = sup.state || 'Delhi';
-      document.getElementById('prof-info-terms').textContent = sup.payment_terms || 'Net 30';
-      document.getElementById('prof-info-status').textContent = sup.status || 'Active';
-      document.getElementById('prof-info-address').textContent = sup.address || 'N/A';
-
-      // Load purchase documents
-      try {
-        const docs = await api.getSupplierPurchases(supId);
-        const tbody = document.getElementById('prof-purchases-tbody');
-        if (docs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No purchase invoices linked to this supplier.</td></tr>';
-        } else {
-          tbody.innerHTML = docs.map(d => `
-            <tr>
-              <td><strong>${escapeHtml(d.title)}</strong></td>
-              <td>${escapeHtml(d.invoice_number || 'N/A')}</td>
-              <td>${escapeHtml(new Date(d.created_at).toLocaleDateString())}</td>
-              <td>₹${(d.total_amount || 0).toFixed(2)}</td>
-              <td><span class="badge badge-success">${escapeHtml(d.ocr_status)}</span></td>
-            </tr>
-          `).join('');
-        }
-      } catch (err) {}
-
-      // Load linked medicines stock
-      try {
-        const prods = await api.getSupplierInventory(supId);
-        const tbody = document.getElementById('prof-medicines-tbody');
-        if (prods.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No active medicine stock linked to this supplier.</td></tr>';
-        } else {
-          tbody.innerHTML = prods.map(p => `
-            <tr>
-              <td><strong>${escapeHtml(p.product_name)}</strong></td>
-              <td>${escapeHtml(p.batch_number || 'N/A')}</td>
-              <td>${Number(p.quantity)} units</td>
-              <td>₹${(p.purchase_price || 0).toFixed(2)}</td>
-              <td>${escapeHtml(p.expiry_date)}</td>
-              <td><span class="badge badge-info">${escapeHtml(p.status)}</span></td>
-            </tr>
-          `).join('');
-        }
-      } catch (err) {}
-
-      switchSupplierTab('overview');
-      document.getElementById('supplier-profile-modal').classList.add('active');
-    }
-
-    function closeProfileModal() {
-      document.getElementById('supplier-profile-modal').classList.remove('active');
-    }
-
-    function switchSupplierTab(tabKey) {
-      document.querySelectorAll('.supplier-tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content-panel').forEach(panel => panel.classList.remove('active'));
-
-      const activeBtn = Array.from(document.querySelectorAll('.supplier-tab-btn')).find(b => b.getAttribute('onclick').includes(tabKey));
-      if (activeBtn) activeBtn.classList.add('active');
-
-      const activePanel = document.getElementById(`sup-tab-${tabKey}`);
-      if (activePanel) activePanel.classList.add('active');
-    }
+    // The profile screen lives in js/supplier_profile.js: it loads a supplier by id from the server and never trusts this list.
   </script>
       <script src="js/api.js?v=9.4" defer></script>
   <script src="js/app_preloader.js?v=9.4" defer></script>
@@ -570,5 +552,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.5" defer></script>
+  <script src="js/supplier_profile.js?v=1.3" defer></script>
 </body>
 </html>
