@@ -9,19 +9,23 @@ authenticated file download for uploaded documents. Behaviour is unchanged; help
 import json
 import logging
 import mimetypes
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from dependencies import get_db, get_current_user, AuthenticatedUser, limiter
+from dependencies import get_db, get_current_user, require_permission, AuthenticatedUser, limiter
 import models
 import schemas
 import crud
+import document_review
+import document_storage
 from ai.invoice_service import scan_invoice
 
 logger = logging.getLogger("expiryguard.routes.document_archive")
@@ -132,8 +136,19 @@ async def upload_document(
     target_path = (DOCUMENTS_DIR / unique_name).resolve()
     if not target_path.is_relative_to(DOCUMENTS_DIR):
         raise HTTPException(status_code=400, detail="Invalid target path.")
-    with open(target_path, "wb") as buffer:
-        buffer.write(file_bytes)
+    # write to a temp name first so an interrupted request never leaves a half file under the real name
+    tmp_path = target_path.with_suffix(target_path.suffix + ".part")
+    try:
+        with open(tmp_path, "wb") as buffer:
+            buffer.write(file_bytes)
+        os.replace(tmp_path, target_path)
+        try:
+            document_storage.put_remote(current_user.id, unique_name, file_bytes, file.content_type or "application/octet-stream")
+        except document_storage.StorageError as exc:
+            target_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=503, detail=f"{exc} The invoice was not saved; please try again.")
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
     return crud.create_document(
         db=db,
@@ -153,13 +168,24 @@ async def upload_document(
 def trigger_document_ocr(
     request: Request,
     document_id: int,
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     """Run AI OCR on an uploaded invoice and match its supplier (never creates a supplier silently)."""
     doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
-    full_path = DOCUMENTS_DIR / Path(doc.file_path).name
-    if not full_path.exists():
+    if str(doc.ocr_status or "").lower() == "verified":
+        raise HTTPException(status_code=409, detail="This invoice is already verified; its stock was added. OCR cannot be run again.")
+    prior = document_review.parse_ocr(doc)
+    if prior.get("corrected") and not force:
+        raise HTTPException(
+            status_code=409,
+            detail="HAS_CORRECTIONS: This invoice has corrections saved by a user. Re-running OCR would replace the "
+                   "reading they were made on. Repeat with force=true to run it anyway (the corrections are kept as "
+                   "previous_corrections).",
+        )
+    full_path, blob = document_storage.read_original(DOCUMENTS_DIR, current_user.id, Path(doc.file_path).name)
+    if full_path is None:
         raise HTTPException(
             status_code=404,
             detail="Document file not found on server. Please upload the document again.",
@@ -215,7 +241,14 @@ def trigger_document_ocr(
             else:
                 doc.supplier_id = None
 
+        if prior.get("corrected"):
+            data["previous_corrections"] = prior["corrected"]
         doc.ocr_raw_json = json.dumps(data, default=str)
+    elif prior.get("items"):
+        # a failed re-run must not wipe an earlier good reading: keep it and report the failure
+        db.rollback()
+        raise HTTPException(status_code=502, detail="OCR could not read this invoice again. The earlier reading was kept. "
+                                                    + str(ocr_res.get("error", "")))
     else:
         doc.ocr_status = "Failed"
         doc.ocr_raw_json = json.dumps({"error": ocr_res.get("error", "Unknown OCR failure"), "items": []}, default=str)
@@ -296,3 +329,98 @@ def delete_document(
 ):
     """Delete a document record."""
     return crud.delete_document(db=db, document_id=document_id, user_id=current_user.id)
+
+
+# ---------------------------------------------------------------------------------------------------------
+# Invoice review workspace: original file, read-only review, corrections, confirm
+# ---------------------------------------------------------------------------------------------------------
+
+_INLINE_TYPES = {".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+
+
+@router.get("/documents/{document_id}/file")
+def get_document_original(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    The original uploaded invoice, exactly as uploaded. Authenticated, only for the owning pharmacy, never cached by
+    shared caches. If the server's disk lost the file it is restored from the durable copy when one is configured.
+    """
+    doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
+    name = Path(doc.file_path).name
+    media = _INLINE_TYPES.get(Path(name).suffix.lower())
+    if not media:
+        raise HTTPException(status_code=415, detail="This file type cannot be previewed.")
+    try:
+        path, blob = document_storage.read_original(DOCUMENTS_DIR, current_user.id, name)
+    except document_storage.StorageError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    headers = {
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f'inline; filename="{name}"',
+    }
+    if path is not None:
+        return FileResponse(path=path, media_type=media, headers=headers)
+    if blob is not None:
+        return Response(content=blob, media_type=media, headers=headers)
+    raise HTTPException(
+        status_code=404,
+        detail="The original file is no longer stored on the server"
+               + ("" if document_storage.remote_enabled() else " (durable storage is not configured, so files are lost when the server disk is reset)")
+               + ".",
+    )
+
+
+@router.get("/documents/{document_id}/review")
+def get_document_review(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Read-only review picture of a document (header, supplier link, lines with problems, totals). Changes nothing."""
+    doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
+    return document_review.review_view(db, current_user.id, doc)
+
+
+class ReviewHeader(BaseModel):
+    supplier_id: Optional[int] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[str] = None
+    total_amount: Optional[float] = None
+
+
+class ReviewCorrections(BaseModel):
+    header: ReviewHeader
+    items: List[dict]
+
+
+@router.put("/documents/{document_id}/review-data")
+def save_document_corrections(
+    document_id: int,
+    body: ReviewCorrections,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+):
+    """Save corrections next to the untouched OCR reading. Never posts stock; refused for a Verified document."""
+    doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
+    document_review.save_corrections(db, current_user.id, doc, body.header.model_dump(), body.items)
+    return document_review.review_view(db, current_user.id, doc)
+
+
+class ConfirmReview(BaseModel):
+    acknowledge_warnings: bool = False
+
+
+@router.post("/documents/{document_id}/confirm-review")
+def confirm_document_review(
+    document_id: int,
+    body: Optional[ConfirmReview] = None,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+):
+    """Confirm & Add to Stock for the reviewed invoice, through the purchase engine (one transaction, no double posting)."""
+    doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
+    return document_review.confirm_document(db, current_user.id, doc, acknowledge_warnings=bool(body and body.acknowledge_warnings))

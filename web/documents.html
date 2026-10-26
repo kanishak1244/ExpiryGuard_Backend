@@ -64,6 +64,56 @@
     .preview-frame {
       width: 100%; height: 100%; border: none; background: white;
     }
+
+    /* ---- Invoice review workspace (two panels: original bill | read-only summary + lines) ---- */
+    #dr-workspace { display: none; height: calc(100vh - 120px); min-height: 440px; }
+    .dr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; height: 100%; }
+    .dr-panel { min-height: 0; display: flex; flex-direction: column; background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+    .dr-phead { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--color-border); flex: 0 0 auto; }
+    .dr-phead b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dr-phead small { color: var(--muted-text); font-size: 11.5px; white-space: nowrap; }
+    .dr-phead .sp { flex: 1; }
+    .dr-phead button { padding: 3px 9px; font-size: 12px; }
+    .dr-preview { flex: 1 1 auto; min-height: 0; overflow: auto; background: #1e293b; display: flex; align-items: flex-start; justify-content: center; }
+    .dr-img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    .dr-pdf { width: 100%; height: 100%; border: 0; background: #fff; }
+    .dr-pv-msg { color: #cbd5e1; font-size: 13px; padding: 40px 16px; text-align: center; margin: auto; }
+    .dr-pv-msg.bad { color: #fecaca; }
+    .dr-right-top { flex: 0 0 auto; padding: 10px 12px 4px; }
+    .dr-summary .dr-sup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; margin-bottom: 8px; }
+    .dr-summary .dr-sup.warn { padding: 8px 10px; border: 1px solid #F59E0B; border-radius: 8px; background: rgba(245,158,11,.12); }
+    .dr-sub { font-size: 11.5px; color: var(--muted-text); }
+    .dr-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; }
+    .dr-f { display: flex; flex-direction: column; font-size: 11px; color: var(--muted-text); min-width: 0; }
+    .dr-f b { font-size: 13px; color: var(--dark-text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dr-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #E2E8F0; color: #334155; }
+    .dr-badge.ok { background: #DCFCE7; color: #166534; } .dr-badge.warn { background: #FEF3C7; color: #92400E; }
+    .dr-badge.bad { background: #FEE2E2; color: #991B1B; } .dr-badge.info { background: #DBEAFE; color: #1E40AF; }
+    .dr-note { font-size: 12px; margin-top: 6px; padding: 5px 9px; border-radius: 6px; }
+    .dr-note.warn { background: rgba(245,158,11,.15); color: #B45309; } .dr-note.info { background: rgba(59,130,246,.14); color: #1D4ED8; }
+    .dr-note.bad { background: rgba(220,38,38,.14); color: #B91C1C; } .dr-note.ok { background: rgba(22,163,74,.16); color: #15803D; }
+    [data-theme="dark"] .dr-note.warn { color: #FCD34D; } [data-theme="dark"] .dr-note.info { color: #93C5FD; }
+    [data-theme="dark"] .dr-note.bad { color: #FCA5A5; } [data-theme="dark"] .dr-note.ok { color: #86EFAC; }
+    .dr-lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 12px; }
+    .dr-table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 11.5px; }
+    .dr-table th { position: sticky; top: 0; z-index: 1; background: var(--color-surface-card); text-align: left; padding: 6px 5px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .02em; color: var(--muted-text); border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+    .dr-table td { padding: 5px 5px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    .dr-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dr-table .n { width: 22px; color: var(--muted-text); }
+    .dr-table td.name { min-width: 120px; font-weight: 600; word-break: break-word; }
+    .dr-table td.bad, .dr-table td.name.bad { background: rgba(220,38,38,.10); }
+    .dr-table td.warn { background: rgba(245,158,11,.10); }
+    .dr-rowbad td:first-child { box-shadow: inset 3px 0 0 #DC2626; }
+    .dr-miss { color: #DC2626; font-weight: 700; font-size: 11px; } .dr-na { color: var(--muted-text); } .dr-wdot { color: #F59E0B; font-size: 9px; }
+    .dr-match { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted-text); }
+    .dr-m.new { color: #B45309; font-weight: 600; }
+    .dr-empty { padding: 28px 12px; text-align: center; color: var(--muted-text); font-size: 13px; }
+    .dr-problems { flex: 0 0 auto; margin: 0 12px; padding: 6px 10px; border: 1px solid #DC2626; border-radius: 8px; background: rgba(220,38,38,.08); font-size: 12px; }
+    .dr-problems ul { margin: 3px 0 0 16px; padding: 0; }
+    .dr-bar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-card); }
+    .dr-bar .sp { flex: 1; }
+    #dr-flash { display: none; margin: 4px 12px 0; }
+    @media (max-width: 900px) { #dr-workspace { height: auto; } .dr-grid { grid-template-columns: 1fr; height: auto; } .dr-preview { height: 60vh; flex: none; } .dr-lines { max-height: 55vh; } .dr-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .form-input.flagged { border: 2px solid #dc2626 !important; background: #fef2f2 !important; }
     .preview-img {
       max-width: 100%; max-height: 100%; object-fit: contain;
@@ -158,6 +208,8 @@
       <main class="content-body">
         <input type="file" id="doc-file-input" style="display: none;" accept=".pdf,.png,.jpg,.jpeg" onchange="handleFileSelect(this)">
 
+        <div id="docs-list-view">
+
         <!-- Filter & Search Toolbar -->
         <div class="card" style="margin-bottom: 20px;">
           <div class="card-body" style="padding: 14px 16px;">
@@ -218,6 +270,38 @@
             </div>
           </div>
         </div>
+        </div><!-- /docs-list-view -->
+
+        <!-- INVOICE REVIEW WORKSPACE: original bill (left) | read-only summary + extracted lines (right) -->
+        <div id="dr-workspace">
+          <div class="dr-grid">
+            <section class="dr-panel" aria-label="Original supplier bill">
+              <div class="dr-phead">
+                <b id="dr-title">Invoice</b><small id="dr-meta"></small><span class="sp"></span>
+                <button type="button" class="btn btn-secondary" onclick="drZoom(-0.25)" title="Zoom out">−</button>
+                <small id="dr-zoom-label">100%</small>
+                <button type="button" class="btn btn-secondary" onclick="drZoom(0.25)" title="Zoom in">+</button>
+                <button type="button" class="btn btn-secondary" onclick="drZoom(0)" title="Fit to panel">Fit</button>
+                <button type="button" class="btn btn-secondary" onclick="drOpenLarge()" title="Open the original in a new tab">Open larger</button>
+              </div>
+              <div class="dr-preview" id="dr-preview"></div>
+            </section>
+            <section class="dr-panel" aria-label="Extracted invoice data">
+              <div class="dr-right-top" id="dr-right-top"></div>
+              <div id="dr-flash" class="dr-note info"></div>
+              <div class="dr-lines" id="dr-lines"></div>
+              <div id="dr-problems"></div>
+              <div class="dr-bar">
+                <button type="button" class="btn btn-secondary" id="dr-btn-edit" onclick="drEdit()">✏️ Edit Bill Details</button>
+                <button type="button" class="btn btn-secondary" id="dr-btn-ocr" onclick="drRunOcr()" style="display:none">⚡ Run / Retry OCR</button>
+                <span id="dr-verified-note" class="dr-badge ok" style="display:none">Verified · stock added</span>
+                <span class="sp"></span>
+                <button type="button" class="btn btn-secondary" onclick="drBack()">← Back</button>
+                <button type="button" class="btn btn-primary" id="dr-btn-confirm" onclick="drConfirm()">Confirm &amp; Add to Stock</button>
+              </div>
+            </section>
+          </div>
+        </div>
 
       </main>
     </div>
@@ -228,12 +312,12 @@
     <div class="split-modal-container">
       <div class="split-modal-header">
         <div>
-          <h3 id="split-modal-title" style="margin: 0; font-size: 18px;">Review Extracted Invoice Data</h3>
-          <p id="split-modal-subtitle" style="font-size: 12px; color: var(--muted-text); margin: 0;">Verify extracted medicine lines before committing stock to active inventory.</p>
+          <h3 id="split-modal-title" style="margin: 0; font-size: 18px;">Edit Bill Details</h3>
+          <p id="split-modal-subtitle" style="font-size: 12px; color: var(--muted-text); margin: 0;">Correct the details against the original bill. Saving corrections does not add anything to stock.</p>
         </div>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-secondary" onclick="closeSplitModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="submitDocumentConfirmation()">Confirm & Add to Stock</button>
+          <button class="btn btn-primary" id="editor-save-btn" onclick="saveCorrections()">Save Corrections</button>
         </div>
       </div>
       
@@ -315,6 +399,10 @@
   </div>
 
   <script>
+    let editorDirty = false;
+    document.addEventListener('input', function (e) { if (e.target.closest && e.target.closest('#split-review-modal')) editorDirty = true; });
+    document.addEventListener('change', function (e) { if (e.target.closest && e.target.closest('#split-review-modal')) editorDirty = true; });
+    window.addEventListener('beforeunload', function (e) { if (editorDirty) { e.preventDefault(); e.returnValue = ''; } });
     let activeDocId = null;
     let activeDocData = null;
     let allSuppliersList = [];
@@ -443,7 +531,7 @@
             <td>
               <div style="display: flex; gap: 6px;">
                 ${d.ocr_status === 'Processing' ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="runOcr(${Number(d.id)})">⚡ Run AI OCR</button>` : ''}
-                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openReviewModal(${Number(d.id)})">👁️ Review</button>
+                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="openReviewWorkspace(${Number(d.id)})">👁️ Review</button>
                 <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: var(--error-red);" onclick="deleteDoc(${Number(d.id)})">🗑️</button>
               </div>
             </td>
@@ -476,35 +564,40 @@
     }
 
     async function runOcr(docId) {
-      activeDocId = docId;
-      // Show loading review modal immediately
-      document.getElementById('split-modal-title').textContent = 'Analyzing Invoice with DawaiFlow AI...';
-      document.getElementById('modal-items-tbody').innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 24px; color: var(--muted-text);"><div class="pulse-dot" style="display: inline-block; margin-right: 8px;"></div> ⚡ DawaiFlow AI is extracting medicines, HSN, batches & prices...</td></tr>';
-      document.getElementById('split-review-modal').classList.add('active');
-
+      // upload flow: read the bill, then open the review workspace (the original stays on the left)
       try {
-        const ocrDoc = await api.triggerDocumentOcr(docId);
-        // Sync newly created supplier from backend
+        await api.triggerDocumentOcr(docId);
         await loadSuppliersDropdown();
-        // Direct render from returned OCR response object for sub-second UI response
-        populateReviewModalWithDoc(ocrDoc);
-        loadDocuments();
       } catch (err) {
-        document.getElementById('split-review-modal').classList.remove('active');
-        alert(`AI OCR scan failed: ${err.message}`);
-        loadDocuments();
+        alert(`AI OCR scan failed: ${err.message}\nThe uploaded bill was kept; open it with Review to try again or enter it by hand.`);
       }
+      loadDocuments();
+      openReviewWorkspace(docId);
     }
 
-    async function openReviewModal(docId) {
-      activeDocId = docId;
+    let editorDocId = null;
+
+    // Edit Bill Details: the existing correction form, filled with the corrected-or-extracted values.
+    async function openCorrectionEditor(docId, view, focus) {
+      editorDocId = docId;
       try {
         await loadSuppliersDropdown();
         const docData = await api.getDocumentDetail(docId);
+        const ocr = (function () { try { return JSON.parse(docData.ocr_raw_json || '{}'); } catch (e) { return {}; } })();
+        ocr.items = view.raw_items || ocr.items || [];
+        ocr.invoice_number = view.invoice_number || ocr.invoice_number;
+        ocr.invoice_date = view.invoice_date || ocr.invoice_date;
+        docData.ocr_raw_json = JSON.stringify(ocr);
+        docData.invoice_number = view.invoice_number || docData.invoice_number;
+        docData.invoice_date = view.invoice_date || docData.invoice_date;
+        docData.total_amount = view.printed_total != null ? view.printed_total : docData.total_amount;
         populateReviewModalWithDoc(docData);
+        document.getElementById('split-modal-title').textContent = `Edit Bill Details: ${docData.title}`;
         document.getElementById('split-review-modal').classList.add('active');
+        editorDirty = false;
+        if (focus === 'supplier') setTimeout(() => document.getElementById('modal-supplier-select').focus(), 50);
       } catch (err) {
-        alert(`Failed to open document detail: ${err.message}`);
+        alert(`Failed to open the editor: ${err.message}`);
       }
     }
 
@@ -724,13 +817,15 @@
       // Automated Supplier Matching & Linking
       resolveAndDisplaySupplierMatch(docData);
 
-      // Setup preview left pane
+      // Left pane: the original bill (fetched with the user's login by doc_review.js)
       const paneLeft = document.getElementById('split-preview-pane');
-      const fileUrl = docData.file_path;
-      if (docData.file_type === 'application/pdf') {
-        paneLeft.innerHTML = `<iframe src="${fileUrl}" class="preview-frame"></iframe>`;
+      if (typeof drCurrentOriginalUrl === 'function' && drCurrentOriginalUrl()) {
+        const url = drCurrentOriginalUrl();
+        paneLeft.innerHTML = docData.file_type === 'application/pdf'
+          ? `<iframe src="${url}#toolbar=1&navpanes=0&view=FitH" class="preview-frame"></iframe>`
+          : `<img src="${url}" class="preview-img" alt="Original invoice">`;
       } else {
-        paneLeft.innerHTML = `<img src="${fileUrl}" class="preview-img" alt="Invoice Preview">`;
+        paneLeft.innerHTML = '<p style="color: white;">Original bill is not loaded.</p>';
       }
 
       // Render extracted items table
@@ -783,8 +878,9 @@
         const tt = (k) => (flags[k] ? `title="${esc(flags[k])}"` : '');
         const hsn = item.hsn_code || (flags.hsn_code ? '' : '3004');
         const gst = item.gst_rate || item.gst_percentage || (flags.gst_rate ? '' : getGstRateFromHsn(hsn || '3004'));
+        const extra = esc(JSON.stringify({ brand: item.brand, free_qty: item.free_qty, discount_percent: item.discount_percent, total_price: item.total_price, manufacturing_date: item.manufacturing_date }));
         return `
-          <tr>
+          <tr data-extra="${extra}">
             <td><input type="text" class="form-input item-name ${fl('product_name')}" ${tt('product_name')} value="${esc(item.product_name || '')}" style="padding: 4px;"></td>
             <td><input type="text" class="form-input item-hsn ${fl('hsn_code')}" ${tt('hsn_code')} value="${hsn}" oninput="this.classList.remove('flagged'); handleHsnInputChange(this)" style="padding: 4px; width: 75px;"></td>
             <td><input type="number" step="0.5" class="form-input item-gst ${fl('gst_rate')}" ${tt('gst_rate')} value="${gst}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 65px;"></td>
@@ -816,111 +912,58 @@
       tbody.appendChild(tr);
     }
 
-    async function submitDocumentConfirmation() {
-      if (!activeDocId) return;
-
-      const saveBtn = document.querySelector('#split-review-modal .modal-footer .btn-primary');
-      if (saveBtn) {
-        saveBtn.disabled = true;
-        saveBtn.textContent = '⏳ Saving Stock Records...';
-      }
-
-      const supplierId = document.getElementById('modal-supplier-select').value;
-      const invNum = document.getElementById('modal-inv-number').value;
-      const invDate = document.getElementById('modal-inv-date').value;
-      const invTotal = parseFloat(document.getElementById('modal-inv-total').value) || 0.0;
-
-      const rows = document.querySelectorAll('#modal-items-tbody tr');
+    // Saves corrections only (no stock). Blank fields stay blank so the review shows them as Missing.
+    async function saveCorrections() {
+      if (!editorDocId) return;
+      const btn = document.getElementById('editor-save-btn');
+      const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
       const items = [];
-      const missingMrp = [];
-      const missingBatch = [];
-      const belowCostRows = [];
-
-      rows.forEach(r => {
-        const pName = r.querySelector('.item-name')?.value.trim();
-        const hsn = r.querySelector('.item-hsn')?.value.trim() || '3004';
-        const gst = parseFloat(r.querySelector('.item-gst')?.value) || 12.0;
+      document.querySelectorAll('#modal-items-tbody tr').forEach(r => {
+        const name = r.querySelector('.item-name')?.value.trim();
         const batch = r.querySelector('.item-batch')?.value.trim();
-        const qty = parseInt(r.querySelector('.item-qty')?.value) || 1;
-        const pPrice = parseFloat(r.querySelector('.item-pprice')?.value) || 0.0;
-        const sPrice = parseFloat(r.querySelector('.item-sprice')?.value) || 0.0;
         const exp = r.querySelector('.item-exp')?.value;
-
-        if (pName && exp) {
-          // MRP is mandatory and is never copied from the purchase price.
-          if (!(sPrice > 0)) missingMrp.push(pName);
-          if (!batch) missingBatch.push(pName);
-          const belowCost = pPrice > 0 && sPrice > 0 && sPrice < pPrice;
-          if (belowCost) belowCostRows.push(`${pName}: MRP ₹${sPrice} < purchase ₹${pPrice}`);
-          items.push({
-            product_name: pName,
-            batch_number: batch,
-            quantity: qty,
-            purchase_price: pPrice,
-            mrp: sPrice,
-            unit_price: sPrice,
-            confirm_mrp_below_cost: belowCost,
-            hsn_code: hsn,
-            gst_rate: gst,
-            expiry_date: exp
-          });
-        }
+        const qty = r.querySelector('.item-qty')?.value;
+        if (!name && !batch && !exp && !qty) return;       // untouched blank row
+        let extra = {};
+        try { extra = JSON.parse(r.dataset.extra || '{}'); } catch (e) { extra = {}; }
+        items.push(Object.assign({}, extra, {
+          product_name: name || null,
+          hsn_code: r.querySelector('.item-hsn')?.value.trim() || null,
+          gst_rate: num(r.querySelector('.item-gst')?.value),
+          batch_number: batch || null,
+          quantity: qty === '' || qty == null ? null : parseInt(qty, 10),
+          purchase_price: num(r.querySelector('.item-pprice')?.value),
+          mrp: num(r.querySelector('.item-sprice')?.value),
+          expiry_date: exp || null,
+          field_flags: {},
+        }));
       });
-
-      const resetSave = () => {
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Verified Stock →';
-        }
+      const supplierId = document.getElementById('modal-supplier-select').value;
+      const body = {
+        header: {
+          supplier_id: supplierId ? parseInt(supplierId, 10) : null,
+          invoice_number: document.getElementById('modal-inv-number').value.trim() || null,
+          invoice_date: document.getElementById('modal-inv-date').value || null,
+          total_amount: num(document.getElementById('modal-inv-total').value),
+        },
+        items,
       };
-      if (missingBatch.length > 0) {
-        alert(`Enter the batch number printed on the bill for: ${missingBatch.join(', ')}`);
-        resetSave();
-        return;
-      }
-      if (missingMrp.length > 0) {
-        alert(`Enter the MRP printed on the pack for: ${missingMrp.join(', ')}`);
-        resetSave();
-        return;
-      }
-      if (belowCostRows.length > 0 &&
-          !confirm(`MRP lower than purchase price:\n${belowCostRows.join('\n')}\n\nCheck the MRP printed on the pack. Save anyway?`)) {
-        resetSave();
-        return;
-      }
-
-      if (items.length === 0) {
-        alert("Please enter at least one valid medicine item with name & expiry date.");
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Verified Stock →';
-        }
-        return;
-      }
-
-      const payload = {
-        supplier_id: supplierId ? parseInt(supplierId) : null,
-        invoice_number: invNum,
-        invoice_date: invDate,
-        total_amount: invTotal,
-        items: items
-      };
-
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try {
-        const res = await api.confirmDocument(activeDocId, payload);
-        closeSplitModal();
-        loadDocuments();
+        await api.request(`/documents/${editorDocId}/review-data`, { method: 'PUT', body: JSON.stringify(body) });
+        editorDirty = false;
+        document.getElementById('split-review-modal').classList.remove('active');
+        if (typeof drAfterCorrectionsSaved === 'function') await drAfterCorrectionsSaved();
       } catch (err) {
-        alert(`Failed to verify document: ${err.message}`);
+        alert(`Could not save the corrections: ${typeof drApiMsg === 'function' ? drApiMsg(err) : err.message}`);
       } finally {
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Verified Stock →';
-        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Corrections'; }
       }
     }
 
     function closeSplitModal() {
+      if (editorDirty && !confirm('You have unsaved changes to this bill. Close without saving?')) return;
+      editorDirty = false;
       document.getElementById('split-review-modal').classList.remove('active');
     }
 
@@ -955,5 +998,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.5" defer></script>
+  <script src="js/doc_review.js?v=1.3" defer></script>
 </body>
 </html>

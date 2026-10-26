@@ -3571,7 +3571,10 @@ def get_document_detail(db: Session, document_id: int, user_id: int):
 
 def confirm_document_and_update_stock(db: Session, document_id: int, user_id: int, confirm_req: schemas.DocumentConfirmRequest):
     doc = get_document_detail(db, document_id, user_id)
-    
+    if str(doc.ocr_status or "").lower() == "verified":
+        # a second confirm (double click, retry) must never add the same stock again
+        raise HTTPException(status_code=409, detail="ALREADY_VERIFIED: This invoice was already confirmed and its stock added. Nothing was posted again.")
+
     if confirm_req.supplier_id:
         doc.supplier_id = confirm_req.supplier_id
     if confirm_req.invoice_number:

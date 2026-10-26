@@ -188,8 +188,12 @@ def _bad(detail: str, code: int = 400):
     raise HTTPException(status_code=code, detail=detail)
 
 
-def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate) -> dict:
-    """Post one purchase. All or nothing: any problem rolls back the document, the stock and the ledger rows together."""
+def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, document_id: Optional[int] = None) -> dict:
+    """
+    Post one purchase. All or nothing: any problem rolls back the document, the stock and the ledger rows together.
+    document_id: the scanned supplier invoice this purchase confirms. It is locked, refused if already Verified, linked to
+    the stock rows and marked Verified in the SAME transaction (so Verified always means the stock was posted).
+    """
     today = date.today()
     if data.invoice_date > today + timedelta(days=1):
         _bad("Invoice date cannot be in the future.")
@@ -199,6 +203,14 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate) 
             .filter(models.Supplier.id == data.supplier_id, models.Supplier.user_id == user_id)
             .with_for_update().first()               # serialises two posts for the same supplier (Postgres)
         )
+        doc = None
+        if document_id:
+            doc = (db.query(models.Document).filter(models.Document.id == document_id, models.Document.user_id == user_id)
+                   .with_for_update().first())
+            if not doc:
+                _bad("Document not found.", 404)
+            if str(doc.ocr_status or "").lower() == "verified":
+                _bad("ALREADY_VERIFIED: This invoice was already confirmed and its stock added. Nothing was posted again.", 409)
         if not supplier:
             _bad("Supplier not found or access denied.", 404)
         if str(supplier.status or "Active").lower() == "inactive":
@@ -267,7 +279,7 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate) 
                 purchase_price=c["net_unit_cost"], mrp=l.mrp, confirm_mrp_below_cost=l.confirm_mrp_below_cost,
                 units_per_pack=units, expiry_date=l.expiry_date.isoformat(),
                 manufacturing_date=l.manufacturing_date.isoformat() if l.manufacturing_date else None,
-                supplier_id=supplier.id, invoice_number=data.invoice_number, duplicate_mode="auto",
+                supplier_id=supplier.id, invoice_number=data.invoice_number, document_id=document_id, duplicate_mode="auto",
             )
             was_new = existing is None
             prod = crud.add_real_inventory_item(db, req, user_id, do_commit=False)
@@ -295,6 +307,12 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate) 
                                 "batch_number": prod.batch_number, "new_batch": was_new, "received_qty": c["received_qty"],
                                 "stock_after": prod.quantity, **c})
 
+        if doc is not None:
+            doc.supplier_id = supplier.id
+            doc.invoice_number = data.invoice_number
+            doc.invoice_date = data.invoice_date
+            doc.item_count = len(saved_lines)
+            doc.ocr_status = "Verified"
         db.commit()
     except Exception:
         db.rollback()
