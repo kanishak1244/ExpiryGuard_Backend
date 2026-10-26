@@ -222,12 +222,14 @@ class TestPurchaseManagementPage(unittest.TestCase):
         self.assertIn("beforeunload", js)
 
     def test_every_page_loads_the_new_script_versions(self):
-        for name in os.listdir(os.path.join(ROOT, "web")):
-            if name.endswith(".html") and name != "purchases.html":
-                html = self._read("web/" + name)
-                for script in ("add_inventory_flow", "nav"):
-                    for ver in re.findall(r"js/%s\.js\?v=([0-9.]+)" % script, html):
-                        self.assertEqual(ver, "9.5", (name, script))
+        # every page must load the same (latest) version of the shared scripts, so no page runs a stale cached copy
+        for script in ("add_inventory_flow", "nav"):
+            versions = {}
+            for name in os.listdir(os.path.join(ROOT, "web")):
+                if name.endswith(".html"):
+                    for ver in re.findall(r"js/%s\.js\?v=([0-9.]+)" % script, self._read("web/" + name)):
+                        versions.setdefault(ver, []).append(name)
+            self.assertEqual(len(versions), 1, (script, versions))
 
 
 if __name__ == "__main__":

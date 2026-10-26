@@ -2669,7 +2669,7 @@ async function matchVoiceInputToItem(spokenText) {
       mrp: p.unit_price || 0,
       pricePerUnit: p.price_per_unit || p.loose_tablet_price,
       unitsPerPack: p.units_per_pack || p.tablets_per_strip || 10,
-      gst: p.gst_percentage || p.gst_rate || 12.0,
+      gst: [p.gst_percentage, p.gst_rate].find(v => v !== undefined && v !== null && v !== '') ?? 12.0,
       similarity: p.similarity !== undefined ? p.similarity : 0.7,
       isInventory: p.is_inventory !== false
     }));

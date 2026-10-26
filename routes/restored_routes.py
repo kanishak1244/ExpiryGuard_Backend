@@ -347,8 +347,8 @@ def get_gstr1_summary(
         .options(selectinload(models.Sale.items))
         .filter(
             models.Sale.user_id == current_user.id,
-            models.Sale.created_at >= start_dt,
-            models.Sale.created_at <= end_dt,
+            models.Sale.created_at >= start_dt - timedelta(hours=5, minutes=30),
+            models.Sale.created_at <= end_dt - timedelta(hours=5, minutes=30),
         )
         .order_by(models.Sale.created_at.desc())
         .all()
@@ -398,37 +398,15 @@ def get_gstr1_summary(
             b2c_total_tax += s_tax
             b2c_total_amount += s_total
 
-        # HSN breakdown from sale items
-        for item in s.items:
-            hsn = getattr(item, 'hsn_code', None) or "3004"
-            rate = float(getattr(item, 'gst_percentage', None) or getattr(item, 'gst_rate', None) or s.gst_percentage or 12.0)
-            item_taxable = float(getattr(item, 'line_total', None) or (item.quantity * item.unit_price))
-            item_tax = float(getattr(item, 'taxable_value', None) or (item_taxable * rate / 100.0))
 
-            if hsn not in hsn_dict:
-                hsn_dict[hsn] = {
-                    "hsn_code": hsn,
-                    "description": "Medicines / Pharma Supplies",
-                    "gst_rate": rate,
-                    "total_quantity": 0,
-                    "taxable_value": 0.0,
-                    "gst_amount": 0.0,
-                }
-            hsn_dict[hsn]["total_quantity"] += item.quantity
-            hsn_dict[hsn]["taxable_value"] += item_taxable
-            hsn_dict[hsn]["gst_amount"] += item_tax
-
-    # Format HSN summary list
+    # HSN summary and credit notes (sales returns of the period) from the saved line figures
+    from tax_reports import sales_tax_breakdown
+    ist = timedelta(hours=5, minutes=30)
+    tx = sales_tax_breakdown(db, current_user.id, start_dt - ist, end_dt - ist)
     hsn_summary = [
-        {
-            "hsn_code": k,
-            "description": v["description"],
-            "gst_rate": round(v["gst_rate"], 1),
-            "total_quantity": v["total_quantity"],
-            "taxable_value": round(v["taxable_value"], 2),
-            "gst_amount": round(v["gst_amount"], 2),
-        }
-        for k, v in hsn_dict.items()
+        {"hsn_code": h["hsn_code"], "description": "Medicines / Pharma Supplies", "gst_rate": round(h["gst_rate"], 1),
+         "total_quantity": h["quantity"], "taxable_value": h["taxable_amount"], "gst_amount": h["total_tax"]}
+        for h in tx["hsn"]
     ]
 
     total_taxable = round(sum(s.total_taxable_value or s.subtotal for s in sales), 2)
@@ -451,6 +429,22 @@ def get_gstr1_summary(
             "sgst": total_sgst,
             "igst": total_igst,
             "total_output_tax": total_tax,
+        },
+        "credit_notes": {                                 # sales returns made in the period
+            "count": tx["return_count"],
+            "taxable_value": tx["returns"]["taxable"],
+            "cgst": tx["returns"]["cgst"],
+            "sgst": tx["returns"]["sgst"],
+            "igst": tx["returns"]["igst"],
+            "total_tax": tx["returns"]["gst"],
+            "total_amount": tx["returns"]["total"],
+        },
+        "net_totals": {
+            "taxable_value": tx["net"]["taxable"],
+            "cgst": tx["net"]["cgst"],
+            "sgst": tx["net"]["sgst"],
+            "igst": tx["net"]["igst"],
+            "total_output_tax": tx["net"]["gst"],
         },
         "b2b_sales": b2b_sales,
         "b2c_summary": {
@@ -477,37 +471,21 @@ def get_gstr3b_summary(
 
     start_dt, end_dt, period_label, period_code = _parse_gst_period_dates(period)
 
-    sales = (
-        db.query(models.Sale)
-        .filter(
-            models.Sale.user_id == current_user.id,
-            models.Sale.created_at >= start_dt,
-            models.Sale.created_at <= end_dt,
-        )
-        .all()
-    )
+    from tax_reports import sales_tax_breakdown, purchase_tax
+    ist = timedelta(hours=5, minutes=30)
+    tx = sales_tax_breakdown(db, current_user.id, start_dt - ist, end_dt - ist)
+    outward_taxable = tx["net"]["taxable"]
+    outward_cgst = tx["net"]["cgst"]
+    outward_sgst = tx["net"]["sgst"]
+    outward_igst = tx["net"]["igst"]
+    outward_tax = tx["net"]["gst"]
 
-    purchases = (
-        db.query(models.PurchaseInvoice)
-        .filter(
-            models.PurchaseInvoice.user_id == current_user.id,
-            models.PurchaseInvoice.created_at >= start_dt,
-            models.PurchaseInvoice.created_at <= end_dt,
-        )
-        .all()
-    )
-
-    outward_taxable = sum(s.total_taxable_value or s.subtotal for s in sales)
-    outward_cgst = sum(s.total_cgst for s in sales)
-    outward_sgst = sum(s.total_sgst for s in sales)
-    outward_igst = sum(s.total_igst for s in sales)
-    outward_tax = sum(s.tax_amount for s in sales)
-
-    itc_taxable = sum(p.subtotal for p in purchases)
-    itc_total_tax = sum(p.tax_amount for p in purchases)
-    itc_igst = sum(p.tax_amount if getattr(p, 'is_interstate', False) else 0.0 for p in purchases)
-    itc_cgst = (itc_total_tax - itc_igst) / 2.0
-    itc_sgst = (itc_total_tax - itc_igst) / 2.0
+    pt = purchase_tax(db, current_user.id, start_dt.date(), end_dt.date())
+    itc_taxable = pt["taxable"]
+    itc_total_tax = pt["tax"]
+    itc_igst = 0.0                                        # purchase invoices do not record inter-state supply yet
+    itc_cgst = itc_total_tax / 2.0
+    itc_sgst = itc_total_tax / 2.0
 
     net_cgst = max(0.0, outward_cgst - itc_cgst)
     net_sgst = max(0.0, outward_sgst - itc_sgst)
@@ -519,7 +497,9 @@ def get_gstr3b_summary(
         "period_label": period_label,
         "gstin": getattr(current_user, "gstin", None) or current_user.gst_number or "07AABCE1234F1Z5",
         "pharmacy_name": current_user.shop_name or "Pharmacy",
-        "section_3_1_outward_supplies": {
+        "section_3_1_outward_supplies": {                 # net of sales returns made in the period
+            "gross_taxable_value": tx["gross"]["taxable"],
+            "returns_taxable_value": tx["returns"]["taxable"],
             "taxable_value": round(outward_taxable, 2),
             "cgst": round(outward_cgst, 2),
             "sgst": round(outward_sgst, 2),
@@ -689,7 +669,7 @@ def export_inventory_csv(
             f"{p.unit_price:.2f}",
             f"{p.price_per_unit:.2f}" if p.price_per_unit else "N/A",
             p.hsn_code or "3004",
-            p.gst_rate or 12.0,
+            crud._gst_value(p.gst_rate),
             p.expiry_date.strftime("%Y-%m-%d") if p.expiry_date else "",
             p.status or "Safe"
         ])
@@ -1179,8 +1159,8 @@ def search_items_voice(
                 "batch_number": "CATALOG-NEW",
                 "quantity": 50,
                 "hsn_code": cat.hsn_code or "3004",
-                "gst_rate": cat.gst_rate or 12.0,
-                "gst_percentage": cat.gst_rate or 12.0,
+                "gst_rate": crud._gst_value(cat.gst_rate),
+                "gst_percentage": crud._gst_value(cat.gst_rate),
                 "purchase_price": (cat.default_price or 50.0) * 0.75,
                 "unit_price": cat.default_price or 50.0,
                 "price_per_unit": cat.price_per_unit,

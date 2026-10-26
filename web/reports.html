@@ -241,7 +241,7 @@
         <!-- High-Level Financial & Operational KPI Grid -->
         <div class="metric-grid-6">
           <div class="kpi-card">
-            <span class="kpi-title">Gross Sales Revenue</span>
+            <span class="kpi-title">Net Sales (after returns)</span>
             <div class="kpi-num" id="rep-total-sales" style="color: var(--status-safe, #10B981);">₹0.00</div>
             <div class="kpi-desc" id="rep-bills-sub">0 Bills (Avg ₹0.00)</div>
           </div>
@@ -338,15 +338,15 @@
             <div style="padding: 16px;">
               <div style="display: flex; flex-direction: column; gap: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                  <span style="color: var(--color-text-secondary);">Estimated Output GST (Sales)</span>
+                  <span style="color: var(--color-text-secondary);">Output GST (Sales, net of returns)</span>
                   <strong class="num-currency" id="rep-gst-output">₹0.00</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
-                  <span style="color: var(--color-text-secondary);">Estimated Input Tax Credit (Purchases)</span>
+                  <span style="color: var(--color-text-secondary);">Input Tax Credit (Purchase invoices)</span>
                   <strong class="num-currency" id="rep-gst-itc" style="color: #3B82F6;">₹0.00</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; padding-top: 4px;">
-                  <span>Net Estimated GST Payable</span>
+                  <span>Net GST Payable</span>
                   <span class="num-currency" id="rep-gst-net" style="color: var(--status-safe, #10B981);">₹0.00</span>
                 </div>
                 <p style="font-size: 11.5px; color: var(--color-text-muted); margin-top: 4px;">
@@ -412,6 +412,6 @@
   <script src="js/nav.js?v=9.5" defer></script>
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
-  <script src="js/reports.js?v=9.4" defer></script>
+  <script src="js/reports.js?v=9.5" defer></script>
 </body>
 </html>

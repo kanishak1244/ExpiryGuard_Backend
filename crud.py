@@ -904,7 +904,7 @@ def create_product(
         ocr_text=product.ocr_text,
         composition=getattr(product, 'composition', None),
         hsn_code=getattr(product, 'hsn_code', '3004') or '3004',
-        gst_rate=getattr(product, 'gst_rate', 12.0) or 12.0,
+        gst_rate=_gst_value(getattr(product, 'gst_rate', None)),
         tablets_per_strip=getattr(product, 'tablets_per_strip', None) or getattr(product, 'units_per_pack', None),
         units_per_pack=getattr(product, 'units_per_pack', None) or getattr(product, 'tablets_per_strip', None),
         loose_tablet_price=getattr(product, 'loose_tablet_price', None),
@@ -1097,6 +1097,12 @@ def create_transaction(
 # ===========================
 # POS / COUNTER SALES TRANSACTION
 # ===========================
+
+def _gst_value(*candidates, default: float = 12.0) -> float:
+    """First GST rate that is actually set (0 % is a real rate for exempt medicines); only a missing one falls back."""
+    from tax_reports import gst_value
+    return gst_value(*candidates, default=default)
+
 
 def generate_bill_number() -> str:
     return f"BILL-{uuid.uuid4().hex[:8].upper()}"
@@ -1345,7 +1351,7 @@ def create_sale_transaction(
         prepared_items = []
         gross_subtotal = 0.0
         line_discount_total = 0.0
-        default_shop_gst = shop.default_gst_percentage or 12.0
+        default_shop_gst = _gst_value(shop.default_gst_percentage)
 
         # Process every cart item using batch-loaded products in memory
         for item in sale_data.items:
@@ -1453,18 +1459,10 @@ def create_sale_transaction(
             taxable_line_total = round(gross_line_total - line_discount, 2)
 
             item_hsn = getattr(product, "hsn_code", None) or "3004"
+            # the rate sent by the screen, else the medicine's own rate (0 % = exempt, kept), else the shop default
+            from tax_reports import product_gst_rate
             gst_percentage = (
-                item.gst_percentage
-                if item.gst_percentage is not None
-                else (
-                    product.gst_percentage
-                    if (product.gst_percentage is not None and product.gst_percentage > 0)
-                    else (
-                        getattr(product, "gst_rate", None)
-                        if (getattr(product, "gst_rate", None) is not None and product.gst_rate > 0)
-                        else default_shop_gst
-                    )
-                )
+                float(item.gst_percentage) if item.gst_percentage is not None else product_gst_rate(product, default_shop_gst)
             )
 
             gross_subtotal += gross_line_total
@@ -1930,7 +1928,8 @@ def create_held_bill(
             line_gross = round(unit_price * item.quantity, 2)
             line_discount = round(float(item.discount or 0.0), 2)
             taxable_line = max(0.0, round(line_gross - line_discount, 2))
-            gst_pct = float(item.gst_percentage if item.gst_percentage is not None else (prod.gst_percentage or 12.0))
+            from tax_reports import product_gst_rate
+            gst_pct = float(item.gst_percentage) if item.gst_percentage is not None else product_gst_rate(prod)    # 0 % stays 0 %
             line_tax = round(taxable_line * (gst_pct / 100.0), 2)
             line_total = round(taxable_line + line_tax, 2)
 
@@ -2825,7 +2824,7 @@ def create_custom_medicine(db: Session, data: schemas.CustomMedicineCreate):
         category=data.category or "allopathy",
         composition=data.composition,
         hsn_code=data.hsn_code or "3004",
-        gst_rate=data.gst_rate or 12.0,
+        gst_rate=_gst_value(data.gst_rate),
         default_price=data.default_price or 0.0,
         tablets_per_strip=data.tablets_per_strip or 10,
         units_per_pack=data.tablets_per_strip or 10,
@@ -2920,8 +2919,8 @@ def add_real_inventory_item(db: Session, data: schemas.InventoryAddRequest, user
         tablets_per_strip=units,
         total_price=data.unit_price * data.quantity,
         hsn_code=data.hsn_code or "3004",
-        gst_rate=data.gst_rate or 12.0,
-        gst_percentage=data.gst_rate or 12.0,
+        gst_rate=_gst_value(data.gst_rate),
+        gst_percentage=_gst_value(data.gst_rate),
         manufacturing_date=mfg_date,
         expiry_date=exp_date,
         days_remaining=days_remaining,
@@ -3612,7 +3611,7 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
             brand=item.brand,
             category=item.category or "allopathy",
             hsn_code=item.hsn_code or "3004",
-            gst_rate=item.gst_rate or 12.0,
+            gst_rate=_gst_value(item.gst_rate),
             batch_number=item.batch_number,
             quantity=item.quantity,
             purchase_price=item.purchase_price,
@@ -4714,13 +4713,17 @@ def ist_today_start_utc() -> "datetime":
     return datetime.combine(now_ist.date(), datetime.min.time()) - ist_offset
 
 
-def compute_profit_for_period(db: Session, user_id: int, start_utc, end_utc=None) -> dict:
+PACK_UNITS = ("strip", "pack", "box", "bottle")
+
+
+def compute_profit_for_period(db: Session, user_id: int, start_utc, end_utc=None, details: bool = False) -> dict:
     """
-    Profit = taxable sale value (after discount, GST excluded) minus the cost of what was actually sold,
-    net of returned quantity. Cost is the batch's real purchase price (per strip; a loose line uses the price
-    divided by tablets per strip). A line with no known cost (> 0) is left out and counted separately, never
-    estimated, so the figure is honest and the UI can say how many lines it covers.
+    Profit of the bills made in the period = taxable sale value (after discount, GST excluded) minus the cost of what was
+    actually sold, both net of quantity later returned. Cost is the batch's purchase price per strip/pack; a loose
+    unit (tablet) costs that price divided by tablets per strip. A line with no known cost (> 0) is left out of
+    revenue, cost and profit and counted separately, never estimated, so the margin is honest.
     """
+    r = _round_half_up
     q = (
         db.query(models.SaleItem, models.Product)
         .join(models.Sale, models.SaleItem.sale_id == models.Sale.id)
@@ -4730,29 +4733,38 @@ def compute_profit_for_period(db: Session, user_id: int, start_utc, end_utc=None
     if end_utc is not None:
         q = q.filter(models.Sale.created_at < end_utc)
 
-    profit = 0.0
-    counted = 0
-    total = 0
+    revenue = cogs = unknown_revenue = 0.0
+    counted = total = 0
     for item, product in q.all():
         qty = int(item.quantity or 0)
         net_qty = max(0, qty - int(item.returned_quantity or 0))
         if qty <= 0 or net_qty <= 0:
             continue  # fully returned lines earn nothing
         total += 1
+        line_revenue = float(item.taxable_value or 0.0) * (net_qty / qty)
         cost_per_pack = float(product.purchase_price or 0.0) if product is not None else 0.0
-        if cost_per_pack <= 0:
+        unit_cost = None
+        if cost_per_pack > 0:
+            if (item.unit_type or "strip").lower() in PACK_UNITS:
+                unit_cost = cost_per_pack
+            else:
+                per_strip = int(item.tablets_per_strip or (product.tablets_per_strip if product is not None else 0)
+                                or (product.units_per_pack if product is not None else 0) or 0)
+                unit_cost = cost_per_pack / per_strip if per_strip > 0 else None
+        if unit_cost is None:
+            unknown_revenue += line_revenue
             continue
-        if (item.unit_type or "strip").lower() == "loose":
-            per_strip = int(item.tablets_per_strip or (product.tablets_per_strip if product is not None else 0) or 0)
-            if per_strip <= 0:
-                continue
-            unit_cost = cost_per_pack / per_strip
-        else:
-            unit_cost = cost_per_pack
-        revenue = float(item.taxable_value or 0.0) * (net_qty / qty)
-        profit += revenue - unit_cost * net_qty
+        revenue += line_revenue
+        cogs += unit_cost * net_qty
         counted += 1
-    return {"profit": round(profit, 2), "lines_counted": counted, "lines_total": total}
+    profit = revenue - cogs
+    if not details:
+        return {"profit": r(profit, 2), "lines_counted": counted, "lines_total": total}
+    return {
+        "profit": r(profit, 2), "revenue": r(revenue, 2), "cogs": r(cogs, 2),
+        "margin_percent": r(profit / revenue * 100.0, 1) if revenue > 0 else 0.0,
+        "revenue_without_cost": r(unknown_revenue, 2), "lines_counted": counted, "lines_total": total,
+    }
 
 
 def get_dashboard_stats(db: Session, user_id: int):
@@ -4819,25 +4831,8 @@ def get_dashboard_stats(db: Session, user_id: int):
         models.Product.expiry_date < today
     ).scalar() or 0.0
 
-    # 5. Net Profit (Revenue - COGS) for current month via SQL join
-    cogs_result = db.query(
-        func.sum(
-            models.SaleItem.quantity * func.coalesce(
-                # Real purchase price only; never estimated from the sale price (unknown cost counts as 0).
-                models.Product.purchase_price,
-                0.0
-            )
-        )
-    ).join(
-        models.Sale, models.SaleItem.sale_id == models.Sale.id
-    ).outerjoin(
-        models.Product, models.SaleItem.product_id == models.Product.id
-    ).filter(
-        models.Sale.user_id == user_id,
-        models.Sale.created_at >= start_of_month
-    ).scalar() or 0.0
-
-    net_profit = max(0.0, float(month_revenue) - float(cogs_result))
+    # 5. Net profit of this month's bills: the same rule as today's profit (taxable value, real cost, net of returns)
+    net_profit = compute_profit_for_period(db, user_id, start_of_month)["profit"]
     today_profit = compute_profit_for_period(db, user_id, start_of_today)
 
     return {
@@ -5776,27 +5771,13 @@ def get_reports_analytics(
         for k, v in sorted_by_vol
     ]
 
-    # 4. COGS & PROFIT
-    cogs = db.query(
-        func.sum(
-            models.SaleItem.quantity * func.coalesce(
-                # Real purchase price only; never estimated from the sale price (unknown cost counts as 0).
-                models.Product.purchase_price,
-                0.0
-            )
-        )
-    ).join(
-        models.Sale, models.SaleItem.sale_id == models.Sale.id
-    ).outerjoin(
-        models.Product, models.SaleItem.product_id == models.Product.id
-    ).filter(
-        models.Sale.user_id == user_id,
-        models.Sale.created_at >= query_start_date,
-        models.Sale.created_at <= query_end_date
-    ).scalar() or 0.0
-
-    gross_profit = max(0.0, total_sales - float(cogs))
-    margin_percent = (gross_profit / total_sales * 100) if total_sales > 0 else 0.0
+    # 4. PROFIT (bills of the period, net of later returns, GST excluded, real batch cost) and RETURNS of the period
+    profit_info = compute_profit_for_period(db, user_id, query_start_date, query_end_date + datetime.timedelta(microseconds=1), details=True)
+    from tax_reports import sales_tax_breakdown
+    tax_info = sales_tax_breakdown(db, user_id, query_start_date, query_end_date)
+    total_returns = tax_info["refunded_amount"]
+    from tax_reports import purchase_tax
+    purchase_tax_info = purchase_tax(db, user_id, start_date.date(), end_date.date())
 
     # 5. SLOW MOVING PRODUCTS
     slow_moving_query = db.query(
@@ -5887,6 +5868,9 @@ def get_reports_analytics(
         "end_date": end_date.strftime("%Y-%m-%d"),
         "sales_metrics": {
             "total_sales": round(float(total_sales), 2),
+            "total_returns": total_returns,
+            "return_count": tax_info["return_count"],
+            "net_sales": round(float(total_sales) - float(total_returns), 2),
             "bill_count": bill_count,
             "avg_bill_value": round(float(avg_bill_value), 2),
             "payment_split": {k: round(v, 2) for k, v in payment_split.items()},
@@ -5898,11 +5882,22 @@ def get_reports_analytics(
             "avg_purchase_value": round(float(avg_purchase_value), 2),
             "trend": purchases_trend
         },
+        "gst_metrics": {                                           # saved bill tax, net of returns; ITC from purchase invoices
+            "output_gst": tax_info["net"]["gst"],
+            "gross_output_gst": tax_info["gross"]["gst"],
+            "returned_output_gst": tax_info["returns"]["gst"],
+            "input_gst": purchase_tax_info["tax"],
+            "net_payable": round(tax_info["net"]["gst"] - purchase_tax_info["tax"], 2),
+        },
         "profit_metrics": {
-            "gross_revenue": round(float(total_sales), 2),
-            "cogs": round(float(cogs), 2),
-            "gross_profit": round(float(gross_profit), 2),
-            "margin_percent": round(float(margin_percent), 1)
+            "gross_revenue": profit_info["revenue"],                  # taxable value (GST excluded) of lines with a known cost
+            "cogs": profit_info["cogs"],
+            "gross_profit": profit_info["profit"],
+            "margin_percent": profit_info["margin_percent"],
+            "revenue_without_cost": profit_info["revenue_without_cost"],
+            "lines_counted": profit_info["lines_counted"],
+            "lines_total": profit_info["lines_total"],
+            "basis": "Bills of the period, net of later returns, GST excluded; lines without a purchase price are left out.",
         },
         "inventory_analytics": {
             "total_items": total_items,
@@ -8035,7 +8030,7 @@ def serialize_quick_batch_record(product: models.Product) -> dict:
         "stock_quantity": product.quantity or 0,
         "unit": "Strips" if product.is_countable else "Packs",
         "hsn_code": product.hsn_code or "3004",
-        "gst_rate": float(product.gst_rate or 12.0),
+        "gst_rate": _gst_value(product.gst_rate),
         "tablets_per_strip": product.tablets_per_strip or 10,
         "shop_id": product.user_id,
         "branch_id": None
@@ -8395,58 +8390,16 @@ def get_gst_financial_summary(
     pharmacy_name = user.shop_name if user else "DawaiFlow Pharmacy"
     owner_name = user.owner_name if user else "Pharmacy Admin"
 
-    sales = db.query(models.Sale).filter(
-        models.Sale.user_id == user_id,
-        models.Sale.created_at >= query_start,
-        models.Sale.created_at <= query_end
-    ).all()
-
-    total_sales = sum(float(s.total_amount or 0.0) for s in sales)
-    total_bills = len(sales)
-
-    sale_ids = [s.id for s in sales]
-    hsn_map = {}
-    total_output_gst = 0.0
-
-    if sale_ids:
-        sale_items = db.query(models.SaleItem).filter(models.SaleItem.sale_id.in_(sale_ids)).all()
-        for item in sale_items:
-            hsn = (item.hsn_code or "3004").strip()
-            total_item_amt = float(item.total_price or 0.0)
-            gst_rate = float(getattr(item, "gst_percentage", 12.0) or 12.0)
-            
-            taxable = round(total_item_amt / (1.0 + gst_rate / 100.0), 2)
-            item_tax = round(total_item_amt - taxable, 2)
-            total_output_gst += item_tax
-
-            if hsn not in hsn_map:
-                hsn_map[hsn] = {
-                    "hsn_code": hsn,
-                    "taxable_amount": 0.0,
-                    "cgst_amount": 0.0,
-                    "sgst_amount": 0.0,
-                    "igst_amount": 0.0,
-                    "total_tax": 0.0,
-                    "total_amount": 0.0
-                }
-            hsn_map[hsn]["taxable_amount"] += taxable
-            hsn_map[hsn]["cgst_amount"] += round(item_tax / 2.0, 2)
-            hsn_map[hsn]["sgst_amount"] += round(item_tax / 2.0, 2)
-            hsn_map[hsn]["total_tax"] += item_tax
-            hsn_map[hsn]["total_amount"] += total_item_amt
-
-    hsn_summary = list(hsn_map.values())
-
-    purchases = db.query(models.PurchaseInvoice).filter(
-        models.PurchaseInvoice.user_id == user_id,
-        models.PurchaseInvoice.created_at >= query_start,
-        models.PurchaseInvoice.created_at <= query_end
-    ).all()
-
-    total_purchases = sum(float(p.total_amount or 0.0) for p in purchases)
-    total_purchase_invoices = len(purchases)
-    total_input_gst = sum(float(getattr(p, "gst_amount", 0.0) or getattr(p, "tax_amount", 0.0) or 0.0) for p in purchases)
-
+    from tax_reports import sales_tax_breakdown, purchase_tax
+    tx = sales_tax_breakdown(db, user_id, query_start, query_end)
+    total_sales = tx["net"]["total"]
+    total_bills = tx["bill_count"]
+    total_output_gst = tx["net"]["gst"]
+    hsn_summary = [dict(h) for h in tx["hsn"]]
+    pt = purchase_tax(db, user_id, start_date.date(), end_date.date())
+    total_purchases = pt["total"]
+    total_purchase_invoices = pt["count"]
+    total_input_gst = pt["tax"]
     net_gst_payable = round(total_output_gst - total_input_gst, 2)
 
     return {
@@ -8456,7 +8409,12 @@ def get_gst_financial_summary(
         "period_label": preset,
         "start_date": start_date.strftime("%Y-%m-%d"),
         "end_date": end_date.strftime("%Y-%m-%d"),
-        "total_sales": round(total_sales, 2),
+        "total_sales": round(total_sales, 2),                       # net of returns made in the period
+        "gross_sales": tx["gross"]["total"],
+        "total_returns": tx["returns"]["total"],
+        "return_count": tx["return_count"],
+        "gross_output_gst": tx["gross"]["gst"],
+        "returned_output_gst": tx["returns"]["gst"],
         "total_bills": total_bills,
         "total_purchases": round(total_purchases, 2),
         "total_purchase_invoices": total_purchase_invoices,

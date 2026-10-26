@@ -112,13 +112,21 @@ window.ReportsApp = {
     // 1. KPI Cards
     const elSales = document.getElementById('rep-total-sales');
     const elBillsSub = document.getElementById('rep-bills-sub');
-    if (elSales) elSales.textContent = this.formatCurrency(sales.total_sales);
-    if (elBillsSub) elBillsSub.textContent = `${sales.bill_count || 0} Bills (Avg ${this.formatCurrency(sales.avg_bill_value)})`;
+    const netSales = sales.net_sales !== undefined ? sales.net_sales : sales.total_sales;
+    if (elSales) elSales.textContent = this.formatCurrency(netSales);
+    if (elBillsSub) {
+      elBillsSub.textContent = `${sales.bill_count || 0} Bills (Avg ${this.formatCurrency(sales.avg_bill_value)})` +
+        (sales.total_returns ? ` · Returns ${this.formatCurrency(sales.total_returns)} of ${this.formatCurrency(sales.total_sales)}` : '');
+    }
 
     const elProfit = document.getElementById('rep-gross-profit');
     const elMarginSub = document.getElementById('rep-margin-sub');
     if (elProfit) elProfit.textContent = this.formatCurrency(profit.gross_profit);
-    if (elMarginSub) elMarginSub.textContent = `Margin: ${(profit.margin_percent || 0).toFixed(1)}%`;
+    if (elMarginSub) {
+      elMarginSub.textContent = `Margin: ${(profit.margin_percent || 0).toFixed(1)}% on ${this.formatCurrency(profit.gross_revenue)} (excl. GST)` +
+        (profit.revenue_without_cost ? ` · ${this.formatCurrency(profit.revenue_without_cost)} of sales has no purchase price and is left out` : '');
+      if (profit.basis) elMarginSub.title = profit.basis;
+    }
 
     const elPurchases = document.getElementById('rep-total-purchases');
     const elPurchasesSub = document.getElementById('rep-purchases-sub');
@@ -184,7 +192,7 @@ window.ReportsApp = {
     this.renderProductPerformance(data.product_performance || {});
 
     // 6. GST Snapshot
-    this.renderGstSnapshot(sales.total_sales || 0, purchases.total_purchases || 0);
+    this.renderGstSnapshot(data.gst_metrics || {});
   },
 
   renderTrends(salesTrend, purchasesTrend) {
@@ -307,11 +315,11 @@ window.ReportsApp = {
     }
   },
 
-  renderGstSnapshot(salesTotal, purchasesTotal) {
-    // Standard pharmaceutical average blended GST rate ~12% (5.35% CGST + 5.35% SGST or 12% IGST)
-    const outputGst = Math.round(salesTotal * (12 / 112) * 100) / 100;
-    const inputGst = Math.round(purchasesTotal * (12 / 112) * 100) / 100;
-    const netGst = Math.max(0, Math.round((outputGst - inputGst) * 100) / 100);
+  // Real figures from the server: GST saved on each bill line (net of returns) and GST on purchase invoices.
+  renderGstSnapshot(gst) {
+    const outputGst = Number(gst.output_gst || 0);
+    const inputGst = Number(gst.input_gst || 0);
+    const netGst = Number(gst.net_payable || 0);
 
     const elOutput = document.getElementById('rep-gst-output');
     const elItc = document.getElementById('rep-gst-itc');

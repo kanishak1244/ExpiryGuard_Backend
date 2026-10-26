@@ -632,7 +632,7 @@ function selectCatalogMedicine(med) {
     ? `Catalogue ₹${Number(med.default_price).toFixed(2)} (check the pack)`
     : 'MRP printed on the pack';
   document.getElementById('price-purchase').value = '';
-  document.getElementById('price-gst-rate').value = (med.gst_rate || 12.0).toFixed(1);
+  document.getElementById('price-gst-rate').value = Number(med.gst_rate ?? 12.0).toFixed(1);
 
   calcTotalQuantity();
   calcPricingPerPill();
@@ -892,7 +892,7 @@ async function handleBatchFormQueue(e) {
     brand: selectedMedicineMeta.brand || '',
     category: selectedMedicineMeta.category || 'allopathy',
     hsn_code: selectedMedicineMeta.hsn_code || '3004',
-    gst_rate: parseFloat(document.getElementById('price-gst-rate').value) || 12.0,
+    gst_rate: (function (v) { return isFinite(v) ? v : 12.0; })(parseFloat(document.getElementById('price-gst-rate').value)),
     batch_number: batchNum,
     quantity: parseInt(document.getElementById('qty-total-strips').value) || 1,
     purchase_price: purchaseVal,
