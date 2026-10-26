@@ -144,6 +144,16 @@ def _to_purchase(doc: models.Document, supplier_id: int, eff: dict, lines: List[
     )
 
 
+def _active_draft(db: Session, user_id: int, document_id: int) -> Optional[dict]:
+    d = db.query(models.PurchaseDraft).filter(models.PurchaseDraft.user_id == user_id, models.PurchaseDraft.document_id == document_id,
+                                              models.PurchaseDraft.status == "DRAFT").first()
+    if not d:
+        return None
+    import purchase_drafts
+    return {"id": d.id, "reference": purchase_drafts.draft_ref(d.id), "version": d.version,
+            "updated_at": d.updated_at.isoformat() if d.updated_at else None}
+
+
 def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
     eff = effective(doc)
     today = date.today()
@@ -201,7 +211,7 @@ def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
         "printed_total": printed, "computed": totals, "total_differs": total_differs, "notes": notes,
         "line_count": len(lines), "lines": lines, "raw_items": eff["items"], "blocking": blocking, "blocking_count": len(blocking),
         "can_confirm": not blocking and not verified and not failed, "can_edit": not verified,
-        "verified": verified, "failed": failed,
+        "verified": verified, "failed": failed, "draft": _active_draft(db, user_id, doc.id),
     }
 
 
@@ -267,3 +277,23 @@ def confirm_document(db: Session, user_id: int, doc: models.Document, acknowledg
                            allow_below_cost=bool(below_cost))
     res = purchase_entry.post_manual_purchase(db, user_id, payload, document_id=doc.id)
     return {"message": f"Invoice confirmed: {res['items_count']} medicine line(s) added to stock as {res['voucher_no']}.", **res}
+
+
+def save_as_draft(db: Session, user_id: int, doc: models.Document, header: Optional[dict] = None, items: Optional[List[dict]] = None) -> dict:
+    """
+    Save as Draft for a scanned bill: optionally store the user's corrections first, then keep one open purchase draft
+    pointing at the document. Nothing is posted and the document status does not change (it is not Verified).
+    """
+    import purchase_drafts
+    if str(doc.ocr_status or "").lower() == "verified":
+        raise HTTPException(status_code=409, detail="This invoice is already verified and its stock was added; it cannot be saved as a draft.")
+    if header is not None or items is not None:
+        save_corrections(db, user_id, doc, header or {}, items or [])
+    view = review_view(db, user_id, doc)
+    try:
+        inv_date = datetime.strptime(str(view["invoice_date"])[:10], "%Y-%m-%d").date() if view.get("invoice_date") else None
+    except ValueError:
+        inv_date = None
+    total = view["computed"]["total"] if view.get("computed") else None
+    draft = purchase_drafts.upsert_ocr_draft(db, user_id, doc, doc.supplier_id, view.get("invoice_number"), inv_date, view["line_count"], total)
+    return {"draft": draft, "review": review_view(db, user_id, doc)}

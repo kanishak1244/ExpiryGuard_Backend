@@ -42,7 +42,7 @@
 
   function renderSummary(s) {
     if (!s) { $('pm-summary').style.display = 'none'; return; }
-    $('pm-summary').style.display = 'grid';
+    $('pm-summary').style.display = 'grid'; $('pm-summary').dataset.ready = '1';
     $('pm-k-docs').textContent = s.documents;
     $('pm-k-value').textContent = '₹' + money(s.total_value);
     $('pm-k-pay').textContent = '₹' + money(s.outstanding_payables);
@@ -77,6 +77,7 @@
       if (mySeq !== state.seq) return;
       state.total = res.total;
       renderSummary(res.summary);
+      if (res.summary && res.summary.draft_count != null) setDraftCount(res.summary.draft_count);
       const hasFilter = Object.keys(f).some((k) => f[k]);
       if (!res.items.length) {
         if (state.page > 1 && res.total > 0) { state.page = Math.max(1, Math.ceil(res.total / PAGE_SIZE)); return load(); }
@@ -165,6 +166,88 @@
     }
   };
 
+  // ---------------------------------------------------------------- drafts tab (server-saved drafts)
+  const D = { page: 1, seq: 0 };
+  const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
+  function setDraftCount(n) { $('pm-draft-count').textContent = n; }
+  async function loadDraftCount() {
+    try { setDraftCount((await api.request('/purchases/drafts?page_size=1')).draft_count); } catch (e) { /* the tab still works without the badge */ }
+  }
+
+  window.pmTab = function (which) {
+    const drafts = which === 'drafts';
+    $('pm-tab-all').classList.toggle('active', !drafts);
+    $('pm-tab-drafts').classList.toggle('active', drafts);
+    $('pm-all-view').style.display = drafts ? 'none' : '';
+    $('pm-drafts-view').style.display = drafts ? '' : 'none';
+    $('pm-summary').style.display = drafts ? 'none' : ($('pm-summary').dataset.ready ? 'grid' : 'none');
+    if (drafts) loadDrafts(); else loadDraftCount();
+  };
+
+  function dState(title, text, retry) {
+    $('pd-table-wrap').style.display = 'none'; $('pd-pager').style.display = 'none';
+    const b = $('pd-state'); b.style.display = 'block';
+    b.innerHTML = `<strong>${esc(title)}</strong>${esc(text || '')}` + (retry ? '<div style="margin-top:10px"><button type="button" class="btn btn-primary btn-sm" onclick="pdReload()">Retry</button></div>' : '')
+      + (title === 'No drafts match these filters' ? '<div style="margin-top:10px"><button type="button" class="btn btn-secondary btn-sm" onclick="pdClear()">Clear filters</button></div>' : '');
+  }
+
+  async function loadDrafts() {
+    const my = ++D.seq;
+    dState('Loading drafts…', '', false);
+    const p = new URLSearchParams({ page: D.page, page_size: PAGE_SIZE, status: $('pd-status').value });
+    if ($('pd-q').value.trim()) p.set('q', $('pd-q').value.trim());
+    if ($('pd-from').value) p.set('date_from', $('pd-from').value);
+    if ($('pd-to').value) p.set('date_to', $('pd-to').value);
+    try {
+      const res = await api.request('/purchases/drafts?' + p.toString());
+      if (my !== D.seq) return;
+      setDraftCount(res.draft_count);
+      if (!res.items.length) {
+        if (D.page > 1 && res.total > 0) { D.page = Math.max(1, Math.ceil(res.total / PAGE_SIZE)); return loadDrafts(); }
+        const filtered = $('pd-q').value || $('pd-from').value || $('pd-to').value || $('pd-status').value !== 'DRAFT';
+        dState(filtered ? 'No drafts match these filters' : 'No drafts yet', filtered ? '' : 'Use Save as Draft in Add Manually or in an invoice review to keep unfinished purchases here.', false);
+        return;
+      }
+      $('pd-state').style.display = 'none';
+      $('pd-tbody').innerHTML = res.items.map(function (d) {
+        const open = d.status === 'DRAFT';
+        const href = d.source === 'OCR' && d.document_id ? 'documents.html?review=' + d.document_id : 'purchase_entry.html?draft=' + d.id;
+        const actions = open
+          ? `<a class="btn btn-primary btn-sm" style="text-decoration:none" href="${href}">Continue editing</a> <button type="button" class="btn btn-secondary btn-sm" onclick="pdDelete(${d.id}, '${esc(d.reference)}')">Delete</button>`
+          : (d.purchase_invoice_id ? `<a class="btn btn-secondary btn-sm" style="text-decoration:none" href="purchases.html?view=${d.purchase_invoice_id}">View purchase</a>` : '');
+        return `<tr>
+          <td>${esc(d.reference)}</td>
+          <td>${d.supplier_name ? esc(d.supplier_name) : '<span class="pm-na">Supplier not selected</span>'}</td>
+          <td>${d.invoice_number ? esc(d.invoice_number) : '<span class="pm-na">—</span>'}</td>
+          <td>${esc(fmtDate(d.created_at))}</td><td>${esc(fmtDate(d.updated_at))}</td>
+          <td class="numeric">${d.line_count}</td>
+          <td class="numeric">${d.estimated_total == null ? '<span class="pm-na" title="Not enough numbers entered yet">—</span>' : money(d.estimated_total) + ' <small class="pm-na">est.</small>'}</td>
+          <td>${d.source === 'OCR' ? 'OCR bill' : 'Manual'}</td>
+          <td><span class="pm-badge ${open ? 'PARTIAL' : 'PAID'}">${open ? 'Draft' : 'Posted'}</span></td>
+          <td>${actions}</td></tr>`;
+      }).join('');
+      $('pd-table-wrap').style.display = 'block';
+      const from = (res.page - 1) * res.page_size + 1, to = from + res.items.length - 1;
+      $('pd-range').textContent = `Showing ${from}–${to} of ${res.total}`;
+      $('pd-prev').disabled = res.page <= 1; $('pd-next').disabled = to >= res.total;
+      $('pd-pager').style.display = 'flex';
+    } catch (e) {
+      if (my !== D.seq) return;
+      dState('Could not load drafts', (e && e.message ? e.message : 'Network error').slice(0, 200), true);
+    }
+  }
+
+  window.pdReload = loadDrafts;
+  window.pdApply = function (ev) { if (ev) ev.preventDefault(); D.page = 1; loadDrafts(); };
+  window.pdClear = function () { ['pd-q', 'pd-from', 'pd-to'].forEach(function (id) { $(id).value = ''; }); $('pd-status').value = 'DRAFT'; D.page = 1; loadDrafts(); };
+  window.pdGoto = function (d) { D.page = Math.max(1, D.page + d); loadDrafts(); };
+  window.pdDelete = async function (id, ref) {
+    if (!window.confirm('Delete ' + ref + '? Only the draft is removed. A scanned bill stays in Documents, and nothing in stock changes.')) return;
+    try { await api.request('/purchases/drafts/' + id, { method: 'DELETE' }); loadDrafts(); }
+    catch (e) { dState('Could not delete the draft', (e && e.message ? e.message : '').slice(0, 200), true); }
+  };
+
   // keep unsaved Add Inventory work from being lost by leaving the page
   window.addEventListener('beforeunload', function (ev) {
     if (typeof inventoryCart !== 'undefined' && inventoryCart.length) { ev.preventDefault(); ev.returnValue = ''; }
@@ -175,18 +258,8 @@
     load();
     const view = parseInt(new URLSearchParams(window.location.search).get('view'), 10);
     if (view > 0) window.pmOpenDetail(view);
-    if (typeof peDraftStore === 'function') {
-      try {
-        const list = peDraftStore(window.localStorage).list();
-        const note = $('pm-drafts-note');
-        if (list.length && note) {
-          note.style.display = 'block';
-          note.innerHTML = list.length + ' manual purchase draft(s) saved on this device: ' + list.slice(0, 3).map(function (d) {
-            return '<a href="purchase_entry.html?draft=' + encodeURIComponent(d.id) + '">' + esc((d.header && d.header.supplierName) || 'No supplier') + ' · ' + esc((d.header && d.header.invoiceNo) || 'no invoice no.') + '</a>';
-          }).join(' · ');
-        }
-      } catch (e) { /* drafts are optional */ }
-    }
+    if (new URLSearchParams(window.location.search).get('tab') === 'drafts') pmTab('drafts');
+    else loadDraftCount();
     const action = new URLSearchParams(window.location.search).get('action');
     if (action === 'import' || action === 'search') {
       // wait for add_inventory_flow.js (defer) before opening the window

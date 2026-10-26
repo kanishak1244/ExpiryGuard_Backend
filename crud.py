@@ -3630,6 +3630,9 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
         prod.invoice_number = doc.invoice_number
         created_products.append(prod)
 
+    db.query(models.PurchaseDraft).filter(models.PurchaseDraft.document_id == doc.id, models.PurchaseDraft.user_id == user_id,
+                                          models.PurchaseDraft.status == "DRAFT").update(
+        {models.PurchaseDraft.status: "FINALIZED", models.PurchaseDraft.finalized_at: datetime.utcnow()}, synchronize_session=False)
     db.commit()
     invalidate_products_cache(user_id)
     return {"message": f"Document verified successfully. {len(created_products)} item batches added to stock with full supplier traceability.", "document_id": doc.id}
@@ -3637,6 +3640,11 @@ def confirm_document_and_update_stock(db: Session, document_id: int, user_id: in
 
 def delete_document(db: Session, document_id: int, user_id: int):
     doc = get_document_detail(db, document_id, user_id)
+    # a purchase draft pointing at this bill goes with it; a finalized one is kept as history without the link
+    db.query(models.PurchaseDraft).filter(models.PurchaseDraft.document_id == doc.id, models.PurchaseDraft.user_id == user_id,
+                                          models.PurchaseDraft.status == "DRAFT").delete(synchronize_session=False)
+    db.query(models.PurchaseDraft).filter(models.PurchaseDraft.document_id == doc.id).update({models.PurchaseDraft.document_id: None},
+                                                                                              synchronize_session=False)
     db.delete(doc)
     db.commit()
     return {"message": "Document deleted successfully."}
@@ -4352,6 +4360,8 @@ def list_purchase_documents(
             "total_value": round(float(total_value), 2),
             "outstanding_payables": round(sum(positive), 2),
             "suppliers_with_balance": len(positive),
+            "draft_count": int(db.query(func.count(models.PurchaseDraft.id)).filter(
+                models.PurchaseDraft.user_id == user_id, models.PurchaseDraft.status == "DRAFT").scalar() or 0),
         },
     }
 

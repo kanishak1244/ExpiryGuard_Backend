@@ -663,6 +663,39 @@ class CustomerPayment(Base):
     sale = relationship("Sale")
 
 
+class PurchaseDraft(Base):
+    """
+    A purchase that is being prepared but NOT posted. It never touches stock, supplier balances, purchase invoices,
+    the supplier ledger or any purchase report: those only change when the purchase engine posts the purchase, and
+    only then is the draft marked FINALIZED (in the same transaction).
+    Rollback: DROP TABLE purchase_drafts (nothing else references it).
+    """
+    __tablename__ = "purchase_drafts"
+    __table_args__ = (Index("idx_purchase_drafts_user_status", "user_id", "status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=True, index=True)      # the scanned bill (OCR drafts)
+    purchase_invoice_id = Column(Integer, ForeignKey("purchase_invoices.id"), nullable=True)  # set when finalized
+
+    source = Column(String, nullable=False, default="MANUAL")          # MANUAL, OCR
+    status = Column(String, nullable=False, default="DRAFT")           # DRAFT, FINALIZED
+    invoice_number = Column(String, nullable=True)
+    invoice_date = Column(Date, nullable=True)
+    payload = Column(Text, nullable=True)                              # JSON: the editor's header + rows (MANUAL)
+    line_count = Column(Integer, nullable=False, default=0)
+    estimated_total = Column(Float, nullable=True)                     # an estimate, never a posted amount
+    version = Column(Integer, nullable=False, default=1)               # bumps on every save; stale saves are refused
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    finalized_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    supplier = relationship("Supplier")
+
+
 class PurchaseReturn(Base):
     __tablename__ = "purchase_returns"
 

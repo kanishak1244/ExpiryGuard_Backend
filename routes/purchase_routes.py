@@ -22,6 +22,7 @@ import models
 import schemas
 import crud
 import purchase_entry
+import purchase_drafts
 
 logger = logging.getLogger("expiryguard.routes.purchases")
 
@@ -98,6 +99,53 @@ def post_manual_purchase(
     res = purchase_entry.post_manual_purchase(db, current_user.id, data)
     fast_cache.invalidate_user(current_user.id)
     return res
+
+
+@router.post("/purchases/drafts")
+def save_purchase_draft(
+    data: purchase_drafts.DraftSave,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+    db: Session = Depends(get_db),
+):
+    """Save (create or update) a purchase draft. A draft posts nothing: no stock, no supplier balance, no purchase invoice."""
+    return purchase_drafts.save_draft(db, current_user.id, data)
+
+
+@router.get("/purchases/drafts")
+def list_purchase_drafts(
+    q: Optional[str] = Query(None, max_length=80),
+    status: str = Query("DRAFT", pattern="^(?i:DRAFT|FINALIZED|ALL)$"),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Drafts of this pharmacy (server-side paging) with the accurate open-draft count."""
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status_code=400, detail="date_from must not be after date_to.")
+    return purchase_drafts.list_drafts(db, current_user.id, q=q, status=status, date_from=date_from, date_to=date_to,
+                                       page=page, page_size=page_size)
+
+
+@router.get("/purchases/drafts/{draft_id}")
+def get_purchase_draft(
+    draft_id: int,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    return purchase_drafts.get_draft(db, current_user.id, draft_id)
+
+
+@router.delete("/purchases/drafts/{draft_id}")
+def delete_purchase_draft(
+    draft_id: int,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+    db: Session = Depends(get_db),
+):
+    """Delete a draft (the draft row only; a scanned bill stays in Documents)."""
+    return purchase_drafts.delete_draft(db, current_user.id, draft_id)
 
 
 @router.get("/purchases/check-duplicate")

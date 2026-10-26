@@ -61,13 +61,19 @@ test('problems list shows the count and the first problems', () => {
 });
 
 test('actions follow the document status', () => {
-  assert.deepEqual(m.drActions({ status: 'Needs Review', can_edit: true, verified: false, failed: false }), { edit: true, confirm: true, ocr: false, back: true });
-  assert.deepEqual(m.drActions({ status: 'Verified', can_edit: false, verified: true, failed: false }), { edit: false, confirm: false, ocr: false, back: true });
-  assert.deepEqual(m.drActions({ status: 'Failed', can_edit: true, verified: false, failed: true }), { edit: true, confirm: false, ocr: true, back: true });
+  assert.deepEqual(m.drActions({ status: 'Needs Review', can_edit: true, verified: false, failed: false }), { edit: true, draft: true, confirm: true, ocr: false, back: true });
+  assert.deepEqual(m.drActions({ status: 'Verified', can_edit: false, verified: true, failed: false }), { edit: false, draft: false, confirm: false, ocr: false, back: true });
+  assert.deepEqual(m.drActions({ status: 'Failed', can_edit: true, verified: false, failed: true }), { edit: true, draft: true, confirm: false, ocr: true, back: true });
   assert.equal(m.drActions({ status: 'Processing', can_edit: true, verified: false, failed: false }).confirm, false);
 });
 
 test('taxable is calculated from quantity, rate and discount only when both exist', () => {
   assert.equal(m.drTaxable(line({ quantity: 10, purchase_price: 50, discount_percent: 10 })), 450);
   assert.equal(m.drTaxable(line({ quantity: null })), null);
+});
+
+test('a saved draft is shown on the review with its reference and the no-stock reminder', () => {
+  const html = m.drSummaryHtml({ supplier: null, supplier_status: 'unlinked', status: 'Needs Review', line_count: 1, notes: [], draft: { reference: 'DRAFT-00007' } });
+  assert.ok(html.includes('DRAFT-00007') && html.includes('Nothing has been added to stock'));
+  assert.ok(!m.drSummaryHtml({ supplier: null, supplier_status: 'unlinked', status: 'Needs Review', line_count: 1, notes: [] }).includes('Saved as draft'));
 });

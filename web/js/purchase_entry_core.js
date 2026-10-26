@@ -122,7 +122,32 @@
     return {
       supplier_id: header.supplierId, invoice_number: String(header.invoiceNo).trim(), invoice_date: header.invoiceDate,
       payment_status: header.paymentStatus || 'UNPAID', expected_total: peCalcTotals(rows).total, items,
+      ...(header.draftId ? { draft_id: header.draftId } : {}),
     };
+  }
+
+  // What is sent to POST /purchases/drafts. Transient fields (batch suggestions) are not stored; every typed value is.
+  function peBuildDraftBody(header, rows, draftId, version) {
+    const clean = rows.map(r => { const c = Object.assign({}, r); delete c._batches; return c; });
+    const body = {
+      supplier_id: header.supplierId || null, invoice_number: String(header.invoiceNo || '').trim() || null,
+      invoice_date: header.invoiceDate || null,
+      payload: { header: { supplierId: header.supplierId || null, supplierName: header.supplierName || '', invoiceNo: header.invoiceNo || '',
+        invoiceDate: header.invoiceDate || '', paymentStatus: header.paymentStatus || 'UNPAID' }, rows: clean },
+    };
+    if (draftId) { body.draft_id = draftId; if (version) body.expected_version = version; }
+    return body;
+  }
+
+  // The editor state back from a saved draft (rows get fresh ids only when missing).
+  function peRestoreDraft(draft) {
+    const p = draft.payload || {};
+    const header = Object.assign({ supplierId: null, supplierName: '', invoiceNo: '', invoiceDate: '', paymentStatus: 'UNPAID' }, p.header || {});
+    if (draft.supplier_id) { header.supplierId = draft.supplier_id; header.supplierName = draft.supplier_name || header.supplierName; }
+    if (draft.invoice_number) header.invoiceNo = draft.invoice_number;
+    if (draft.invoice_date) header.invoiceDate = draft.invoice_date;
+    const rows = (Array.isArray(p.rows) && p.rows.length ? p.rows : [peNewRow()]).map(r => Object.assign(peNewRow(), r));
+    return { header, rows };
   }
 
   // A medicine picked from the suggestions fills the row's medicine details only; batch, quantity and rates stay for the user.
@@ -182,6 +207,6 @@
 
   return {
     PE_COLS, PE_DETAIL_COLS, PE_DRAFT_KEY, peNewRow, peRowEmpty, peCalcLine, peCalcTotals, peParseExpiry, peTodayISO,
-    peValidateRows, peBuildPayload, peApplyMedicine, peNextCell, peDraftStore,
+    peValidateRows, peBuildPayload, peBuildDraftBody, peRestoreDraft, peApplyMedicine, peNextCell, peDraftStore,
   };
 });

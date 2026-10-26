@@ -293,6 +293,7 @@
               <div id="dr-problems"></div>
               <div class="dr-bar">
                 <button type="button" class="btn btn-secondary" id="dr-btn-edit" onclick="drEdit()">✏️ Edit Bill Details</button>
+                <button type="button" class="btn btn-secondary" id="dr-btn-draft" onclick="drSaveDraft()">💾 Save as Draft</button>
                 <button type="button" class="btn btn-secondary" id="dr-btn-ocr" onclick="drRunOcr()" style="display:none">⚡ Run / Retry OCR</button>
                 <span id="dr-verified-note" class="dr-badge ok" style="display:none">Verified · stock added</span>
                 <span class="sp"></span>
@@ -317,6 +318,7 @@
         </div>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-secondary" onclick="closeSplitModal()">Cancel</button>
+          <button class="btn btn-secondary" id="editor-draft-btn" onclick="saveEditorDraft()">Save as Draft</button>
           <button class="btn btn-primary" id="editor-save-btn" onclick="saveCorrections()">Save Corrections</button>
         </div>
       </div>
@@ -446,6 +448,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const wantReview = parseInt(new URLSearchParams(window.location.search).get('review'), 10);
+      if (wantReview > 0) window.addEventListener('load', () => { if (typeof openReviewWorkspace === 'function') openReviewWorkspace(wantReview); });
       // 0ms instant cached render from memory/sessionStorage/localStorage
       try {
         const cachedSuppliers = (window.api && typeof window.api.getCached === 'function' && window.api.getCached('/suppliers')) ||
@@ -913,9 +917,7 @@
     }
 
     // Saves corrections only (no stock). Blank fields stay blank so the review shows them as Missing.
-    async function saveCorrections() {
-      if (!editorDocId) return;
-      const btn = document.getElementById('editor-save-btn');
+    function collectEditorBody() {
       const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
       const items = [];
       document.querySelectorAll('#modal-items-tbody tr').forEach(r => {
@@ -939,7 +941,7 @@
         }));
       });
       const supplierId = document.getElementById('modal-supplier-select').value;
-      const body = {
+      return {
         header: {
           supplier_id: supplierId ? parseInt(supplierId, 10) : null,
           invoice_number: document.getElementById('modal-inv-number').value.trim() || null,
@@ -948,18 +950,35 @@
         },
         items,
       };
-      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    }
+
+    // Saves corrections only (no stock). Blank fields stay blank so the review shows them as Missing.
+    // asDraft: the same save, plus the purchase draft that points at this bill (still no stock).
+    async function persistEditor(asDraft) {
+      if (!editorDocId) return;
+      const btn = document.getElementById(asDraft ? 'editor-draft-btn' : 'editor-save-btn');
+      const label = btn ? btn.textContent : '';
+      const body = collectEditorBody();
+      document.querySelectorAll('#split-review-modal .split-modal-header button').forEach(b => { b.disabled = true; });
+      if (btn) btn.textContent = 'Saving…';
       try {
-        await api.request(`/documents/${editorDocId}/review-data`, { method: 'PUT', body: JSON.stringify(body) });
+        let draftRes = null;
+        if (asDraft) draftRes = await api.request(`/documents/${editorDocId}/save-draft`, { method: 'POST', body: JSON.stringify(body) });
+        else await api.request(`/documents/${editorDocId}/review-data`, { method: 'PUT', body: JSON.stringify(body) });
         editorDirty = false;
         document.getElementById('split-review-modal').classList.remove('active');
-        if (typeof drAfterCorrectionsSaved === 'function') await drAfterCorrectionsSaved();
+        if (asDraft && typeof drAfterDraftSaved === 'function') await drAfterDraftSaved(draftRes);
+        else if (typeof drAfterCorrectionsSaved === 'function') await drAfterCorrectionsSaved();
       } catch (err) {
-        alert(`Could not save the corrections: ${typeof drApiMsg === 'function' ? drApiMsg(err) : err.message}`);
+        // the editor stays open with everything the user typed
+        alert(`Could not save: ${typeof drApiMsg === 'function' ? drApiMsg(err) : err.message}\nYour entries are still on this screen.`);
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Save Corrections'; }
+        document.querySelectorAll('#split-review-modal .split-modal-header button').forEach(b => { b.disabled = false; });
+        if (btn) btn.textContent = label;
       }
     }
+    function saveCorrections() { return persistEditor(false); }
+    function saveEditorDraft() { return persistEditor(true); }
 
     function closeSplitModal() {
       if (editorDirty && !confirm('You have unsaved changes to this bill. Close without saving?')) return;
@@ -998,6 +1017,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.5" defer></script>
-  <script src="js/doc_review.js?v=1.3" defer></script>
+  <script src="js/doc_review.js?v=1.4" defer></script>
 </body>
 </html>

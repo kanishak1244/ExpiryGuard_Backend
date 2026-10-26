@@ -1,17 +1,17 @@
 /**
  * Add Manually: spreadsheet-style purchase entry (purchase_entry.html).
  * Rules and arithmetic live in purchase_entry_core.js (tested with Node); posting is done by the server
- * (POST /purchases/manual), which recalculates everything. Drafts stay in this browser and never touch stock.
+ * (POST /purchases/manual), which recalculates everything. Drafts are saved on the server (POST /purchases/drafts) and never touch stock.
  */
 (function () {
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const drafts = peDraftStore(window.localStorage);
+  const localDrafts = peDraftStore(window.localStorage);      // only used once: to move drafts saved in this browser by the earlier version to the server
 
   const state = {
     rows: [], header: { supplierId: null, supplierName: '', invoiceNo: '', invoiceDate: '', paymentStatus: 'UNPAID' },
-    draftId: null, dirty: false, saving: false, posted: false, suppliers: [], activeRow: 0, activeCol: 'name',
+    draftId: null, draftVersion: null, draftRef: '', dirty: false, saving: false, posted: false, suppliers: [], activeRow: 0, activeCol: 'name',
     pop: { kind: null, items: [], sel: 0, row: -1 }, ticket: 0, searchTimer: null, medForRow: -1,
   };
 
@@ -446,7 +446,7 @@
         } else { throw e; }
       }
       state.posted = true; state.dirty = false;
-      if (state.draftId) drafts.remove(state.draftId);
+      state.draftId = null;
       const ok = $('pe-ok');
       ok.innerHTML = `<b>Purchase saved.</b> ${esc(res.voucher_no)} · Invoice ${esc(res.invoice_number)} · ${esc(res.supplier_name)} · ${res.items_count} item(s) · ${money(res.total_amount)}.
         Stock was updated and the supplier balance includes this purchase.
@@ -456,7 +456,7 @@
       ok.style.display = 'block';
       ok.scrollIntoView({ block: 'start' });
       document.querySelectorAll('#pe-tbody input, .pe-head input, .pe-head select').forEach(el => { el.disabled = true; });
-      $('pe-save-btn').disabled = true; $('pe-draft-btn').disabled = true;
+      ['pe-save-btn', 'pe-draft-btn', 'pe-top-save-btn', 'pe-top-draft-btn'].forEach(id => { $(id).disabled = true; });
     } catch (e) {
       const msg = apiMessage(e);
       const dup = /PUR-(\d+)/.exec(msg);
@@ -469,62 +469,105 @@
   };
 
   function post() {
-    const payload = peBuildPayload(state.header, state.rows);
+    const payload = peBuildPayload(Object.assign({}, state.header, { draftId: state.draftId }), state.rows);
     return api.request('/purchases/manual', { method: 'POST', body: JSON.stringify(payload) });
   }
 
   function setBusy(b) {
-    $('pe-save-btn').disabled = b; $('pe-draft-btn').disabled = b;
+    ['pe-save-btn', 'pe-draft-btn', 'pe-top-save-btn', 'pe-top-draft-btn'].forEach(id => { $(id).disabled = b; });
     $('pe-save-btn').textContent = b ? 'Saving…' : 'Save Purchase';
+    $('pe-top-save-btn').textContent = b ? 'Saving…' : 'Save Purchase';
   }
 
-  // ---------- drafts (this browser only)
-  function snapshotRows() { return state.rows.map(r => Object.assign({}, r)); }
+  // ---------- drafts (saved on the server; they never change stock, balances or the purchase list)
+  function showDraftRef() {
+    $('pe-draft-ref').textContent = state.draftRef ? 'Editing ' + state.draftRef : '';
+  }
 
-  window.peSaveDraft = function () {
+  window.peSaveDraft = async function () {
+    if (state.saving || state.posted) return;
     readHeader();
     const hasContent = state.header.supplierId || state.header.invoiceNo.trim() || state.rows.some(r => !peRowEmpty(r));
     if (!hasContent) { showErrors(['Enter a supplier, an invoice number or at least one medicine before saving a draft.']); return; }
     showErrors([]);
-    if (!state.draftId) state.draftId = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const rec = drafts.save({ id: state.draftId, header: Object.assign({}, state.header), rows: snapshotRows() });
-    if (!rec) { showErrors(['Could not save the draft in this browser (storage is full or blocked).']); return; }
-    state.dirty = false;
-    notice('Draft saved in this browser at ' + new Date(rec.savedAt).toLocaleTimeString() + '. No stock or supplier balance was changed.');
-    renderDrafts();
+    state.saving = true;
+    setBusy(true);
+    try {
+      const body = peBuildDraftBody(state.header, state.rows, state.draftId, state.draftVersion);
+      const d = await api.request('/purchases/drafts', { method: 'POST', body: JSON.stringify(body) });
+      state.draftId = d.id; state.draftVersion = d.version; state.draftRef = d.reference;
+      state.dirty = false;
+      showDraftRef();
+      history.replaceState(null, '', 'purchase_entry.html?draft=' + d.id);          // reloading reopens this same draft
+      notice(`Draft ${d.reference} saved at ${new Date().toLocaleTimeString()}. It is listed under Purchase Management → Drafts. Nothing was added to stock and no supplier balance changed.`);
+      const ok = $('pe-ok');
+      ok.innerHTML = `<b>Draft saved.</b> ${esc(d.reference)} · ${d.line_count} line(s)${d.estimated_total != null ? ' · estimate ' + money(d.estimated_total) : ''}.
+        You can keep editing here, or <a href="purchases.html?tab=drafts">go to Drafts</a>.`;
+      ok.style.display = 'block';
+      setTimeout(() => { if (ok.innerHTML.indexOf('Draft saved') === 0) ok.style.display = 'none'; }, 6000);
+    } catch (e) {
+      const msg = apiMessage(e);
+      showErrors([msg + (/DRAFT_CHANGED/.test(msg) ? '' : ' Your entries are still on this screen; nothing was lost.')]);
+      if (/DRAFT_CHANGED/.test(msg)) {
+        $('pe-errors').insertAdjacentHTML('beforeend', '<div style="margin-top:6px"><a href="javascript:void(0)" onclick="peReloadDraft()">Reload the saved draft</a> (your unsaved changes on this screen will be replaced)</div>');
+      }
+    } finally {
+      state.saving = false;
+      if (!state.posted) setBusy(false);
+    }
   };
 
-  function loadDraft(id) {
-    const d = drafts.get(id);
-    if (!d) return;
-    state.draftId = d.id;
-    state.header = Object.assign({ supplierId: null, supplierName: '', invoiceNo: '', invoiceDate: '', paymentStatus: 'UNPAID' }, d.header);
-    state.rows = (d.rows && d.rows.length ? d.rows : [peNewRow()]).map(r => Object.assign(peNewRow(), r));
-    $('pe-invoice-no').value = state.header.invoiceNo || '';
-    $('pe-invoice-date').value = state.header.invoiceDate || peTodayISO();
-    $('pe-payment').value = state.header.paymentStatus || 'UNPAID';
-    $('pe-supplier').value = state.header.supplierName || '';
-    if (state.header.supplierId) setSupplier(state.header.supplierId, state.header.supplierName);
-    render(null);
-    state.dirty = false;
-    showErrors([]);
-    notice('Draft restored. Nothing is posted until you press Save Purchase.');
+  window.peReloadDraft = function () { if (state.draftId) loadDraft(state.draftId, true); };
+
+  async function loadDraft(id, force) {
+    try {
+      const d = await api.request('/purchases/drafts/' + id);
+      if (d.source === 'OCR' && d.document_id) { window.location.href = 'documents.html?review=' + d.document_id; return; }
+      if (d.status !== 'DRAFT') {
+        showErrors([`${d.reference} was already posted as purchase ${d.purchase_voucher_no || ''}. It cannot be edited.`]);
+        return;
+      }
+      const r = peRestoreDraft(d);
+      state.draftId = d.id; state.draftVersion = d.version; state.draftRef = d.reference;
+      state.header = r.header; state.rows = r.rows;
+      $('pe-invoice-no').value = state.header.invoiceNo || '';
+      $('pe-invoice-date').value = state.header.invoiceDate || peTodayISO();
+      $('pe-payment').value = state.header.paymentStatus || 'UNPAID';
+      $('pe-supplier').value = state.header.supplierName || '';
+      if (state.header.supplierId) setSupplier(state.header.supplierId, state.header.supplierName);
+      render(null);
+      state.dirty = false;
+      showErrors([]);
+      showDraftRef();
+      notice(`${d.reference} reopened (saved ${new Date(d.updated_at).toLocaleString()}). Nothing is posted until you press Save Purchase.`);
+    } catch (e) {
+      showErrors(['Could not open this draft: ' + apiMessage(e)]);
+    }
   }
 
-  function renderDrafts() {
-    const list = drafts.list();
-    $('pe-drafts').innerHTML = list.length
-      ? '<b style="font-size:12px">Drafts on this device</b>' + list.map(d => {
-        const n = (d.rows || []).filter(r => !peRowEmpty(r)).length;
-        return `<div class="pe-sub" style="display:flex;justify-content:space-between;gap:8px;margin-top:4px"><span>${esc(d.header && d.header.supplierName || 'No supplier')} · ${esc(d.header && d.header.invoiceNo || 'no invoice no.')} · ${n} line(s) · ${esc(new Date(d.savedAt).toLocaleString())}</span>
-          <span><a href="javascript:void(0)" data-open-draft="${esc(d.id)}">Open</a> · <a href="javascript:void(0)" data-del-draft="${esc(d.id)}">Delete</a></span></div>`;
-      }).join('')
-      : '';
+  // drafts saved in this browser by the earlier version: offer to move them to the server
+  function offerLocalDrafts() {
+    const list = localDrafts.list();
+    if (!list.length) return;
+    $('pe-drafts').innerHTML = `<span class="pe-sub warn">${list.length} draft(s) saved earlier only in this browser. <a href="javascript:void(0)" id="pe-move-local">Move them to the server</a></span>`;
+    $('pe-move-local').addEventListener('click', async () => {
+      let moved = 0;
+      for (const d of list) {
+        try {
+          const rows = (d.rows || []).map(r => { const c = Object.assign({}, r); delete c._batches; return c; });
+          const h = d.header || {};
+          await api.request('/purchases/drafts', { method: 'POST', body: JSON.stringify({ supplier_id: h.supplierId || null, invoice_number: h.invoiceNo || null,
+            invoice_date: h.invoiceDate || null, payload: { header: h, rows } }) });
+          localDrafts.remove(d.id); moved++;
+        } catch (e) { /* a draft that cannot be saved stays in this browser */ }
+      }
+      $('pe-drafts').innerHTML = `<span class="pe-sub ok">${moved} draft(s) moved. See Purchase Management → Drafts.</span>`;
+    });
   }
 
   window.peClear = function () {
     if ((state.dirty || state.rows.some(r => !peRowEmpty(r))) && !window.confirm('Clear everything on this screen?')) return;
-    state.rows = [peNewRow()]; state.draftId = null; state.header = { supplierId: null, supplierName: '', invoiceNo: '', invoiceDate: peTodayISO(), paymentStatus: 'UNPAID' };
+    state.rows = [peNewRow()]; state.draftId = null; state.draftVersion = null; state.draftRef = ''; showDraftRef(); state.header = { supplierId: null, supplierName: '', invoiceNo: '', invoiceDate: peTodayISO(), paymentStatus: 'UNPAID' };
     $('pe-supplier').value = ''; $('pe-invoice-no').value = ''; $('pe-invoice-date').value = state.header.invoiceDate; $('pe-payment').value = 'UNPAID';
     $('pe-supplier-sub').innerHTML = '<a href="javascript:void(0)" onclick="peOpenSupplierModal()">+ Add supplier</a>'; $('pe-invoice-sub').textContent = '';
     state.dirty = false; showErrors([]); render({ row: 0, col: 'name' });
@@ -544,7 +587,7 @@
     state.header.invoiceDate = peTodayISO();
     state.rows = [peNewRow()];
     render({ row: 0, col: 'name' });
-    renderDrafts();
+    offerLocalDrafts();
     loadSuppliers();
 
     const tb = $('pe-tbody');
@@ -583,15 +626,10 @@
     $('pe-invoice-date').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); focusCell(0, 'name'); } });
     $('pe-payment').addEventListener('change', markDirty);
     document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 's' && !e.target.closest('#pe-tbody')) { e.preventDefault(); peSave(); } });
-    $('pe-drafts').addEventListener('click', (e) => {
-      const o = e.target.closest('[data-open-draft]'), d = e.target.closest('[data-del-draft]');
-      if (o) { if (!state.dirty || window.confirm('Replace what is on screen with this draft?')) loadDraft(o.dataset.openDraft); }
-      if (d && window.confirm('Delete this draft?')) { drafts.remove(d.dataset.delDraft); if (state.draftId === d.dataset.delDraft) state.draftId = null; renderDrafts(); }
-    });
     window.addEventListener('beforeunload', (e) => { if (state.dirty && !state.posted) { e.preventDefault(); e.returnValue = ''; } });
 
     const want = new URLSearchParams(window.location.search).get('draft');
-    if (want) loadDraft(want);
+    if (want) loadDraft(parseInt(want, 10));
     // test hook (read-only view of the screen state)
     window.__pe = state;
   }

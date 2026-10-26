@@ -112,6 +112,7 @@
         ${item('Calculated total', comp ? '₹' + comp : NA)}
       </div>
       ${v.verified ? '' : (v.notes || []).map(n => `<div class="dr-note warn">${esc(n)}</div>`).join('')}
+      ${v.draft ? `<div class="dr-note info">Saved as draft <b>${esc(v.draft.reference)}</b>. Find it under Purchase Management → Drafts. Nothing has been added to stock.</div>` : ''}
       ${v.corrected ? '<div class="dr-note info">Showing the corrected details saved for this bill. The original OCR reading is kept.</div>' : ''}
       ${v.ocr_error ? `<div class="dr-note bad">OCR could not read this bill: ${esc(v.ocr_error)}. The original is still available on the left.</div>` : ''}
     </div>`;
@@ -127,6 +128,7 @@
   function drActions(v) {
     return {
       edit: v.can_edit,
+      draft: !v.verified,
       confirm: !v.verified && !v.failed && String(v.status || '').toLowerCase() !== 'processing',
       ocr: !v.verified && (v.failed || String(v.status || '').toLowerCase() === 'processing'),
       back: true,
@@ -188,7 +190,7 @@
 
   function setBusy(b) {
     S.busy = b;
-    ['dr-btn-confirm', 'dr-btn-edit', 'dr-btn-ocr'].forEach(id => { const e = $(id); if (e) e.disabled = b; });
+    ['dr-btn-confirm', 'dr-btn-edit', 'dr-btn-ocr', 'dr-btn-draft'].forEach(id => { const e = $(id); if (e) e.disabled = b; });
   }
 
   function paint() {
@@ -200,6 +202,7 @@
     $('dr-problems').innerHTML = drProblemsHtml(v);
     const a = drActions(v);
     $('dr-btn-edit').style.display = a.edit ? '' : 'none';
+    $('dr-btn-draft').style.display = a.draft ? '' : 'none';
     $('dr-btn-confirm').style.display = a.confirm ? '' : 'none';
     $('dr-btn-ocr').style.display = a.ocr ? '' : 'none';
     $('dr-verified-note').style.display = v.verified ? '' : 'none';
@@ -303,6 +306,29 @@
   window.drEdit = function (focus) {
     if (!S.id || !S.view || !S.view.can_edit) return;
     if (typeof openCorrectionEditor === 'function') openCorrectionEditor(S.id, S.view, focus);
+  };
+
+  function draftFlash(res) {
+    const ref = res && res.draft ? res.draft.reference : 'the draft';
+    flash(`Saved as draft ${ref}. It is listed under Purchase Management → Drafts. Nothing was added to stock.`, 'ok');
+  }
+
+  // Save as Draft from the read-only review: keeps the bill's current details as an open purchase draft.
+  window.drSaveDraft = async function () {
+    if (!S.id || S.busy) return;
+    setBusy(true);
+    try {
+      const res = await api.request('/documents/' + S.id + '/save-draft', { method: 'POST' });
+      S.view = res.review; paint();
+      draftFlash(res);
+    } catch (e) {
+      flash(apiMsg(e) + ' The bill and its details are unchanged.', 'bad');
+    } finally { setBusy(false); }
+  };
+
+  window.drAfterDraftSaved = async function (res) {
+    await loadView();
+    draftFlash(res);
   };
 
   window.drAfterCorrectionsSaved = async function () {

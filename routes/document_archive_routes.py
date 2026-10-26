@@ -424,3 +424,15 @@ def confirm_document_review(
     """Confirm & Add to Stock for the reviewed invoice, through the purchase engine (one transaction, no double posting)."""
     doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
     return document_review.confirm_document(db, current_user.id, doc, acknowledge_warnings=bool(body and body.acknowledge_warnings))
+
+
+@router.post("/documents/{document_id}/save-draft")
+def save_document_as_draft(
+    document_id: int,
+    body: Optional[ReviewCorrections] = None,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+):
+    """Save as Draft from the invoice review: keeps corrections (if sent) and one open purchase draft linked to the bill. Posts nothing."""
+    doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
+    return document_review.save_as_draft(db, current_user.id, doc, body.header.model_dump() if body else None, body.items if body else None)

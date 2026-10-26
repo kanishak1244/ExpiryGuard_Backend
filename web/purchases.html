@@ -154,6 +154,10 @@
           .pm-badge.UNPAID { background: #FEE2E2; color: #991B1B; }
           .pm-badge.PARTIAL { background: #FEF3C7; color: #92400E; }
           .pm-na { color: var(--muted-text); }
+          .pm-tabs { display: flex; gap: 6px; margin: 0 0 12px 0; border-bottom: 1px solid var(--color-border); }
+          .pm-tab { border: 0; background: transparent; color: var(--muted-text); font: inherit; font-weight: 600; padding: 8px 14px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+          .pm-tab.active { color: var(--dark-text); border-bottom-color: var(--primary-green); }
+          .pm-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--primary-green); color: #fff; font-size: 11px; text-align: center; }
           .pm-note { font-size: 12px; color: var(--muted-text); margin-top: 8px; }
           @media (max-width: 1250px) { .pm-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
           @media (max-width: 1000px) { .pm-actions { grid-template-columns: 1fr; } .pm-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -180,7 +184,12 @@
             <span><span class="pm-t">Add Manually</span><span class="pm-d">Enter supplier invoice and medicine details manually in a spreadsheet-style form.</span></span>
           </button>
         </div>
-        <div id="pm-drafts-note" class="pm-note" style="display:none; margin: -6px 0 14px 2px;"></div>
+        <div class="pm-tabs" role="tablist" aria-label="Purchases">
+          <button type="button" class="pm-tab active" id="pm-tab-all" role="tab" onclick="pmTab('all')">All Purchases</button>
+          <button type="button" class="pm-tab" id="pm-tab-drafts" role="tab" onclick="pmTab('drafts')">Drafts <span class="pm-count" id="pm-draft-count">0</span></button>
+        </div>
+
+        <div id="pm-all-view">
 
         <div class="pm-summary" id="pm-summary" style="display:none;">
           <div class="card pm-kpi"><div class="l">Purchase documents</div><div class="v" id="pm-k-docs">–</div></div>
@@ -230,6 +239,43 @@
           </div>
           <p class="pm-note">Shows purchases saved with a supplier invoice. Stock added by Search Medicine or Excel import is recorded in inventory only and does not create a purchase document here yet.</p>
         </div>
+        </div><!-- /pm-all-view -->
+
+        <div id="pm-drafts-view" style="display:none;">
+          <div class="card" style="padding: 14px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+              <div><b>Purchase drafts</b><div class="pm-note" style="margin:2px 0 0">Saved but not posted: drafts never change stock, supplier balances or the purchase list. Amounts are estimates.</div></div>
+              <a class="btn btn-primary btn-sm" href="purchase_entry.html" style="text-decoration:none">+ New purchase</a>
+            </div>
+            <form class="pm-filters" id="pd-filters" onsubmit="pdApply(event)">
+              <label class="pm-q">Search
+                <input type="search" id="pd-q" class="form-input" placeholder="Supplier, invoice no. or DRAFT-00012" autocomplete="off">
+              </label>
+              <label>Updated from <input type="date" id="pd-from" class="form-input"></label>
+              <label>to <input type="date" id="pd-to" class="form-input"></label>
+              <label>Show
+                <select id="pd-status" class="form-input"><option value="DRAFT">Open drafts</option><option value="FINALIZED">Posted from a draft</option><option value="ALL">All</option></select>
+              </label>
+              <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="pdClear()">Clear filters</button>
+            </form>
+            <div id="pd-state" class="pm-state" style="display:none;"></div>
+            <div class="table-responsive" id="pd-table-wrap" style="display:none;">
+              <table class="data-table">
+                <thead><tr><th>Draft</th><th>Supplier</th><th>Invoice no.</th><th>Created</th><th>Last updated</th><th class="numeric">Lines</th>
+                  <th class="numeric">Estimated total (₹)</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="pd-tbody"></tbody>
+              </table>
+            </div>
+            <div class="pm-pager" id="pd-pager" style="display:none;">
+              <span id="pd-range"></span>
+              <span>
+                <button type="button" class="btn btn-secondary btn-sm" id="pd-prev" onclick="pdGoto(-1)">‹ Previous</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="pd-next" onclick="pdGoto(1)">Next ›</button>
+              </span>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   </div>
@@ -251,8 +297,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=10.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.5" defer></script>
-  <script src="js/billing_math.js?v=13.0" defer></script>
-  <script src="js/purchase_entry_core.js?v=1.0" defer></script>
-  <script src="js/purchases_page.js?v=1.1" defer></script>
+  <script src="js/purchases_page.js?v=1.2" defer></script>
 </body>
 </html>

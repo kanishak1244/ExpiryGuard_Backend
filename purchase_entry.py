@@ -68,6 +68,7 @@ class ManualPurchaseCreate(BaseModel):
     invoice_date: date
     payment_status: str = Field(default="UNPAID", pattern="^(?i:UNPAID|PAID)$")
     expected_total: Optional[float] = Field(default=None, ge=0)     # what the screen showed; refused if the server differs
+    draft_id: Optional[int] = Field(default=None, ge=1)             # the saved draft this purchase finalizes (marked FINALIZED with the posting)
     items: List[ManualPurchaseLine] = Field(min_length=1, max_length=MAX_LINES)
 
     @field_validator("invoice_number")
@@ -247,6 +248,9 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, 
         )
         db.add(invoice)
         db.flush()
+        if data.draft_id or document_id:
+            import purchase_drafts                       # drafts finalize in this same transaction, never separately
+            purchase_drafts.mark_finalized(db, user_id, invoice.id, draft_id=data.draft_id, document_id=document_id)
 
         stamp = f"{datetime.utcnow():%Y%m%d%H%M%S}"
         saved_lines = []

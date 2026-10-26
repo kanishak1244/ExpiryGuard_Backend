@@ -98,3 +98,36 @@ test('drafts: save, list newest first, restore exactly, remove; broken storage i
   assert.deepEqual(broken.list(), []);
   assert.equal(broken.save(draft), null);
 });
+
+test('draft body keeps every typed value, drops transient fields, carries identity and version', () => {
+  const r = row({ name: 'DOLO', free: '2', disc: '10' });
+  r._batches = [{ batch_number: 'X' }];
+  const header = { supplierId: 3, supplierName: 'Alpha', invoiceNo: ' A-1 ', invoiceDate: '2026-10-26', paymentStatus: 'PAID' };
+  const body = m.peBuildDraftBody(header, [r, m.peNewRow()], 12, 4);
+  assert.equal(body.draft_id, 12);
+  assert.equal(body.expected_version, 4);
+  assert.equal(body.supplier_id, 3);
+  assert.equal(body.invoice_number, 'A-1');
+  assert.equal(body.payload.rows.length, 2);
+  assert.equal(body.payload.rows[0].free, '2');
+  assert.ok(!('_batches' in body.payload.rows[0]));
+  assert.equal(m.peBuildDraftBody(header, [r], null, null).draft_id, undefined);
+});
+
+test('a draft restores to the same header and rows (what was typed is what comes back)', () => {
+  const rows = [row({ name: 'DOLO', batch: 'D1', expiry: '12/30', qty: '5', free: '1', rate: '40', disc: '5', gst: '5', mrp: '70' }), row({ name: 'ZINC', batch: 'Z9' })];
+  const header = { supplierId: 3, supplierName: 'Alpha', invoiceNo: 'A-1', invoiceDate: '2026-10-26', paymentStatus: 'UNPAID' };
+  const saved = m.peBuildDraftBody(header, rows, 1, 1);
+  const back = m.peRestoreDraft({ supplier_id: 3, supplier_name: 'Alpha', invoice_number: 'A-1', invoice_date: '2026-10-26', payload: saved.payload });
+  assert.equal(back.header.supplierId, 3);
+  assert.equal(back.header.invoiceNo, 'A-1');
+  assert.deepEqual(back.rows.map(r => [r.name, r.batch, r.expiry, r.qty, r.free, r.rate, r.disc, r.gst, r.mrp]),
+    rows.map(r => [r.name, r.batch, r.expiry, r.qty, r.free, r.rate, r.disc, r.gst, r.mrp]));
+  assert.equal(m.peRestoreDraft({ payload: {} }).rows.length, 1);                    // an empty draft still opens with one blank row
+});
+
+test('posting a reopened draft sends its id so the server can finalize it with the purchase', () => {
+  const p = m.peBuildPayload({ supplierId: 3, invoiceNo: 'A-1', invoiceDate: '2026-10-26', draftId: 9 }, [row({})]);
+  assert.equal(p.draft_id, 9);
+  assert.equal(m.peBuildPayload({ supplierId: 3, invoiceNo: 'A-1', invoiceDate: '2026-10-26' }, [row({})]).draft_id, undefined);
+});

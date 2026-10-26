@@ -119,7 +119,13 @@
         <div>
           <h1 class="page-title">Add Purchase Manually</h1>
         </div>
-        <a href="purchases.html" class="btn btn-secondary btn-sm" style="text-decoration:none">← Purchase Management</a>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end;">
+          <span id="pe-draft-ref" class="pe-sub" style="margin:0"></span>
+          <a href="purchases.html?tab=drafts" class="btn btn-secondary btn-sm" style="text-decoration:none">Drafts</a>
+          <button type="button" class="btn btn-secondary btn-sm" id="pe-top-draft-btn" onclick="peSaveDraft()">Save as Draft</button>
+          <button type="button" class="btn btn-primary btn-sm" id="pe-top-save-btn" onclick="peSave()">Save Purchase</button>
+          <a href="purchases.html" class="btn btn-secondary btn-sm" style="text-decoration:none">← Purchase Management</a>
+        </div>
       </header>
 
 
@@ -224,7 +230,7 @@
 
         <div class="pe-foot">
           <div class="card pe-card" style="margin:0;">
-            <div class="pe-sub" id="pe-save-state">Nothing is posted until you press Save Purchase. Drafts stay in this browser and never change stock or balances.</div>
+            <div class="pe-sub" id="pe-save-state">Nothing is posted until you press Save Purchase. Drafts are saved on the server and never change stock or balances.</div>
             <div id="pe-drafts" style="margin-top:8px;"></div>
           </div>
           <div class="card pe-card pe-tot" style="margin:0;">
@@ -293,7 +299,7 @@
   <script src="js/app.js?v=10.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.5" defer></script>
   <script src="js/billing_math.js?v=13.0" defer></script>
-  <script src="js/purchase_entry_core.js?v=1.0" defer></script>
-  <script src="js/purchase_entry.js?v=1.0" defer></script>
+  <script src="js/purchase_entry_core.js?v=1.1" defer></script>
+  <script src="js/purchase_entry.js?v=1.1" defer></script>
 </body>
 </html>
