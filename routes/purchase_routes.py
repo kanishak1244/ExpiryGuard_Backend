@@ -21,6 +21,7 @@ from dependencies import (
 import models
 import schemas
 import crud
+import purchase_entry
 
 logger = logging.getLogger("expiryguard.routes.purchases")
 
@@ -85,6 +86,40 @@ def get_purchase_document_detail(
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase not found.")
     return doc
+
+
+@router.post("/purchases/manual", status_code=201)
+def post_manual_purchase(
+    data: purchase_entry.ManualPurchaseCreate,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_CREATE")),
+    db: Session = Depends(get_db),
+):
+    """Add Manually: post one supplier invoice (stock, document, ledger) in a single transaction."""
+    res = purchase_entry.post_manual_purchase(db, current_user.id, data)
+    fast_cache.invalidate_user(current_user.id)
+    return res
+
+
+@router.get("/purchases/check-duplicate")
+def check_duplicate_supplier_invoice(
+    supplier_id: int = Query(..., ge=1),
+    invoice_number: str = Query(..., min_length=1, max_length=60),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Is this supplier invoice number already saved for this supplier? (read-only)"""
+    return purchase_entry.check_duplicate(db, current_user.id, supplier_id, invoice_number)
+
+
+@router.get("/purchases/medicine-search")
+def purchase_medicine_search(
+    q: str = Query(..., min_length=1, max_length=80),
+    limit: int = Query(12, ge=1, le=30),
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+    db: Session = Depends(get_db),
+):
+    """Medicine suggestions for the purchase grid: this shop's medicines with batches, then the catalog (read-only)."""
+    return purchase_entry.search_medicines(db, current_user.id, q, limit)
 
 
 @router.get("/purchases/dashboard")

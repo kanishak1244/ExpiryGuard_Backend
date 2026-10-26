@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Purchase Manually — DawaiFlow Web App</title>
+  <!-- Dawaiflow Instant Theme Bootstrap — Prevents Any White Flash / FOUC -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('expiryguard_theme');
+        var isDark = saved === 'dark' || (saved !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var active = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.setAttribute('data-theme', active);
+        root.setAttribute('data-theme-preference', saved || 'system');
+        root.style.backgroundColor = isDark ? '#0B132B' : '#F8FAFC';
+        root.style.colorScheme = active;
+      } catch (e) {}
+    })();
+  </script>
+  <style id="df-theme-critical">
+    html[data-theme="dark"], html[data-theme="dark"] body {
+      background-color: #0B132B !important;
+      color: #F8FAFC;
+      color-scheme: dark;
+    }
+    html[data-theme="light"], html[data-theme="light"] body {
+      background-color: #F8FAFC !important;
+      color: #0F172A;
+      color-scheme: light;
+    }
+  </style>
+  <link rel="stylesheet" href="css/styles.css?v=10.9">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container layout-pinned" id="purchase-entry-page">
+    
+    <!-- Sidebar -->
+    <!-- Canonical Sidebar Navigation -->
+    <!-- Canonical Sidebar Navigation -->
+        <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="brand-logo">
+          <div class="shield-icon">🛡️</div>
+          <div class="brand-title">Dawai<span>Flow</span></div>
+        </a>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-category">Main Menu</div>
+        <a href="index.html" class="nav-item" data-nav-id="dashboard">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Dashboard</span>
+        </a>
+        <a href="billing.html" class="nav-item" data-nav-id="billing">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="6" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="12" y2="16"></line></svg>
+          <span class="nav-text">Create New Bill</span>
+        </a>
+        <a href="sales.html" class="nav-item" data-nav-id="sales">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          <span class="nav-text">Billing / Live Sales</span>
+        </a>
+        <a href="inventory.html" class="nav-item" data-nav-id="inventory">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          <span class="nav-text">Live Inventory</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item active" data-nav-id="add-inventory" onclick="openAddInventoryModal()">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="nav-text">+ Add Inventory</span>
+        </a>
+        <a href="documents.html" class="nav-item" data-nav-id="documents">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">Documents & OCR</span>
+        </a>
+        <a href="suppliers.html" class="nav-item" data-nav-id="suppliers">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span class="nav-text">Suppliers</span>
+        </a>
+        <a href="khata.html" class="nav-item" data-nav-id="khata">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span class="nav-text">Khata Ledger</span>
+        </a>
+        <a href="returns.html" class="nav-item" data-nav-id="returns">
+          <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          <span class="nav-text">Returns & Refunds</span>
+        </a>
+        <a href="gst_filing.html" class="nav-item" data-nav-id="gst-filing">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span class="nav-text">GST Filing</span>
+        </a>
+        <a href="reports.html" class="nav-item" data-nav-id="reports">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span class="nav-text">Reports & Analytics</span>
+        </a>
+        <a href="settings.html" class="nav-item" data-nav-id="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar">P</div>
+          <div class="user-info">
+            <span class="user-name" id="shop-name-header">AI Pharmacy</span>
+            <span class="user-role">Owner / Pharmacist</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div>
+          <h1 class="page-title">Add Purchase Manually</h1>
+        </div>
+        <a href="purchases.html" class="btn btn-secondary btn-sm" style="text-decoration:none">← Purchase Management</a>
+      </header>
+
+
+
+      <main class="content-body">
+        <style>
+          .pe-card { padding: 12px 14px; margin-bottom: 12px; }
+          .pe-head { display: grid; grid-template-columns: 2.2fr 1.3fr 1fr 1.2fr 1fr; gap: 10px 12px; align-items: start; }
+          .pe-head label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted-text); position: relative; }
+          .pe-head .form-input, .pe-card .form-input { padding: 7px 9px; font-size: 13px; width: 100%; box-sizing: border-box; }
+          .pe-req::after { content: ' *'; color: #DC2626; }
+          .pe-sub { font-size: 11.5px; color: var(--muted-text); min-height: 15px; margin-top: 2px; }
+          .pe-sub.warn { color: #B45309; } .pe-sub.bad { color: #DC2626; } .pe-sub.ok { color: #15803D; }
+          .pe-hint { font-size: 11.5px; color: var(--muted-text); margin: 0 0 8px 0; }
+          .pe-hint kbd { background: rgba(100,116,139,.18); border-radius: 3px; padding: 0 4px; font-size: 11px; }
+          .pe-grid-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+          table.pe-grid { border-collapse: collapse; width: 100%; min-width: 1080px; font-size: 12.5px; }
+          .pe-grid th { background: rgba(100,116,139,.12); padding: 7px 6px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted-text); white-space: nowrap; }
+          .pe-grid td { padding: 0; border-top: 1px solid var(--color-border); vertical-align: middle; }
+          .pe-grid td.pe-n { width: 30px; text-align: center; color: var(--muted-text); }
+          .pe-grid td.pe-amt { text-align: right; padding: 0 8px; font-weight: 600; white-space: nowrap; }
+          .pe-grid input { width: 100%; box-sizing: border-box; border: 0; background: transparent; color: inherit; padding: 8px 6px; font: inherit; outline: none; }
+          .pe-grid input:focus { background: rgba(13,148,136,.14); box-shadow: inset 0 0 0 2px var(--primary-green); }
+          .pe-grid input.num { text-align: right; }
+          .pe-grid input.bad { box-shadow: inset 0 0 0 2px #DC2626; }
+          .pe-grid td.pe-act { width: 70px; white-space: nowrap; text-align: center; }
+          .pe-grid td.pe-act button { border: 0; background: transparent; cursor: pointer; font-size: 14px; color: var(--muted-text); padding: 6px; }
+          .pe-grid tr.pe-detail td { background: rgba(100,116,139,.07); padding: 8px 10px; }
+          .pe-detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+          .pe-detail-grid label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted-text); }
+          .pe-detail-grid input { border: 1px solid var(--color-border); border-radius: 6px; padding: 6px 8px; background: transparent; }
+          .pe-pop { position: absolute; z-index: 60; min-width: 320px; max-width: 460px; max-height: 280px; overflow-y: auto; background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.28); display: none; }
+          .pe-pop .it { padding: 7px 10px; cursor: pointer; font-size: 12.5px; border-bottom: 1px solid var(--color-border); }
+          .pe-pop .it small { display: block; color: var(--muted-text); font-size: 11px; }
+          .pe-pop .it.sel, .pe-pop .it:hover { background: rgba(13,148,136,.2); }
+          .pe-pop .it.add { color: var(--primary-green); font-weight: 600; }
+          .pe-foot { display: grid; grid-template-columns: 1fr minmax(260px, 340px); gap: 14px; margin-top: 12px; align-items: start; }
+          .pe-tot div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+          .pe-tot .big { font-size: 17px; font-weight: 800; border-top: 1px solid var(--color-border); margin-top: 4px; padding-top: 6px; }
+          .pe-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+          .pe-errors { border: 1px solid #DC2626; background: rgba(220,38,38,.1); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; margin-bottom: 10px; display: none; }
+          .pe-errors ul { margin: 4px 0 0 18px; padding: 0; }
+          .pe-ok { border: 1px solid #16A34A; background: rgba(22,163,74,.12); border-radius: 8px; padding: 12px 14px; display: none; margin-bottom: 12px; }
+          .pe-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+          .pe-modal-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted-text); }
+          @media (max-width: 1000px) { .pe-head { grid-template-columns: 1fr 1fr; } .pe-foot { grid-template-columns: 1fr; } .pe-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+          @media (max-width: 520px) { .pe-head, .pe-modal-grid { grid-template-columns: 1fr; } }
+        </style>
+
+        <div id="pe-ok" class="pe-ok"></div>
+        <div id="pe-errors" class="pe-errors" role="alert"></div>
+
+        <div class="card pe-card">
+          <div class="pe-head">
+            <label><span class="pe-req">Supplier</span>
+              <input type="text" id="pe-supplier" class="form-input" placeholder="Type to search suppliers" autocomplete="off">
+              <div id="pe-supplier-pop" class="pe-pop"></div>
+              <span class="pe-sub" id="pe-supplier-sub"><a href="javascript:void(0)" onclick="peOpenSupplierModal()">+ Add supplier</a></span>
+            </label>
+            <label><span class="pe-req">Supplier invoice no.</span>
+              <input type="text" id="pe-invoice-no" class="form-input" placeholder="As printed on the bill" autocomplete="off" maxlength="60">
+              <span class="pe-sub" id="pe-invoice-sub"></span>
+            </label>
+            <label><span class="pe-req">Invoice date</span>
+              <input type="date" id="pe-invoice-date" class="form-input">
+            </label>
+            <label>Purchase voucher no.
+              <input type="text" id="pe-voucher" class="form-input" value="Assigned when posted" disabled>
+              <span class="pe-sub">DawaiFlow's own number (PUR-00001…)</span>
+            </label>
+            <label>Payment
+              <select id="pe-payment" class="form-input">
+                <option value="UNPAID">Credit — payable to supplier</option>
+                <option value="PAID">Paid in full</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <p class="pe-hint">
+          <kbd>Tab</kbd>/<kbd>Enter</kbd> next cell · <kbd>Shift+Tab</kbd> back · <kbd>↑</kbd><kbd>↓</kbd> choose a suggestion, <kbd>Enter</kbd> pick ·
+          <kbd>F2</kbd> new medicine · <kbd>Ctrl+Enter</kbd> new row · <kbd>Ctrl+Delete</kbd> delete row · <kbd>Ctrl+S</kbd> save · <kbd>Esc</kbd> close list.
+          Expiry as <b>MM/YY</b>. Free units are received at no charge.
+        </p>
+
+        <div class="pe-grid-wrap">
+          <table class="pe-grid" id="pe-grid">
+            <thead>
+              <tr>
+                <th>#</th><th style="min-width:210px">Medicine</th><th style="min-width:110px">Company</th><th style="min-width:80px">Packing</th>
+                <th style="min-width:90px">Batch</th><th style="min-width:80px">Expiry</th><th>Unit</th>
+                <th style="min-width:60px">Qty</th><th style="min-width:56px">Free</th><th style="min-width:80px">Rate</th>
+                <th style="min-width:60px">Disc %</th><th style="min-width:56px">GST %</th><th style="min-width:80px">MRP</th>
+                <th style="text-align:right">Amount (₹)</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="pe-tbody"></tbody>
+          </table>
+        </div>
+        <div id="pe-pop" class="pe-pop"></div>
+        <div style="margin-top:8px;"><button type="button" class="btn btn-secondary btn-sm" onclick="peAddRow(true)">+ Add row (Ctrl+Enter)</button></div>
+
+        <div class="pe-foot">
+          <div class="card pe-card" style="margin:0;">
+            <div class="pe-sub" id="pe-save-state">Nothing is posted until you press Save Purchase. Drafts stay in this browser and never change stock or balances.</div>
+            <div id="pe-drafts" style="margin-top:8px;"></div>
+          </div>
+          <div class="card pe-card pe-tot" style="margin:0;">
+            <div><span>Items</span><span id="pe-t-count">0</span></div>
+            <div><span>Subtotal</span><span id="pe-t-sub">₹0.00</span></div>
+            <div><span>Discount</span><span id="pe-t-disc">₹0.00</span></div>
+            <div><span>Taxable value</span><span id="pe-t-tax">₹0.00</span></div>
+            <div><span>CGST</span><span id="pe-t-cgst">₹0.00</span></div>
+            <div><span>SGST</span><span id="pe-t-sgst">₹0.00</span></div>
+            <div class="big"><span>Purchase amount</span><span id="pe-t-total">₹0.00</span></div>
+          </div>
+        </div>
+
+        <div class="pe-actions">
+          <button type="button" class="btn btn-secondary" onclick="peCancel()">Cancel</button>
+          <button type="button" class="btn btn-secondary" onclick="peClear()">Clear</button>
+          <button type="button" class="btn btn-secondary" id="pe-draft-btn" onclick="peSaveDraft()">Save as Draft</button>
+          <button type="button" class="btn btn-primary" id="pe-save-btn" onclick="peSave()">Save Purchase</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Add supplier -->
+  <div id="pe-supplier-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px; padding: 20px;">
+      <div class="modal-header" style="margin-bottom: 10px;"><h2 style="margin:0;font-size:17px;">Add supplier</h2>
+        <button class="close-btn" onclick="peCloseModals()" aria-label="Close">&times;</button></div>
+      <div class="pe-modal-grid">
+        <label style="grid-column:1/-1">Name *<input id="ps-name" class="form-input" maxlength="120"></label>
+        <label>Phone<input id="ps-phone" class="form-input" maxlength="20"></label>
+        <label>GSTIN<input id="ps-gstin" class="form-input" maxlength="15"></label>
+      </div>
+      <div class="pe-sub bad" id="ps-err"></div>
+      <div class="pe-actions"><button class="btn btn-secondary" onclick="peCloseModals()">Cancel</button>
+        <button class="btn btn-primary" onclick="peCreateSupplier()">Save supplier</button></div>
+    </div>
+  </div>
+
+  <!-- Add new medicine -->
+  <div id="pe-med-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px; padding: 20px;">
+      <div class="modal-header" style="margin-bottom: 10px;"><h2 style="margin:0;font-size:17px;">Add new medicine</h2>
+        <button class="close-btn" onclick="peCloseModals()" aria-label="Close">&times;</button></div>
+      <p class="pe-sub">Medicine details only. Batch, expiry, quantity and rates are entered on the purchase row.</p>
+      <div class="pe-modal-grid">
+        <label style="grid-column:1/-1">Medicine name *<input id="pm-name" class="form-input" maxlength="200"></label>
+        <label>Company / manufacturer<input id="pm-company" class="form-input" maxlength="200"></label>
+        <label>Composition<input id="pm-comp" class="form-input" maxlength="300"></label>
+        <label>Packing (e.g. strip of 10)<input id="pm-pack" class="form-input" maxlength="100"></label>
+        <label>Units per pack<input id="pm-units" class="form-input" type="number" min="1" max="1000" value="10"></label>
+        <label>HSN code<input id="pm-hsn" class="form-input" maxlength="12" value="3004"></label>
+        <label>GST %<select id="pm-gst" class="form-input"><option>0</option><option>5</option><option selected>12</option><option>18</option><option>28</option></select></label>
+        <label style="grid-column:1/-1">Barcode / product code (optional)<input id="pm-barcode" class="form-input" maxlength="64"></label>
+      </div>
+      <div class="pe-sub bad" id="pm-err"></div>
+      <div class="pe-actions"><button class="btn btn-secondary" onclick="peCloseModals()">Cancel</button>
+        <button class="btn btn-primary" onclick="peCreateMedicine()">Create and use</button></div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=9.4" defer></script>
+  <script src="js/app_preloader.js?v=9.4" defer></script>
+  <script src="js/nav.js?v=9.5" defer></script>
+  <script src="js/confirm_modal.js?v=9.4" defer></script>
+  <script src="js/app.js?v=10.0" defer></script>
+  <script src="js/add_inventory_flow.js?v=9.5" defer></script>
+  <script src="js/billing_math.js?v=13.0" defer></script>
+  <script src="js/purchase_entry_core.js?v=1.0" defer></script>
+  <script src="js/purchase_entry.js?v=1.0" defer></script>
+</body>
+</html>

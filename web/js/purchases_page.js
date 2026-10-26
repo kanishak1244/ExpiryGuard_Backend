@@ -82,7 +82,7 @@
         if (state.page > 1 && res.total > 0) { state.page = Math.max(1, Math.ceil(res.total / PAGE_SIZE)); return load(); }
         showState(hasFilter ? 'empty-filtered' : 'empty',
           hasFilter ? 'No purchases match these filters' : 'No purchase documents yet',
-          hasFilter ? '' : 'Use one of the three options above to add stock. Purchases saved with a supplier invoice will be listed here.', false);
+          hasFilter ? '' : 'Use one of the options above to add stock. Purchases saved with a supplier invoice will be listed here.', false);
         return;
       }
       $('pm-state').style.display = 'none';
@@ -131,6 +131,7 @@
   window.pmScanBill = function () { window.location.href = 'documents.html'; };
   window.pmSearchMedicine = function () { openAddInventoryWorkflow('search'); };
   window.pmImportSheet = function () { openAddInventoryWorkflow('import'); };
+  window.pmAddManually = function () { window.location.href = 'purchase_entry.html'; };
 
   // ---- read-only detail
   window.pmCloseDetail = function () { $('pm-detail-modal').classList.remove('active'); };
@@ -172,6 +173,20 @@
   document.addEventListener('DOMContentLoaded', function () {
     loadSuppliers();
     load();
+    const view = parseInt(new URLSearchParams(window.location.search).get('view'), 10);
+    if (view > 0) window.pmOpenDetail(view);
+    if (typeof peDraftStore === 'function') {
+      try {
+        const list = peDraftStore(window.localStorage).list();
+        const note = $('pm-drafts-note');
+        if (list.length && note) {
+          note.style.display = 'block';
+          note.innerHTML = list.length + ' manual purchase draft(s) saved on this device: ' + list.slice(0, 3).map(function (d) {
+            return '<a href="purchase_entry.html?draft=' + encodeURIComponent(d.id) + '">' + esc((d.header && d.header.supplierName) || 'No supplier') + ' · ' + esc((d.header && d.header.invoiceNo) || 'no invoice no.') + '</a>';
+          }).join(' · ');
+        }
+      } catch (e) { /* drafts are optional */ }
+    }
     const action = new URLSearchParams(window.location.search).get('action');
     if (action === 'import' || action === 'search') {
       // wait for add_inventory_flow.js (defer) before opening the window
