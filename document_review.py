@@ -57,11 +57,35 @@ def _num(v) -> Optional[float]:
     return val.to_float(v)
 
 
+def fill_hsn_gst(hsn, gst):
+    """
+    HSN and GST rate describe the same thing, so one can be filled from the other when a bill printed only one:
+    GST from the HSN table, or the usual HSN for that rate. Returns (hsn, gst, note); note says what was filled in.
+    Both missing -> (None, None, None): the user must give at least one.
+    """
+    import crud
+    clean = str(hsn or "").strip().replace(".", "")
+    table = crud.DEFAULT_HSN_TAX_MAPPINGS
+    if clean and gst is None:
+        for key in (clean, clean[:6], clean[:4]):
+            m = next((x for x in table if x["hsn_code"] == key), None)
+            if m:
+                return hsn, float(m["gst_rate"]), f"GST {m['gst_rate']:g}% filled in from HSN {key}"
+        return hsn, None, None
+    if gst is not None and not clean:
+        m = next((x for x in table if float(x["gst_rate"]) == float(gst) and x.get("category", "medicine") != "service"), None)
+        if m:
+            return m["hsn_code"], gst, f"HSN {m['hsn_code']} filled in from GST {gst:g}%"
+    return hsn, gst, None
+
+
 def _line_view(n: int, item: dict) -> dict:
+    gst = _num(item.get("gst_rate") if item.get("gst_rate") is not None else item.get("gst_percentage"))
+    hsn, gst, filled = fill_hsn_gst(item.get("hsn_code"), gst)
     return {
         "row": n,
         "product_name": (item.get("product_name") or "").strip() or None,
-        "hsn_code": item.get("hsn_code"), "gst_rate": _num(item.get("gst_rate") if item.get("gst_rate") is not None else item.get("gst_percentage")),
+        "hsn_code": hsn, "gst_rate": gst, "tax_filled": filled,
         "batch_number": (str(item.get("batch_number") or "").strip() or None),
         "expiry_date": item.get("expiry_date"),
         "quantity": _num(item.get("quantity")), "free_qty": _num(item.get("free_qty")),
@@ -95,8 +119,14 @@ def _line_problems(db: Session, user_id: int, line: dict, today: date) -> dict:
         add("purchase_price", "Purchase rate is missing.")
     if not line["mrp"] or line["mrp"] <= 0:
         add("mrp", "MRP is missing.")
-    if line["gst_rate"] is None or not (0 <= line["gst_rate"] <= 28):
-        add("gst_rate", "GST rate is missing or not between 0 and 28.")
+    if line["gst_rate"] is None and not line["hsn_code"]:
+        add("gst_rate", "Neither HSN nor GST rate was read: enter at least one (the other is filled in from it).")
+    elif line["gst_rate"] is None:
+        add("gst_rate", "GST rate is missing and this HSN is not in the rate table: enter the GST rate.")
+    elif not (0 <= line["gst_rate"] <= 28):
+        add("gst_rate", "GST rate must be between 0 and 28.")
+    if line.get("tax_filled"):
+        warnings.append({"field": "gst_rate" if line["tax_filled"].startswith("GST") else "hsn_code", "message": line["tax_filled"] + " (check against the bill)."})
     if line["discount_percent"] is not None and not (0 <= line["discount_percent"] <= 100):
         add("discount_percent", "Discount must be between 0 and 100%.")
     for f, why in (line["field_flags"] or {}).items():

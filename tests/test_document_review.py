@@ -355,6 +355,26 @@ class TestDocumentReview(unittest.TestCase):
         self.assertEqual(self.c.post("/documents/%d/confirm" % doc["id"], json=good).status_code, 409)
         self.assertEqual(self.counts(), before)
 
+    def test_hsn_and_gst_fill_each_other_and_one_of_them_is_required(self):
+        doc = self.upload()
+        self.set_ocr(doc["id"], items=[ocr_item(0, hsn_code="", gst_rate=12.0), ocr_item(1, hsn_code="3004", gst_rate=None),
+                                       ocr_item(2, hsn_code="", gst_rate=None)])
+        v = self.c.get("/documents/%d/review" % doc["id"]).json()
+        a, b, c = v["lines"]
+        self.assertEqual((a["hsn_code"], a["gst_rate"]), ("3004", 12.0))
+        self.assertIn("filled in", a["tax_filled"])
+        self.assertEqual((b["hsn_code"], b["gst_rate"]), ("3004", 12.0))
+        self.assertTrue(any(x["field"] == "gst_rate" for x in c["blocking"]))
+        self.assertFalse(v["can_confirm"])
+        self.set_ocr(doc["id"], items=[ocr_item(0, hsn_code="", gst_rate=12.0), ocr_item(1, hsn_code="3004", gst_rate=None)])
+        r = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True})
+        self.assertEqual(r.status_code, 200, r.text)
+        d = self.S()
+        prods = {p.product_name: (p.hsn_code, p.gst_rate) for p in d.query(models.Product).all()}
+        d.close()
+        self.assertEqual(set(prods.values()), {("3004", 12.0)})
+
+
 
 class TestDocumentReviewPage(unittest.TestCase):
     """Static wiring of the Documents page (the screen itself is exercised in the browser)."""
