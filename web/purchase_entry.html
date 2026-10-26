@@ -205,6 +205,30 @@
           </div>
         </div>
 
+        <div class="card pe-card" id="pe-invoice-card">
+          <div class="pe-head" style="grid-template-columns: 1.3fr 1fr 1.6fr 1.2fr;">
+            <label>Bill discount
+              <span style="display:flex; gap:6px;"><input type="text" inputmode="decimal" id="pe-inv-disc" class="form-input" placeholder="0">
+                <select id="pe-inv-disc-mode" class="form-input" style="width:64px"><option value="amount">₹</option><option value="percent">%</option></select></span>
+              <span class="pe-sub">One discount on the whole bill (shared over the lines)</span>
+            </label>
+            <label>Other charges ₹
+              <input type="text" inputmode="decimal" id="pe-inv-other" class="form-input" placeholder="0">
+              <span class="pe-sub">Freight etc.</span>
+            </label>
+            <label>Tax on this bill
+              <span class="pe-sub" style="display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12.5px; color:inherit">
+                <span><input type="checkbox" id="pe-inv-incl"> Rates include GST</span>
+                <span><input type="checkbox" id="pe-inv-igst"> Inter-state (IGST)</span>
+              </span>
+            </label>
+            <label>Rounding
+              <span class="pe-sub" style="font-size:12.5px; color:inherit"><input type="checkbox" id="pe-inv-round"> Round payable to nearest ₹</span>
+              <span class="pe-sub">Totals below are calculated by DawaiFlow's server.</span>
+            </label>
+          </div>
+        </div>
+
         <p class="pe-hint">
           <kbd>Tab</kbd>/<kbd>Enter</kbd> next cell · <kbd>Shift+Tab</kbd> back · <kbd>↑</kbd><kbd>↓</kbd> choose a suggestion, <kbd>Enter</kbd> pick ·
           <kbd>F2</kbd> new medicine · <kbd>Ctrl+Enter</kbd> new row · <kbd>Ctrl+Delete</kbd> delete row · <kbd>Ctrl+S</kbd> save · <kbd>Esc</kbd> close list.
@@ -233,14 +257,18 @@
             <div class="pe-sub" id="pe-save-state">Nothing is posted until you press Save Purchase. Drafts are saved on the server and never change stock or balances.</div>
             <div id="pe-drafts" style="margin-top:8px;"></div>
           </div>
-          <div class="card pe-card pe-tot" style="margin:0;">
+          <div class="card pe-card pe-tot" style="margin:0;" id="pe-totals-card">
             <div><span>Items</span><span id="pe-t-count">0</span></div>
             <div><span>Subtotal</span><span id="pe-t-sub">₹0.00</span></div>
             <div><span>Discount</span><span id="pe-t-disc">₹0.00</span></div>
             <div><span>Taxable value</span><span id="pe-t-tax">₹0.00</span></div>
             <div><span>CGST</span><span id="pe-t-cgst">₹0.00</span></div>
             <div><span>SGST</span><span id="pe-t-sgst">₹0.00</span></div>
+            <div><span>IGST</span><span id="pe-t-igst">₹0.00</span></div>
+            <div><span>Other charges</span><span id="pe-t-other">₹0.00</span></div>
+            <div><span>Round-off</span><span id="pe-t-round">₹0.00</span></div>
             <div class="big"><span>Purchase amount</span><span id="pe-t-total">₹0.00</span></div>
+            <div class="pe-sub bad" id="pe-calc-err"></div>
           </div>
         </div>
 
@@ -299,7 +327,7 @@
   <script src="js/app.js?v=10.0" defer></script>
   <script src="js/add_inventory_flow.js?v=9.6" defer></script>
   <script src="js/billing_math.js?v=13.0" defer></script>
-  <script src="js/purchase_entry_core.js?v=1.1" defer></script>
-  <script src="js/purchase_entry.js?v=1.1" defer></script>
+  <script src="js/purchase_entry_core.js?v=1.2" defer></script>
+  <script src="js/purchase_entry.js?v=1.2" defer></script>
 </body>
 </html>

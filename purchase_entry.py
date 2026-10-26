@@ -14,6 +14,7 @@ Money rules (tax-exclusive, the only mode the system has):
   value. The original rate, discount % and free split are not stored on the document (no columns for them yet).
 Nothing here is called by the list/detail screens; viewing never posts.
 """
+import json
 import logging
 import uuid
 from datetime import date, datetime, timedelta
@@ -26,6 +27,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import models
+import purchase_calc
 import schemas
 
 logger = logging.getLogger("expiryguard.purchase_entry")
@@ -49,6 +51,7 @@ class ManualPurchaseLine(BaseModel):
     free_quantity: int = Field(default=0, ge=0, le=1_000_000)
     purchase_rate: float = Field(ge=0, le=10_000_000)
     discount_percent: float = Field(default=0.0, ge=0, le=100)
+    discount_amount: float = Field(default=0.0, ge=0, le=10_000_000)      # a fixed discount on this line (rupees)
     gst_rate: float = Field(default=12.0, ge=0, le=28)
     mrp: float = Field(gt=0, le=10_000_000)
     confirm_mrp_below_cost: bool = False
@@ -68,6 +71,14 @@ class ManualPurchaseCreate(BaseModel):
     invoice_date: date
     payment_status: str = Field(default="UNPAID", pattern="^(?i:UNPAID|PAID)$")
     expected_total: Optional[float] = Field(default=None, ge=0)     # what the screen showed; refused if the server differs
+    invoice_discount_percent: float = Field(default=0.0, ge=0, le=100)   # one invoice-level discount: percent OR amount
+    invoice_discount_amount: float = Field(default=0.0, ge=0, le=1_000_000_000)
+    other_charges: float = Field(default=0.0, ge=0, le=1_000_000_000)    # freight / other charges
+    other_charges_gst: float = Field(default=0.0, ge=0, le=28)
+    interstate: bool = False                                              # IGST instead of CGST + SGST
+    prices_include_gst: bool = False                                      # rates already contain GST
+    round_to_rupee: bool = False                                          # supplier rounds the payable to the nearest rupee
+    printed_total: Optional[float] = Field(default=None, ge=0)            # what the supplier printed (reconciliation only)
     draft_id: Optional[int] = Field(default=None, ge=1)             # the saved draft this purchase finalizes (marked FINALIZED with the posting)
     items: List[ManualPurchaseLine] = Field(min_length=1, max_length=MAX_LINES)
 
@@ -81,17 +92,11 @@ class ManualPurchaseCreate(BaseModel):
 
 
 def calc_line(qty, free, rate, discount_percent, gst_rate) -> dict:
-    """Amounts of one line (the single formula; the browser mirrors it in web/js/purchase_entry_core.js)."""
-    r = crud._round_half_up
-    gross = r(float(qty) * float(rate), 2)
-    discount = r(gross * float(discount_percent or 0) / 100.0, 2)
-    taxable = r(gross - discount, 2)
-    gst = r(taxable * float(gst_rate or 0) / 100.0, 2)
-    received = int(qty) + int(free or 0)
-    return {
-        "gross": gross, "discount": discount, "taxable": taxable, "gst": gst, "total": r(taxable + gst, 2),
-        "received_qty": received, "net_unit_cost": r(taxable / received, 4) if received else 0.0,
-    }
+    """Amounts of one line, from the one calculation (purchase_calc). Kept for the draft estimate and the tests."""
+    c = purchase_calc.calc_invoice([{"qty": qty, "free": free, "rate": rate, "disc_percent": discount_percent, "gst_rate": gst_rate}])
+    ln = c["lines"][0]
+    return {"gross": ln["gross"], "discount": ln["line_discount"], "taxable": ln["taxable"], "gst": ln["tax"], "total": ln["total"],
+            "received_qty": ln["received_qty"], "net_unit_cost": ln["net_unit_cost"]}
 
 
 def calc_totals(lines: List[dict]) -> dict:
@@ -103,6 +108,43 @@ def calc_totals(lines: List[dict]) -> dict:
         "gst": r(sum(l["gst"] for l in lines), 2),
         "total": r(sum(l["total"] for l in lines), 2),
     }
+
+
+class CalcLine(BaseModel):
+    quantity: float = Field(default=0, ge=0, le=1_000_000)
+    free_quantity: float = Field(default=0, ge=0, le=1_000_000)
+    purchase_rate: float = Field(default=0, ge=0, le=10_000_000)
+    discount_percent: float = Field(default=0.0, ge=0, le=100)
+    discount_amount: float = Field(default=0.0, ge=0, le=10_000_000)
+    gst_rate: float = Field(default=12.0, ge=0, le=28)
+
+
+class CalcRequest(BaseModel):
+    """Everything the calculation needs and nothing else, so an unfinished screen can be previewed."""
+    items: List[CalcLine] = Field(default_factory=list, max_length=MAX_LINES)
+    invoice_discount_percent: float = Field(default=0.0, ge=0, le=100)
+    invoice_discount_amount: float = Field(default=0.0, ge=0, le=1_000_000_000)
+    other_charges: float = Field(default=0.0, ge=0, le=1_000_000_000)
+    other_charges_gst: float = Field(default=0.0, ge=0, le=28)
+    interstate: bool = False
+    prices_include_gst: bool = False
+    round_to_rupee: bool = False
+    printed_total: Optional[float] = Field(default=None, ge=0)
+
+
+def calculate(data) -> dict:
+    """The authoritative calculation of a purchase (manual, OCR, draft or preview): lines, tax groups, totals and reconciliation."""
+    try:
+        calc = purchase_calc.calc_invoice(
+            [{"qty": l.quantity, "free": l.free_quantity, "rate": l.purchase_rate, "disc_percent": l.discount_percent,
+              "disc_amount": l.discount_amount, "gst_rate": l.gst_rate} for l in data.items],
+            invoice_discount_percent=data.invoice_discount_percent, invoice_discount_amount=data.invoice_discount_amount,
+            other_charges=data.other_charges, other_charges_gst=data.other_charges_gst, interstate=data.interstate,
+            prices_include_gst=data.prices_include_gst, round_to_rupee=data.round_to_rupee)
+    except purchase_calc.CalcError as exc:
+        raise HTTPException(status_code=422, detail=f"CALC_INVALID: {exc}")
+    calc["reconciliation"] = purchase_calc.reconcile(calc, {"total": data.printed_total} if data.printed_total is not None else None)
+    return calc
 
 
 def _norm_invoice(v: str) -> str:
@@ -189,7 +231,8 @@ def _bad(detail: str, code: int = 400):
     raise HTTPException(status_code=code, detail=detail)
 
 
-def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, document_id: Optional[int] = None) -> dict:
+def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, document_id: Optional[int] = None,
+                         override_reason: Optional[str] = None) -> dict:
     """
     Post one purchase. All or nothing: any problem rolls back the document, the stock and the ledger rows together.
     document_id: the scanned supplier invoice this purchase confirms. It is locked, refused if already Verified, linked to
@@ -222,8 +265,12 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, 
                  f"{crud.purchase_voucher_no(dup.id)}. Open it instead of posting it again.", 409)
 
         # recalculate every amount here and compare with what the screen showed
-        calcs = [calc_line(l.quantity, l.free_quantity, l.purchase_rate, l.discount_percent, l.gst_rate) for l in data.items]
-        totals = calc_totals(calcs)
+        calc = calculate(data)
+        calcs = calc["lines"]
+        ct = calc["totals"]
+        totals = {"subtotal": ct["gross"], "discount": ct["discount"], "invoice_discount": ct["invoice_discount"], "taxable": ct["taxable"],
+                  "gst": ct["tax"], "cgst": ct["cgst"], "sgst": ct["sgst"], "igst": ct["igst"], "other_charges": ct["other_charges"],
+                  "round_off": ct["round_off"], "total": ct["payable"]}
         if data.expected_total is not None and abs(totals["total"] - float(data.expected_total)) > 0.01:
             _bad(f"TOTAL_MISMATCH: The server calculated ₹{totals['total']:.2f} but the screen showed "
                  f"₹{float(data.expected_total):.2f}. Check the rates and refresh before saving.", 409)
@@ -248,9 +295,18 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, 
         )
         db.add(invoice)
         db.flush()
+        snapshot = {"totals": calc["totals"], "tax_groups": calc["tax_groups"], "policy": calc["policy"], "reconciliation": calc["reconciliation"],
+                    "inputs": {"invoice_discount_percent": data.invoice_discount_percent, "invoice_discount_amount": data.invoice_discount_amount,
+                               "other_charges": data.other_charges, "interstate": data.interstate, "prices_include_gst": data.prices_include_gst,
+                               "round_to_rupee": data.round_to_rupee},
+                    "posted_by": user_id, "posted_at": datetime.utcnow().isoformat() + "Z", "purchase_id": invoice.id}
+        if override_reason:
+            snapshot["override"] = {"reason": override_reason, "by": user_id, "at": snapshot["posted_at"],
+                                    "printed_total": calc["reconciliation"].get("printed_total"), "calculated_total": ct["payable"],
+                                    "difference": calc["reconciliation"].get("difference")}
         if data.draft_id or document_id:
             import purchase_drafts                       # drafts finalize in this same transaction, never separately
-            purchase_drafts.mark_finalized(db, user_id, invoice.id, draft_id=data.draft_id, document_id=document_id)
+            purchase_drafts.mark_finalized(db, user_id, invoice.id, draft_id=data.draft_id, document_id=document_id, calculation=snapshot)
 
         stamp = f"{datetime.utcnow():%Y%m%d%H%M%S}"
         saved_lines = []
@@ -317,6 +373,15 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, 
             doc.invoice_date = data.invoice_date
             doc.item_count = len(saved_lines)
             doc.ocr_status = "Verified"
+            try:
+                parsed = json.loads(doc.ocr_raw_json) if doc.ocr_raw_json else {}
+                parsed = parsed if isinstance(parsed, dict) else {}
+            except ValueError:
+                parsed = {}
+            parsed["calculation"] = snapshot
+            if override_reason:
+                parsed.setdefault("override_audit", []).append(snapshot["override"])
+            doc.ocr_raw_json = json.dumps(parsed, default=str)
         db.commit()
     except Exception:
         db.rollback()
@@ -329,4 +394,5 @@ def post_manual_purchase(db: Session, user_id: int, data: ManualPurchaseCreate, 
         "id": invoice.id, "voucher_no": crud.purchase_voucher_no(invoice.id), "invoice_number": invoice.invoice_number,
         "supplier_id": supplier.id, "supplier_name": supplier.name, "payment_status": invoice.payment_status,
         "totals": totals, "total_amount": totals["total"], "items_count": len(saved_lines), "lines": saved_lines,
+        "reconciliation": calc["reconciliation"],
     }

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 import crud
 import models
+import purchase_calc
 import purchase_entry
 from ai import invoice_validation as val
 
@@ -95,6 +96,92 @@ def _line_view(n: int, item: dict) -> dict:
     }
 
 
+HEADER_KEYS = ("subtotal", "scheme_amount", "cd_amount", "discount_amount", "taxable_amount", "cgst_amount", "sgst_amount", "igst_amount",
+               "other_amount", "total_amount")
+
+
+def header_figures(eff: dict) -> dict:
+    """What the bill printed in its totals block (OCR), overridden by the user's corrections. Never taken as truth: only compared."""
+    ocr, cor = eff["ocr"], (eff["ocr"].get("corrected") or {})
+    out = {k: _num(ocr.get(k)) for k in HEADER_KEYS}
+    for k in ("discount_amount", "other_amount", "taxable_amount"):
+        if cor.get(k) is not None:
+            out[k] = _num(cor.get(k))
+    disc = out.get("discount_amount") or 0.0
+    if not disc and ((out.get("scheme_amount") or 0) or (out.get("cd_amount") or 0)):
+        disc = (out.get("scheme_amount") or 0.0) + (out.get("cd_amount") or 0.0)
+    out["discount"] = disc or None
+    out["printed_total"] = eff.get("printed_total")
+    return out
+
+
+def invoice_inputs(eff: dict, lines: List[dict]) -> dict:
+    """
+    Decide, from the bill's own figures and without guessing, how the invoice-level parts are calculated:
+      discount      the bill's discount is applied once: from the lines if they carry it, else as an invoice discount;
+                    both present and different = conflicting, applied from the lines only and reported
+      supply        IGST printed (and no CGST/SGST) -> inter-state
+      price mode    inclusive only when the printed taxable amount proves it; unclear -> exclusive and reported
+      rounding      to the rupee when the printed total is a whole rupee
+    """
+    h = header_figures(eff)
+    cor = eff["ocr"].get("corrected") or {}
+    notes = []
+    priced = [l for l in lines if l["quantity"] and l["quantity"] > 0]
+    line_disc = 0.0
+    gross = 0.0
+    for l in priced:
+        g = float(purchase_calc.q2(purchase_calc.D(l["quantity"]) * purchase_calc.D(l["purchase_price"] or 0)))
+        gross += g
+        line_disc += float(purchase_calc.q2(purchase_calc.D(g) * purchase_calc.D(l["discount_percent"] or 0) / 100))
+    hd = h.get("discount") or 0.0
+    inv_disc = 0.0
+    if hd > 0:
+        if line_disc == 0:
+            inv_disc = hd
+            notes.append(f"Discount of ₹{hd:.2f} printed in the totals block is applied once, on the invoice.")
+        elif abs(hd - line_disc) <= 1.0:
+            notes.append("The bill's discount equals the discounts on its lines, so it is not applied a second time.")
+        else:
+            notes.append(f"Conflicting discounts: lines carry ₹{line_disc:.2f} but the totals block prints ₹{hd:.2f}. Only the line discounts were applied: check the bill.")
+    igst, cg, sg = h.get("igst_amount") or 0.0, h.get("cgst_amount") or 0.0, h.get("sgst_amount") or 0.0
+    interstate = bool(cor.get("interstate")) if cor.get("interstate") is not None else bool(igst > 0 and cg == 0 and sg == 0)
+    rates = [l["gst_rate"] for l in priced if l["gst_rate"] is not None]
+    mode = cor.get("prices_include_gst")
+    if mode is None:
+        mode = purchase_calc.infer_tax_mode(gross, line_disc + inv_disc, h.get("taxable_amount"), rates)
+        if mode is None and h.get("taxable_amount"):
+            notes.append("Could not tell from the bill whether its rates include GST; they were treated as excluding GST: check the bill.")
+            mode = False
+    printed = eff.get("printed_total")
+    return {
+        "invoice_discount_amount": inv_disc, "other_charges": h.get("other_amount") or 0.0, "interstate": interstate,
+        "prices_include_gst": bool(mode), "round_to_rupee": bool(printed and abs(printed - round(printed)) < 1e-9),
+        "printed": {"total": printed, "subtotal": h.get("subtotal"), "discount": hd or None, "taxable": h.get("taxable_amount"),
+                    "cgst": h.get("cgst_amount"), "sgst": h.get("sgst_amount"), "igst": h.get("igst_amount"), "other": h.get("other_amount")},
+        "notes": notes,
+    }
+
+
+def calculate_document(eff: dict, lines: List[dict]) -> Optional[dict]:
+    """The authoritative calculation of a scanned bill (None when no line can be priced yet)."""
+    priced = [l for l in lines if l["quantity"] and l["quantity"] > 0 and l["purchase_price"] is not None]
+    if not priced:
+        return None
+    inp = invoice_inputs(eff, lines)
+    try:
+        calc = purchase_calc.calc_invoice(
+            [{"qty": l["quantity"], "free": l["free_qty"] or 0, "rate": l["purchase_price"], "disc_percent": l["discount_percent"] or 0,
+              "gst_rate": l["gst_rate"] or 0} for l in priced],
+            invoice_discount_amount=inp["invoice_discount_amount"], other_charges=inp["other_charges"], interstate=inp["interstate"],
+            prices_include_gst=inp["prices_include_gst"], round_to_rupee=inp["round_to_rupee"])
+    except purchase_calc.CalcError as exc:
+        return {"error": str(exc), "inputs": inp}
+    calc["reconciliation"] = purchase_calc.reconcile(calc, inp["printed"])
+    calc["inputs"] = inp
+    return calc
+
+
 def _line_problems(db: Session, user_id: int, line: dict, today: date) -> dict:
     """{blocking: [(field, message)], warnings: [...]} for one line, plus the medicine match."""
     blocking, warnings = [], []
@@ -150,7 +237,7 @@ def _line_problems(db: Session, user_id: int, line: dict, today: date) -> dict:
 
 
 def _to_purchase(doc: models.Document, supplier_id: int, eff: dict, lines: List[dict], expected_total: Optional[float] = None,
-                 allow_below_cost: bool = False):
+                 allow_below_cost: bool = False, raw_eff: Optional[dict] = None):
     items = []
     for ln in lines:
         iso, _ = val.parse_expiry(ln["expiry_date"])
@@ -168,9 +255,13 @@ def _to_purchase(doc: models.Document, supplier_id: int, eff: dict, lines: List[
         if mfg:
             it["manufacturing_date"] = mfg
         items.append(it)
+    inp = invoice_inputs(raw_eff, lines) if raw_eff is not None else {}
     return purchase_entry.ManualPurchaseCreate(
         supplier_id=supplier_id, invoice_number=str(eff["invoice_number"]).strip(), invoice_date=eff["invoice_date"],
         payment_status="UNPAID", expected_total=expected_total, items=items,
+        invoice_discount_amount=inp.get("invoice_discount_amount", 0.0), other_charges=inp.get("other_charges", 0.0),
+        interstate=inp.get("interstate", False), prices_include_gst=inp.get("prices_include_gst", False),
+        round_to_rupee=inp.get("round_to_rupee", False), printed_total=inp.get("printed", {}).get("total"),
     )
 
 
@@ -213,18 +304,28 @@ def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
     if supplier and inv_no and purchase_entry.find_duplicate_invoice(db, user_id, supplier.id, inv_no):
         hb("invoice_number", f"Invoice {inv_no} of {supplier.name} is already saved as a purchase.")
 
-    calc = [purchase_entry.calc_line(int(l["quantity"] or 0), int(l["free_qty"] or 0), l["purchase_price"] or 0.0,
-                                     l["discount_percent"] or 0.0, l["gst_rate"] or 0.0) for l in lines
-            if l["quantity"] and l["quantity"] > 0]
-    totals = purchase_entry.calc_totals(calc) if calc else None
+    calc = calculate_document(eff, lines)
     notes = []
     printed = _num(eff["printed_total"])
     total_differs = False
-    if totals and printed:
-        tol = max(TOTAL_TOLERANCE_ABS, TOTAL_TOLERANCE_PCT * printed)
-        if abs(totals["total"] - printed) > tol:
-            total_differs = True
-            notes.append(f"Computed total ₹{totals['total']:.2f} differs from the printed total ₹{printed:.2f}.")
+    totals = None
+    recon = None
+    if calc and calc.get("error"):
+        hb("total", "The invoice figures cannot be calculated: " + calc["error"])
+    elif calc:
+        ct = calc["totals"]
+        totals = {"total": ct["payable"], "taxable": ct["taxable"], "gst": ct["tax"], "discount": ct["discount"], "gross": ct["gross"],
+                  "cgst": ct["cgst"], "sgst": ct["sgst"], "igst": ct["igst"], "other_charges": ct["other_charges"], "round_off": ct["round_off"]}
+        recon = calc["reconciliation"]
+        total_differs = recon["status"] == "REVIEW"
+        notes.extend(calc["inputs"]["notes"])
+        if total_differs:
+            notes.insert(0, f"Calculated total ₹{recon['calculated_total']:.2f} differs from the printed total ₹{recon['printed_total']:.2f} by ₹{abs(recon['difference']):.2f}.")
+            notes.extend(recon["likely_causes"])
+        for l, cl in zip([x for x in lines if x["quantity"] and x["quantity"] > 0 and x["purchase_price"] is not None], calc["lines"]):
+            tp = l.get("total_price")
+            if tp is not None and abs(tp - cl["gross"]) > 1.0 and abs(tp - (cl["gross"] - cl["line_discount"])) > 1.0:
+                l["warnings"].append({"field": "total_price", "message": f"Printed line amount ₹{tp:.2f} differs from quantity × rate ₹{cl['gross']:.2f}."})
     line_block = sum(len(l["blocking"]) for l in lines)
     verified = str(doc.ocr_status or "").lower() == "verified"
     failed = str(doc.ocr_status or "").lower() == "failed"
@@ -239,6 +340,9 @@ def review_view(db: Session, user_id: int, doc: models.Document) -> dict:
         "extracted_supplier_name": eff["ocr"].get("supplier_name"),
         "invoice_number": inv_no or None, "invoice_date": inv_date.isoformat() if inv_date else (eff["invoice_date"] or None),
         "printed_total": printed, "computed": totals, "total_differs": total_differs, "notes": notes,
+        "reconciliation": recon, "header_figures": {k: v for k, v in header_figures(eff).items() if k in ("discount_amount", "other_amount", "discount")},
+        "calculation_policy": calc["policy"] if calc and not calc.get("error") else None,
+        "tax_groups": calc["tax_groups"] if calc and not calc.get("error") else [],
         "line_count": len(lines), "lines": lines, "raw_items": eff["items"], "blocking": blocking, "blocking_count": len(blocking),
         "can_confirm": not blocking and not verified and not failed, "can_edit": not verified,
         "verified": verified, "failed": failed, "draft": _active_draft(db, user_id, doc.id),
@@ -269,6 +373,7 @@ def save_corrections(db: Session, user_id: int, doc: models.Document, header: di
     ocr["corrected"] = {
         "supplier_id": supplier_id, "invoice_number": (header.get("invoice_number") or "").strip() or None,
         "invoice_date": (str(inv_date)[:10] if inv_date else None), "total_amount": header.get("total_amount"),
+        **{k: header.get(k) for k in ("discount_amount", "other_amount", "taxable_amount", "interstate", "prices_include_gst") if header.get(k) is not None},
         "items": clean, "saved_at": datetime.utcnow().isoformat() + "Z", "saved_by": user_id,
     }
     doc.ocr_raw_json = json.dumps(ocr, default=str)
@@ -286,8 +391,13 @@ def save_corrections(db: Session, user_id: int, doc: models.Document, header: di
     return doc
 
 
-def confirm_document(db: Session, user_id: int, doc: models.Document, acknowledge_warnings: bool = False) -> dict:
-    """Confirm & Add to Stock for the document as the review shows it. One transaction, via the purchase engine."""
+def confirm_document(db: Session, user_id: int, doc: models.Document, acknowledge_warnings: bool = False,
+                     override_reason: Optional[str] = None) -> dict:
+    """
+    Confirm & Add to Stock for the document as the review shows it. One transaction, via the purchase engine.
+    A calculated total that does not reconcile with the printed total (beyond the tolerance) is refused unless the user gives
+    a reason; the reason, user, time and both totals are then kept on the document (override_audit).
+    """
     status = str(doc.ocr_status or "").lower()
     if status == "verified":
         raise HTTPException(status_code=409, detail="ALREADY_VERIFIED: This invoice was already confirmed and its stock added. Nothing was posted again.")
@@ -297,15 +407,22 @@ def confirm_document(db: Session, user_id: int, doc: models.Document, acknowledg
     if view["blocking"]:
         first = "; ".join(f"{b['field']}: {b['message']}" for b in view["blocking"][:6])
         raise HTTPException(status_code=422, detail=f"REVIEW_INCOMPLETE: {view['blocking_count']} problem(s) must be fixed first. {first}")
+    reason = (override_reason or "").strip()
+    if view["total_differs"] and len(reason) < 5:
+        recon = view["reconciliation"]
+        raise HTTPException(status_code=409, detail=(
+            f"RECONCILIATION_FAILED: calculated ₹{recon['calculated_total']:.2f} vs printed ₹{recon['printed_total']:.2f} "
+            f"(difference ₹{recon['difference']:+.2f}, tolerance ₹{recon['tolerance']:.2f}). " + " ".join(recon["likely_causes"]) +
+            " Correct the bill details, or confirm with an override reason."))
     below_cost = [f"row {l['row']} {l['product_name']}" for l in view["lines"] if any(w["field"] == "mrp" and "lower than the purchase rate" in w["message"] for w in l["warnings"])]
-    if (view["total_differs"] or below_cost) and not acknowledge_warnings:
-        why = (" ".join(view["notes"]) + (" MRP is below the purchase rate for: " + ", ".join(below_cost) + "." if below_cost else "")).strip()
-        raise HTTPException(status_code=409, detail="NEEDS_ACKNOWLEDGEMENT: " + why + " Check the bill, then confirm again to accept.")
+    if below_cost and not acknowledge_warnings:
+        raise HTTPException(status_code=409, detail="NEEDS_ACKNOWLEDGEMENT: MRP is below the purchase rate for: " + ", ".join(below_cost) +
+                                                    ". Check the bill, then confirm again to accept.")
     eff = effective(doc)
     lines = [_line_view(n, it) for n, it in enumerate(eff["items"], 1)]
     payload = _to_purchase(doc, doc.supplier_id, {"invoice_number": view["invoice_number"], "invoice_date": view["invoice_date"]}, lines,
-                           allow_below_cost=bool(below_cost))
-    res = purchase_entry.post_manual_purchase(db, user_id, payload, document_id=doc.id)
+                           expected_total=view["computed"]["total"] if view["computed"] else None, allow_below_cost=bool(below_cost), raw_eff=eff)
+    res = purchase_entry.post_manual_purchase(db, user_id, payload, document_id=doc.id, override_reason=reason if view["total_differs"] else None)
     return {"message": f"Invoice confirmed: {res['items_count']} medicine line(s) added to stock as {res['voucher_no']}.", **res}
 
 

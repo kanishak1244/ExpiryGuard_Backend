@@ -101,6 +101,27 @@
     return out;
   }
 
+  // Invoice-level inputs (bill discount, charges, tax mode) as the server expects them.
+  function peInvoiceFields(inv) {
+    inv = inv || {};
+    const v = num(inv.discount);
+    return {
+      invoice_discount_percent: inv.discountMode === 'percent' ? v : 0,
+      invoice_discount_amount: inv.discountMode === 'percent' ? 0 : v,
+      other_charges: num(inv.other), interstate: !!inv.interstate, prices_include_gst: !!inv.inclusive, round_to_rupee: !!inv.round,
+    };
+  }
+
+  // Body of POST /purchases/calc: only the numbers (so an unfinished screen can be calculated by the server).
+  function peBuildCalcBody(inv, rows) {
+    return Object.assign({
+      items: rows.filter(r => !peRowEmpty(r)).map(r => ({
+        quantity: int(r.qty), free_quantity: int(r.free), purchase_rate: num(r.rate), discount_percent: num(r.disc),
+        gst_rate: String(r.gst).trim() === '' ? 12 : num(r.gst),
+      })),
+    }, peInvoiceFields(inv));
+  }
+
   function peBuildPayload(header, rows) {
     const items = rows.filter(r => !peRowEmpty(r)).map(r => {
       const o = {
@@ -121,7 +142,10 @@
     });
     return {
       supplier_id: header.supplierId, invoice_number: String(header.invoiceNo).trim(), invoice_date: header.invoiceDate,
-      payment_status: header.paymentStatus || 'UNPAID', expected_total: peCalcTotals(rows).total, items,
+      payment_status: header.paymentStatus || 'UNPAID',
+      // the total the server calculated for what is on screen (the screen never invents its own); local value only as a fallback
+      expected_total: header.serverTotal != null ? header.serverTotal : peCalcTotals(rows).total, items,
+      ...peInvoiceFields(header.invoice),
       ...(header.draftId ? { draft_id: header.draftId } : {}),
     };
   }
@@ -133,7 +157,7 @@
       supplier_id: header.supplierId || null, invoice_number: String(header.invoiceNo || '').trim() || null,
       invoice_date: header.invoiceDate || null,
       payload: { header: { supplierId: header.supplierId || null, supplierName: header.supplierName || '', invoiceNo: header.invoiceNo || '',
-        invoiceDate: header.invoiceDate || '', paymentStatus: header.paymentStatus || 'UNPAID' }, rows: clean },
+        invoiceDate: header.invoiceDate || '', paymentStatus: header.paymentStatus || 'UNPAID', invoice: header.invoice || {} }, rows: clean },
     };
     if (draftId) { body.draft_id = draftId; if (version) body.expected_version = version; }
     return body;
@@ -207,6 +231,6 @@
 
   return {
     PE_COLS, PE_DETAIL_COLS, PE_DRAFT_KEY, peNewRow, peRowEmpty, peCalcLine, peCalcTotals, peParseExpiry, peTodayISO,
-    peValidateRows, peBuildPayload, peBuildDraftBody, peRestoreDraft, peApplyMedicine, peNextCell, peDraftStore,
+    peValidateRows, peBuildPayload, peInvoiceFields, peBuildCalcBody, peBuildDraftBody, peRestoreDraft, peApplyMedicine, peNextCell, peDraftStore,
   };
 });

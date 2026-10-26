@@ -363,8 +363,16 @@
               <label class="form-label">Invoice Date</label>
               <input type="date" id="modal-inv-date" class="form-input">
             </div>
+            <div class="form-group">
+              <label class="form-label">Bill discount (₹) as printed</label>
+              <input type="number" step="0.01" id="modal-inv-discount" class="form-input" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Other charges (₹)</label>
+              <input type="number" step="0.01" id="modal-inv-other" class="form-input" placeholder="0">
+            </div>
             <div class="form-group" style="grid-column: span 2;">
-              <label class="form-label">Total Amount (₹)</label>
+              <label class="form-label">Printed invoice total (₹)</label>
               <input type="number" step="0.01" id="modal-inv-total" class="form-input">
             </div>
           </div>
@@ -595,6 +603,7 @@
         docData.invoice_number = view.invoice_number || docData.invoice_number;
         docData.invoice_date = view.invoice_date || docData.invoice_date;
         docData.total_amount = view.printed_total != null ? view.printed_total : docData.total_amount;
+        docData._header = view.header_figures || {};
         populateReviewModalWithDoc(docData);
         document.getElementById('split-modal-title').textContent = `Edit Bill Details: ${docData.title}`;
         document.getElementById('split-review-modal').classList.add('active');
@@ -817,6 +826,8 @@
       document.getElementById('modal-inv-number').value = docData.invoice_number || '';
       document.getElementById('modal-inv-date').value = docData.invoice_date || '';
       document.getElementById('modal-inv-total').value = docData.total_amount || 0.0;
+      document.getElementById('modal-inv-discount').value = (docData._header && docData._header.discount_amount) || '';
+      document.getElementById('modal-inv-other').value = (docData._header && docData._header.other_amount) || '';
 
       // Automated Supplier Matching & Linking
       resolveAndDisplaySupplierMatch(docData);
@@ -947,6 +958,8 @@
           invoice_number: document.getElementById('modal-inv-number').value.trim() || null,
           invoice_date: document.getElementById('modal-inv-date').value || null,
           total_amount: num(document.getElementById('modal-inv-total').value),
+          discount_amount: num(document.getElementById('modal-inv-discount').value),
+          other_amount: num(document.getElementById('modal-inv-other').value),
         },
         items,
       };
@@ -1017,6 +1030,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.6" defer></script>
-  <script src="js/doc_review.js?v=1.4" defer></script>
+  <script src="js/doc_review.js?v=1.5" defer></script>
 </body>
 </html>

@@ -48,15 +48,58 @@
     if (focus) focusCell(focus.row, focus.col);
   }
 
-  function updateTotals() {
-    const t = peCalcTotals(state.rows);
-    $('pe-t-count').textContent = t.count;
-    $('pe-t-sub').textContent = money(t.subtotal);
+  // Totals come from the server (POST /purchases/calc: the one calculation); the screen does not compute a competing total.
+  function readInvoice() {
+    state.header.invoice = { discount: $('pe-inv-disc').value, discountMode: $('pe-inv-disc-mode').value, other: $('pe-inv-other').value,
+      inclusive: $('pe-inv-incl').checked, interstate: $('pe-inv-igst').checked, round: $('pe-inv-round').checked };
+    return state.header.invoice;
+  }
+
+  function writeInvoice(inv) {
+    inv = inv || {};
+    $('pe-inv-disc').value = inv.discount || ''; $('pe-inv-disc-mode').value = inv.discountMode || 'amount'; $('pe-inv-other').value = inv.other || '';
+    $('pe-inv-incl').checked = !!inv.inclusive; $('pe-inv-igst').checked = !!inv.interstate; $('pe-inv-round').checked = !!inv.round;
+  }
+
+  function paintCalc(c) {
+    const t = c.totals;
+    $('pe-t-count').textContent = state.rows.filter(r => !peRowEmpty(r)).length;
+    $('pe-t-sub').textContent = money(t.gross);
     $('pe-t-disc').textContent = money(t.discount);
     $('pe-t-tax').textContent = money(t.taxable);
     $('pe-t-cgst').textContent = money(t.cgst);
     $('pe-t-sgst').textContent = money(t.sgst);
-    $('pe-t-total').textContent = money(t.total);
+    $('pe-t-igst').textContent = money(t.igst);
+    $('pe-t-other').textContent = money(t.other_charges);
+    $('pe-t-round').textContent = money(t.round_off);
+    $('pe-t-total').textContent = money(t.payable);
+    let k = 0;
+    state.rows.forEach((r, i) => {                       // each line's amount as the server calculated it
+      const el = $('pe-amt-' + i);
+      if (el && !peRowEmpty(r) && c.lines[k]) { el.textContent = money(c.lines[k].total); k++; }
+    });
+    $('pe-totals-card').style.opacity = '1';
+  }
+
+  let calcSeq = 0, calcTimer = null;
+  async function calcNow() {
+    const my = ++calcSeq;
+    try {
+      const c = await api.request('/purchases/calc', { method: 'POST', body: JSON.stringify(peBuildCalcBody(readInvoice(), state.rows)) });
+      if (my !== calcSeq) return state.calc;               // a newer calculation is on its way
+      state.calc = c;
+      paintCalc(c);
+      $('pe-calc-err').textContent = '';
+    } catch (e) {
+      if (my === calcSeq) { state.calc = null; $('pe-calc-err').textContent = 'Could not calculate the totals: ' + apiMessage(e); }
+    }
+    return state.calc;
+  }
+
+  function updateTotals() {
+    $('pe-totals-card').style.opacity = '.55';
+    clearTimeout(calcTimer);
+    calcTimer = setTimeout(calcNow, 250);
   }
 
   function focusCell(i, col) {
@@ -422,12 +465,16 @@
     state.header.invoiceNo = $('pe-invoice-no').value;
     state.header.invoiceDate = $('pe-invoice-date').value;
     state.header.paymentStatus = $('pe-payment').value;
+    readInvoice();
   }
 
   window.peSave = async function () {
     if (state.saving || state.posted) return;
     closePop();
     readHeader();
+    clearTimeout(calcTimer);
+    const calc = await calcNow();                         // the total that is saved is the one the server just calculated
+    if (!calc) { showErrors(['The totals could not be calculated, so nothing was saved. Check the numbers and try again.']); return; }
     const problems = collectProblems();
     if (problems.length) { showErrors(problems); return; }
     showErrors([]);
@@ -469,7 +516,7 @@
   };
 
   function post() {
-    const payload = peBuildPayload(Object.assign({}, state.header, { draftId: state.draftId }), state.rows);
+    const payload = peBuildPayload(Object.assign({}, state.header, { draftId: state.draftId, serverTotal: state.calc ? state.calc.totals.payable : null }), state.rows);
     return api.request('/purchases/manual', { method: 'POST', body: JSON.stringify(payload) });
   }
 
@@ -533,6 +580,7 @@
       $('pe-invoice-no').value = state.header.invoiceNo || '';
       $('pe-invoice-date').value = state.header.invoiceDate || peTodayISO();
       $('pe-payment').value = state.header.paymentStatus || 'UNPAID';
+      writeInvoice(state.header.invoice);
       $('pe-supplier').value = state.header.supplierName || '';
       if (state.header.supplierId) setSupplier(state.header.supplierId, state.header.supplierName);
       render(null);
@@ -625,6 +673,10 @@
     $('pe-invoice-date').addEventListener('change', () => { state.header.invoiceDate = $('pe-invoice-date').value; markDirty(); });
     $('pe-invoice-date').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); focusCell(0, 'name'); } });
     $('pe-payment').addEventListener('change', markDirty);
+    ['pe-inv-disc', 'pe-inv-disc-mode', 'pe-inv-other', 'pe-inv-incl', 'pe-inv-igst', 'pe-inv-round'].forEach(id => {
+      $(id).addEventListener('input', () => { markDirty(); updateTotals(); });
+      $(id).addEventListener('change', () => { markDirty(); updateTotals(); });
+    });
     document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 's' && !e.target.closest('#pe-tbody')) { e.preventDefault(); peSave(); } });
     window.addEventListener('beforeunload', (e) => { if (state.dirty && !state.posted) { e.preventDefault(); e.returnValue = ''; } });
 

@@ -111,11 +111,24 @@
         ${item('Medicine lines', v.line_count)}
         ${item('Calculated total', comp ? '₹' + comp : NA)}
       </div>
+      ${v.verified ? '' : drReconHtml(v)}
       ${v.verified ? '' : (v.notes || []).map(n => `<div class="dr-note warn">${esc(n)}</div>`).join('')}
       ${v.draft ? `<div class="dr-note info">Saved as draft <b>${esc(v.draft.reference)}</b>. Find it under Purchase Management → Drafts. Nothing has been added to stock.</div>` : ''}
       ${v.corrected ? '<div class="dr-note info">Showing the corrected details saved for this bill. The original OCR reading is kept.</div>' : ''}
       ${v.ocr_error ? `<div class="dr-note bad">OCR could not read this bill: ${esc(v.ocr_error)}. The original is still available on the left.</div>` : ''}
     </div>`;
+  }
+
+  // How the total was calculated and where it differs from the bill: shown only when it does not reconcile.
+  function drReconHtml(v) {
+    const r = v.reconciliation;
+    if (!r || r.status !== 'REVIEW') return '';
+    const rows = (r.components || []).map(c => `<tr class="${c.ok ? '' : 'dr-rowbad'}"><td>${esc(c.label)}</td><td class="num">${money(c.printed)}</td>
+      <td class="num">${money(c.calculated)}</td><td class="num">${c.difference > 0 ? '+' : ''}${money(c.difference)}</td></tr>`).join('');
+    return `<div class="dr-note warn"><b>Total does not reconcile:</b> printed ₹${money(r.printed_total)}, calculated ₹${money(r.calculated_total)}, difference
+      ${r.difference > 0 ? '+' : ''}₹${money(r.difference)} (tolerance ₹${money(r.tolerance)}).
+      <table class="dr-table" style="margin-top:4px"><thead><tr><th>Part</th><th class="num">Bill</th><th class="num">Calculated</th><th class="num">Diff</th></tr></thead><tbody>${rows}</tbody></table>
+      ${(r.likely_causes || []).map(c => `<div>• ${esc(c)}</div>`).join('')}</div>`;
   }
 
   function drProblemsHtml(v) {
@@ -135,7 +148,7 @@
     };
   }
 
-  const exported = { drExpiryText, drLinesTableHtml, drSummaryHtml, drProblemsHtml, drStatusBadge, drActions, drCell, drTaxable };
+  const exported = { drReconHtml, drExpiryText, drLinesTableHtml, drSummaryHtml, drProblemsHtml, drStatusBadge, drActions, drCell, drTaxable };
   if (typeof document === 'undefined') return exported;
 
   // ------------------------------------------------------------------------------------------------ browser part
@@ -283,17 +296,27 @@
     const lines = v.lines.length;
     const total = v.computed ? '₹' + money(v.computed.total) : '';
     let ack = false;
+    let reason = null;
     const belowCost = v.lines.some(l => (l.warnings || []).some(w => w.field === 'mrp' && /lower than the purchase rate/.test(w.message)));
-    if (v.total_differs || belowCost) {
-      const why = (v.notes || []).concat(belowCost ? ['Some MRPs are lower than the purchase rate.'] : []).join('\n');
-      if (!window.confirm(why + '\n\nCheck the bill. Confirm and add to stock anyway?')) return;
+    if (v.total_differs) {
+      // the calculated total does not match the bill: correct the details, or give a reason (kept in the audit trail)
+      const r = v.reconciliation;
+      reason = window.prompt(`The calculated total ₹${money(r.calculated_total)} does not match the printed total ₹${money(r.printed_total)} (difference ${r.difference > 0 ? '+' : ''}₹${money(r.difference)}).\n\n` +
+        'Best: press Cancel, use Edit Bill Details and fix the figure that is wrong.\nTo add this bill to stock anyway, type the reason (it is recorded with your name and the time):');
+      if (!reason || reason.trim().length < 5) return;
+      reason = reason.trim();
+    }
+    if (belowCost) {
+      if (!window.confirm('Some MRPs are lower than the purchase rate. Check the bill. Confirm and add to stock anyway?')) return;
       ack = true;
+    } else if (v.total_differs) {
+      // already confirmed through the reason above
     } else if (!window.confirm(`Add ${lines} medicine line(s) (${total}) from invoice ${v.invoice_number} to stock and to ${v.supplier.name}'s account?`)) {
       return;
     }
     setBusy(true);
     try {
-      const res = await api.request('/documents/' + S.id + '/confirm-review', { method: 'POST', body: JSON.stringify({ acknowledge_warnings: ack }) });
+      const res = await api.request('/documents/' + S.id + '/confirm-review', { method: 'POST', body: JSON.stringify({ acknowledge_warnings: ack, override_reason: reason }) });
       await loadView();
       flash(res.message + ' ' + 'The original bill stays saved.', 'ok');
     } catch (e) {

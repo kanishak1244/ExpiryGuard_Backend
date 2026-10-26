@@ -222,7 +222,8 @@ def upsert_ocr_draft(db: Session, user_id: int, doc: models.Document, supplier_i
     return view(d, _supplier_name(db, user_id, d.supplier_id))
 
 
-def mark_finalized(db: Session, user_id: int, invoice_id: int, draft_id: Optional[int] = None, document_id: Optional[int] = None) -> None:
+def mark_finalized(db: Session, user_id: int, invoice_id: int, draft_id: Optional[int] = None, document_id: Optional[int] = None,
+                   calculation: Optional[dict] = None) -> None:
     """
     Called by the purchase engine inside its own transaction (no commit here). Turns the draft FINALIZED and links the
     purchase. A draft that is not an open DRAFT of this pharmacy is refused, so a retry or a second tab cannot post twice.
@@ -243,4 +244,12 @@ def mark_finalized(db: Session, user_id: int, invoice_id: int, draft_id: Optiona
     for d in drafts:
         d.status = "FINALIZED"
         d.purchase_invoice_id = invoice_id
+        if calculation is not None:                       # how the posted total was calculated, kept with the draft
+            try:
+                pl = json.loads(d.payload) if d.payload else {}
+                pl = pl if isinstance(pl, dict) else {}
+            except ValueError:
+                pl = {}
+            pl["calculation"] = calculation
+            d.payload = json.dumps(pl, default=str)
         d.finalized_at = datetime.utcnow()

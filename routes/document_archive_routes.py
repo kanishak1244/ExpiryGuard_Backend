@@ -390,6 +390,11 @@ class ReviewHeader(BaseModel):
     invoice_number: Optional[str] = None
     invoice_date: Optional[str] = None
     total_amount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    other_amount: Optional[float] = None
+    taxable_amount: Optional[float] = None
+    interstate: Optional[bool] = None
+    prices_include_gst: Optional[bool] = None
 
 
 class ReviewCorrections(BaseModel):
@@ -412,6 +417,7 @@ def save_document_corrections(
 
 class ConfirmReview(BaseModel):
     acknowledge_warnings: bool = False
+    override_reason: Optional[str] = None
 
 
 @router.post("/documents/{document_id}/confirm-review")
@@ -423,7 +429,8 @@ def confirm_document_review(
 ):
     """Confirm & Add to Stock for the reviewed invoice, through the purchase engine (one transaction, no double posting)."""
     doc = crud.get_document_detail(db=db, document_id=document_id, user_id=current_user.id)
-    return document_review.confirm_document(db, current_user.id, doc, acknowledge_warnings=bool(body and body.acknowledge_warnings))
+    return document_review.confirm_document(db, current_user.id, doc, acknowledge_warnings=bool(body and body.acknowledge_warnings),
+                                           override_reason=body.override_reason if body else None)
 
 
 @router.post("/documents/{document_id}/save-draft")

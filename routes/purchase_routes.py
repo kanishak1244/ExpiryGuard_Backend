@@ -150,6 +150,15 @@ def delete_purchase_draft(
     return purchase_drafts.delete_draft(db, current_user.id, draft_id)
 
 
+@router.post("/purchases/calc")
+def calculate_purchase(
+    data: purchase_entry.CalcRequest,
+    current_user: AuthenticatedUser = Depends(require_permission("PURCHASE_VIEW")),
+):
+    """The authoritative purchase calculation as a preview (saves nothing). The screen shows these totals, it does not compute its own."""
+    return purchase_entry.calculate(data)
+
+
 @router.get("/purchases/check-duplicate")
 def check_duplicate_supplier_invoice(
     supplier_id: int = Query(..., ge=1),

@@ -290,7 +290,7 @@ class TestDocumentReview(unittest.TestCase):
     # ---- confirm
     def test_confirm_posts_purchase_stock_ledger_and_verifies_once(self):
         doc = self.upload()
-        self.set_ocr(doc["id"], items=[ocr_item(0), ocr_item(1, quantity=5, free_qty=1, discount_percent=10)])
+        self.set_ocr(doc["id"], items=[ocr_item(0), ocr_item(1, quantity=5, free_qty=1, discount_percent=10)], total_amount=1624.0)
         r = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(self.status(doc["id"]), "Verified")
@@ -326,14 +326,22 @@ class TestDocumentReview(unittest.TestCase):
                                                                               "invoice_date": date.today().isoformat()}, "items": [ocr_item(0)]})
         self.assertEqual(self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True}).status_code, 200)
 
-    def test_total_difference_and_below_cost_need_acknowledgement(self):
+    def test_total_difference_needs_an_override_reason_that_is_audited(self):
         doc = self.upload()
         self.set_ocr(doc["id"], total_amount=5000.0)
-        r = self.c.post("/documents/%d/confirm-review" % doc["id"])
+        r = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True})
         self.assertEqual(r.status_code, 409)
-        self.assertIn("NEEDS_ACKNOWLEDGEMENT", r.text)
+        self.assertIn("RECONCILIATION_FAILED", r.text)
         self.assertEqual(self.counts()[0], 0)
-        self.assertEqual(self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True}).status_code, 200)
+        ok = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"override_reason": "Supplier bill has a printing error, checked with supplier"})
+        self.assertEqual(ok.status_code, 200, ok.text)
+        d = self.S()
+        raw = json.loads(d.get(models.Document, doc["id"]).ocr_raw_json)
+        d.close()
+        self.assertEqual(raw["override_audit"][0]["by"], 1)
+        self.assertEqual((raw["override_audit"][0]["printed_total"], raw["override_audit"][0]["calculated_total"]), (5000.0, 1120.0))
+        self.assertIn("checked with supplier", raw["override_audit"][0]["reason"])
+        self.assertEqual(raw["calculation"]["totals"]["payable"], 1120.0)
 
     def test_verified_document_cannot_be_edited_or_rerun(self):
         doc = self.upload()
@@ -366,7 +374,7 @@ class TestDocumentReview(unittest.TestCase):
         self.assertEqual((b["hsn_code"], b["gst_rate"]), ("3004", 12.0))
         self.assertTrue(any(x["field"] == "gst_rate" for x in c["blocking"]))
         self.assertFalse(v["can_confirm"])
-        self.set_ocr(doc["id"], items=[ocr_item(0, hsn_code="", gst_rate=12.0), ocr_item(1, hsn_code="3004", gst_rate=None)])
+        self.set_ocr(doc["id"], items=[ocr_item(0, hsn_code="", gst_rate=12.0), ocr_item(1, hsn_code="3004", gst_rate=None)], total_amount=2240.0)
         r = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True})
         self.assertEqual(r.status_code, 200, r.text)
         d = self.S()
