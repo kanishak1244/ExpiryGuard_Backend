@@ -8626,7 +8626,25 @@ def quick_batch_probe(db: Session, user_id: int, candidates: List[str], text: Op
                 continue
             if _canonical_batch(plain) in canon_text and b not in contained_hits:
                 contained_hits.append(b)
-    return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits, "contained": contained_hits}
+
+    # tail: OCR lost the leading characters ("U27174" for 28027174). The read must be 5+ characters that are the END of a
+    # stocked batch of 7+ characters (a leading wrong character is allowed, up to 3 characters missing). Offered for the
+    # pharmacist to confirm only; the app uses it only when it is the single hit.
+    tail_hits: List[str] = []
+    if not (exact_hits or alike_hits or near_hits or contained_hits):
+        stocked_canon = [(b, _canonical_batch(b)) for b in index["exact"].keys() if len(_canonical_batch(b)) >= 7]
+        for raw in candidates[:16]:
+            c = re.sub(r"[^A-Z0-9]", "", (raw or "").strip().upper())
+            if len(c) < 5:
+                continue
+            cc = _canonical_batch(c)
+            for b, cb in stocked_canon:
+                for read in (cc, cc[1:]):
+                    if len(read) >= 5 and len(cb) > len(read) and len(cb) - len(read) <= 3 and cb.endswith(read):
+                        if b not in tail_hits:
+                            tail_hits.append(b)
+                        break
+    return {"exact": exact_hits, "lookalike": alike_hits, "near": near_hits, "contained": contained_hits, "tail": tail_hits}
 
 
 # ===========================

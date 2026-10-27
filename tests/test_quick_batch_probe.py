@@ -39,6 +39,16 @@ class QuickBatchProbeTest(unittest.TestCase):
     def test_near_not_used_when_exact_or_lookalike_found(self):
         self.assertEqual(self.probe("NL2533", "2027174")["near"], [])
 
+    def test_leading_characters_lost_gives_a_tail_hit_only_when_nothing_closer_exists(self):
+        self.assertEqual(self.probe("U27174")["tail"], ["28027174"])       # "28" lost and the next character misread
+        self.assertEqual(self.probe("027174")["tail"], ["28027174"])
+        self.assertEqual(self.probe("2027174")["tail"], [])                # a one-character-off read is "near", not "tail"
+        self.assertEqual(self.probe("7174")["tail"], [])                   # too short to mean anything
+        self.assertEqual(self.probe("U27174", "NL2533")["tail"], [])       # an exact hit wins
+
+    def test_tail_never_returns_a_batch_the_read_does_not_end_like(self):
+        self.assertEqual(self.probe("U27175")["tail"], [])
+
     def test_junk_does_not_match(self):
         r = self.probe("202873", "155.96", "XYZ999")
         self.assertEqual((r["exact"], r["lookalike"], r["near"]), ([], [], []))
