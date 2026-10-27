@@ -35,7 +35,7 @@ class _LazyGeminiClientProxy:
             raise ValueError(
                 "GEMINI_API_KEY is missing or invalid. Please configure a valid Google Gemini API Key in your environment variables."
             )
-        self._instance = genai.Client(api_key=key.strip())
+        self._instance = genai.Client(api_key=key.strip(), http_options=types.HttpOptions(timeout=int(os.getenv('GEMINI_TIMEOUT_SECONDS', '60')) * 1000))   # a stuck AI call must not hold a worker forever
         return self._instance
 
     def __getattr__(self, name):

@@ -42,6 +42,7 @@ if is_supabase_pooler:
         pool_recycle=1800,
         pool_use_lifo=True,
         pool_pre_ping=True,
+        pool_timeout=15,        # fail fast with a clear error instead of queueing a request for 30 s behind a full pool
         connect_args={"prepare_threshold": None, "connect_timeout": 10},
     )
 else:
@@ -50,6 +51,7 @@ else:
         pool_size=10,
         max_overflow=20,
         pool_pre_ping=True,
+        pool_timeout=15,        # fail fast with a clear error instead of queueing a request for 30 s behind a full pool
         pool_use_lifo=True,
         pool_recycle=1800,
         connect_args={"connect_timeout": 10},

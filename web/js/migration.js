@@ -169,6 +169,7 @@ function startMigrationTracking(migrationId) {
     try {
       const token = localStorage.getItem('token');
       const resp = await fetch(`/api/migration/status/${migrationId}`, {
+        signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       if (resp.ok) {

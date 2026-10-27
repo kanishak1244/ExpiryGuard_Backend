@@ -5,6 +5,7 @@ background database warmup, exception handling, and mounts all domain APIRouters
 """
 
 import os
+import time
 import json
 import logging
 from typing import Optional, List, Dict, Any
@@ -99,6 +100,10 @@ app.add_middleware(
 )
 
 
+slow_log = logging.getLogger("expiryguard.slow")
+SLOW_REQUEST_SECONDS = float(os.getenv("SLOW_REQUEST_SECONDS", "3"))
+
+
 # Security Headers & CSRF Protection Middleware
 @app.middleware("http")
 async def add_security_headers_and_csrf_guard(request: Request, call_next):
@@ -117,7 +122,11 @@ async def add_security_headers_and_csrf_guard(request: Request, call_next):
                         content={"detail": "CSRF origin check failed. State-changing request blocked."}
                     )
 
+    started = time.perf_counter()
     response = await call_next(request)
+    took = time.perf_counter() - started
+    if took > SLOW_REQUEST_SECONDS:
+        slow_log.warning("slow request: %s %s took %.1fs status=%s", request.method, request.url.path, took, response.status_code)   # path only: no query string, no body
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"

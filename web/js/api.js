@@ -199,13 +199,43 @@ class ApiClient {
     this.requestLogout();
   }
 
+  // fetch that can never hang the app: aborts after timeoutMs. A timed-out write is NOT retried (it may have been saved).
+  async fetchWithTimeout(url, config, timeoutMs) {
+    const ctl = new AbortController();
+    const outer = config && config.signal;
+    if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', () => ctl.abort(), { once: true }); }
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      return await fetch(url, Object.assign({}, config, { signal: ctl.signal }));
+    } catch (err) {
+      if (err && err.name === 'AbortError' && !(outer && outer.aborted)) {
+        const method = String((config && config.method) || 'GET').toUpperCase();
+        const e = new Error(method === 'GET'
+          ? 'The server is taking too long to respond. Your work on this screen is kept; please try again.'
+          : 'The server did not answer in time. This action may or may not have been saved: check before doing it again.');
+        e.code = 'REQUEST_TIMEOUT';
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  requestTimeoutMs(endpoint, config) {
+    const method = String((config && config.method) || 'GET').toUpperCase();
+    if (config && config.body instanceof FormData) return 180000;            // uploads / OCR
+    if (/\/(ocr|scan|import|export|report|backup|migration)/i.test(endpoint)) return 120000;
+    return method === 'GET' ? 30000 : 60000;
+  }
+
   async ensureAuthenticated(forceRefresh = false) {
     if (!forceRefresh && this.getToken()) return this.getToken();
     try {
       if (forceRefresh) {
         localStorage.removeItem(this.tokenKey);
       }
-      const res = await fetch(`${API_BASE_URL}/auth/session`, { credentials: 'include' });
+      const res = await this.fetchWithTimeout(`${API_BASE_URL}/auth/session`, { credentials: 'include' }, 15000);
       if (res.ok) {
         const data = await res.json();
         if (data.access_token) {
@@ -249,7 +279,8 @@ class ApiClient {
     };
 
     try {
-      let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+      const timeoutMs = this.requestTimeoutMs(endpoint, config);
+      let response = await this.fetchWithTimeout(`${API_BASE_URL}${endpoint}`, config, timeoutMs);
 
       if (response.status === 401) {
         localStorage.removeItem(this.tokenKey);
@@ -259,7 +290,7 @@ class ApiClient {
           if (typeof bodyBuilder === 'function') {
             config.body = bodyBuilder();
           }
-          response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+          response = await this.fetchWithTimeout(`${API_BASE_URL}${endpoint}`, config, timeoutMs);
         }
         if (response.status === 401) {
           this.showLoginModal();
@@ -850,11 +881,11 @@ class ApiClient {
     const endpoint = `/reports/export/sales?re_export=${reExport}`;
     const headers = await this.getHeaders(false);
     const isFileOrigin = (window.location.protocol === 'file:' || !window.location.origin || window.location.origin === 'null');
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       credentials: isFileOrigin ? 'omit' : 'include',
       headers
-    });
+    }, 120000);
 
     if (!response.ok) {
       const errText = await response.text();
