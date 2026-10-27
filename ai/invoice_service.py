@@ -598,9 +598,21 @@ def _scan_uncached(image_items: List[Tuple[bytes, str]], user_id: Optional[int])
     try:
         r1 = _call_gemini(INVOICE_PROMPT, image_items, calls)
     except Exception as e:
-        logger.warning("[INVOICE] first reading failed: %s", type(e).__name__)
+        # the exception text of the AI service (no bill content, no key) so a failure can be diagnosed from the log
+        logger.warning("[INVOICE] first reading failed: %s: %s", type(e).__name__, str(e)[:300])
         log_ai_metrics("/scan-invoice", "invoice", GEMINI_PRIMARY_MODEL, False, False, time.time() - t0, error=type(e).__name__)
-        return _manual_entry("The invoice could not be read. Please retake the photo or enter the bill manually.", "gemini_failed", calls.n)
+        low = f"{type(e).__name__} {e}".lower()
+        if "timeout" in low or "timed out" in low or "deadline" in low:
+            why = "The AI service took too long to answer. Please press Run / Retry OCR once, or enter the bill manually."
+        elif any(k in low for k in ("429", "quota", "resource_exhausted", "rate")):
+            why = "The AI service is busy or its free quota is used up right now. Please try again in a minute, or enter the bill manually."
+        elif any(k in low for k in ("503", "unavailable", "overloaded", "500", "502", "504")):
+            why = "The AI service is temporarily unavailable. Please press Run / Retry OCR in a minute, or enter the bill manually."
+        elif any(k in low for k in ("api key", "api_key", "401", "403", "permission", "not found", "404")):
+            why = "The AI service is not set up correctly (key or model). The bill was kept; please enter it manually and tell support."
+        else:
+            why = "The invoice could not be read. Please retake the photo or enter the bill manually."
+        return _manual_entry(why, "gemini_failed", calls.n)
 
     items1, printed1 = _parse_pass(r1)
     if not items1:
