@@ -157,11 +157,14 @@
     if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
   }
 
+  // Reusable medicine data only. The prices are REFERENCE values from earlier records; batch, expiry and quantity are never shown.
   function medItems(list, term) {
+    const money = v => (v != null && Number(v) > 0) ? '₹' + Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-';
     const items = list.map(m => ({
       med: m,
-      html: `${esc(m.product_name)}${m.brand ? ' · ' + esc(m.brand) : ''}<small>${m.source === 'shop' ? 'In your inventory' : 'Medicine catalog'}` +
-        `${m.composition ? ' · ' + esc(m.composition) : ''}${m.batches && m.batches.length ? ' · batches: ' + m.batches.map(b => esc(b.batch_number)).join(', ') : ''}</small>`,
+      html: `${esc(m.product_name)}${m.brand ? ' · ' + esc(m.brand) : ''}<small>` +
+        `Last buy ${money(m.last_purchase_rate)} · Sell ${money(m.selling_rate != null ? m.selling_rate : m.mrp)} · MRP ${money(m.mrp)}` +
+        `${m.composition ? ' · ' + esc(m.composition) : ''}${m.source === 'shop' ? '' : ' · catalog'}</small>`,
     }));
     items.push({ add: true, name: term, html: `+ Add New Medicine${term ? ' “' + esc(term) + '”' : ''} (F2)` });
     return items;
@@ -196,12 +199,12 @@
     if (item.add) { openMedicineModal(i, item.name); return; }
     const r = state.rows[i];
     const m = item.med;
-    r._batches = m.batches || [];
+    r._batches = [];                           // a new purchase has its own batch, expiry and quantity: nothing is copied
+    r.batch = ''; r.expiry = ''; r.mfg = ''; r.qty = ''; r.free = '';
     peApplyMedicine(r, m);
     closePop();
     markDirty();
-    render({ row: i, col: 'batch' });          // the search text is gone with the popup; the next row stays empty
-    showBatchPop(i);
+    render({ row: i, col: 'batch' });          // the next cell to fill in is the batch number, empty
   }
 
   function pickBatch(i, item) {

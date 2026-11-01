@@ -149,6 +149,9 @@ def warmup_database():
                 logger.info("[Startup] Scheduler disabled by ENABLE_SCHEDULER.")
             else:
                 start_scheduler()
+                # trigram indexes for the medicine suggestions (idempotent, background, PostgreSQL only)
+                import threading, purchase_entry
+                threading.Thread(target=purchase_entry.ensure_search_indexes, daemon=True).start()
         except Exception as sched_err:
             logger.warning(f"[Startup] Scheduler start notice: {sched_err}")
 

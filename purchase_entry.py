@@ -22,7 +22,7 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 import crud
@@ -170,61 +170,114 @@ def check_duplicate(db: Session, user_id: int, supplier_id: int, invoice_number:
     }
 
 
+def _like_escape(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def search_medicines(db: Session, user_id: int, q: str, limit: int = 12) -> list:
     """
-    Suggestions for the medicine cell: this shop's medicines first (with their batches, last cost, MRP and pack data),
-    then catalog medicines the shop does not have yet. Read-only.
+    Medicine-master suggestions for the manual purchase grid. Read-only, server-side, indexed.
+
+    The master is every medicine this shop ever registered (every non-deleted stock record, WHATEVER its stock: zero,
+    out of stock, expired, no live batch) plus the global catalog. Stock is never used as a filter.
+    A medicine appears once. Names that START with the text come first, then names that contain it, then matches on
+    manufacturer / composition. Only reusable medicine data is returned (name, manufacturer, composition, pack, HSN, GST
+    and the previous purchase rate / MRP as REFERENCE); no batch number, expiry, quantity or any other batch data.
     """
     term = (q or "").strip()
     if len(term) < 2:
         return []
-    like = f"%{term.lower()}%"
-    P = models.Product
-    rows = (
-        db.query(P).filter(P.user_id == user_id, P.is_deleted == False, or_(
-            func.lower(P.product_name).like(like), func.lower(func.coalesce(P.brand, "")).like(like),
-            func.lower(func.coalesce(P.composition, "")).like(like), func.coalesce(P.barcode, "") == term))
-        .order_by(P.product_name, P.expiry_date.desc()).limit(200).all()
+    limit = max(1, min(int(limit or 12), 30))
+    esc_term = _like_escape(term.lower())
+    contains, prefix = f"%{esc_term}%", f"{esc_term}%"
+    P, C = models.Product, models.MedicineCatalog
+
+    def rank(name_col):
+        return case((name_col.ilike(prefix, escape="\\"), 0), (name_col.ilike(contains, escape="\\"), 1), else_=2)
+
+    # --- this shop's medicines: one row per medicine name, best rank first
+    key = func.lower(func.trim(P.product_name))
+    shop_rank = rank(P.product_name)
+    names = (
+        db.query(key.label("k"), func.min(shop_rank).label("r"))
+        .filter(P.user_id == user_id, P.is_deleted == False, or_(
+            P.product_name.ilike(contains, escape="\\"), func.coalesce(P.brand, "").ilike(contains, escape="\\"),
+            func.coalesce(P.composition, "").ilike(contains, escape="\\"), func.coalesce(P.barcode, "") == term))
+        .group_by(key).order_by(func.min(shop_rank), key).limit(limit).all()
     )
-    by_name = {}
-    for p in rows:
-        key = p.product_name.strip().lower()
-        entry = by_name.get(key)
-        if entry is None:
-            if len(by_name) >= limit:
-                continue
-            entry = by_name[key] = {
-                "source": "shop", "product_id": p.id, "catalog_id": None, "product_name": p.product_name, "brand": p.brand,
-                "composition": p.composition, "pack_size_label": p.pack_size_label,
-                "units_per_pack": p.units_per_pack or p.tablets_per_strip, "hsn_code": p.hsn_code,
-                "gst_rate": p.gst_rate, "barcode": p.barcode, "last_purchase_rate": p.purchase_price,
-                "mrp": p.unit_price, "batches": [],
-            }
-        if len(entry["batches"]) < 8:
-            entry["batches"].append({
-                "product_id": p.id, "batch_number": p.batch_number, "expiry_date": p.expiry_date.isoformat() if p.expiry_date else None,
-                "quantity": p.quantity, "mrp": p.unit_price, "purchase_price": p.purchase_price,
-            })
-    out = list(by_name.values())
-    if len(out) < limit:
-        C = models.MedicineCatalog
-        catalog = (
-            db.query(C).filter(or_(func.lower(C.product_name).like(like), func.lower(func.coalesce(C.brand, "")).like(like),
-                                   func.lower(func.coalesce(C.composition, "")).like(like)))
-            .order_by(func.lower(C.product_name).like(term.lower() + "%").desc(), C.product_name).limit(limit).all()
-        )
-        for c in catalog:
-            if c.product_name.strip().lower() in by_name:
-                continue
-            out.append({
-                "source": "catalog", "product_id": None, "catalog_id": c.id, "product_name": c.product_name, "brand": c.brand,
-                "composition": c.composition, "pack_size_label": c.pack_size_label,
-                "units_per_pack": c.units_per_pack or c.tablets_per_strip, "hsn_code": c.hsn_code, "gst_rate": c.gst_rate,
-                "barcode": None, "last_purchase_rate": None, "mrp": c.default_price or None, "batches": [],
-            })
-            if len(out) >= limit:
-                break
-    return out
+    shop_out = []
+    if names:
+        ranks = {n.k: n.r for n in names}
+        rows = (db.query(P).filter(P.user_id == user_id, P.is_deleted == False, key.in_(list(ranks)))
+                .order_by(P.id.desc()).all())                       # newest record first
+        by_name = {}
+        for p in rows:
+            by_name.setdefault(p.product_name.strip().lower(), []).append(p)
+        for k, plist in by_name.items():
+            latest = plist[0]
+            pick = lambda attr: next((getattr(x, attr) for x in plist if getattr(x, attr)), None)   # newest non-empty value
+            rate, mrp = pick("purchase_price"), pick("unit_price")
+            shop_out.append((ranks.get(k, 2), 0, k, {
+                "source": "shop", "product_id": latest.id, "catalog_id": None, "product_name": latest.product_name,
+                "brand": pick("brand"), "composition": pick("composition"), "pack_size_label": pick("pack_size_label"),
+                "units_per_pack": pick("units_per_pack") or pick("tablets_per_strip"), "hsn_code": latest.hsn_code,
+                "gst_rate": latest.gst_rate, "barcode": pick("barcode"),
+                "last_purchase_rate": rate, "mrp": mrp, "selling_rate": mrp,     # the selling rate is the MRP in DawaiFlow
+                "batches": [],                                                   # batch data is never suggested
+            }))
+    seen = {k for _, _, k, _ in shop_out}
+
+    # --- global catalog, medicines this shop does not have
+    cat_rank = rank(C.product_name)
+    catalog = (
+        db.query(C, cat_rank.label("r"))
+        .filter(or_(C.product_name.ilike(contains, escape="\\"), func.coalesce(C.brand, "").ilike(contains, escape="\\"),
+                    func.coalesce(C.composition, "").ilike(contains, escape="\\")))
+        .order_by(cat_rank, C.product_name).limit(limit + len(seen)).all()
+    )
+    cat_out = []
+    for c, r in catalog:
+        k = c.product_name.strip().lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        cat_out.append((r, 1, k, {
+            "source": "catalog", "product_id": None, "catalog_id": c.id, "product_name": c.product_name, "brand": c.brand,
+            "composition": c.composition, "pack_size_label": c.pack_size_label,
+            "units_per_pack": c.units_per_pack or c.tablets_per_strip, "hsn_code": c.hsn_code, "gst_rate": c.gst_rate,
+            "barcode": None, "last_purchase_rate": None, "mrp": c.default_price or None, "selling_rate": c.default_price or None,
+            "batches": [],
+        }))
+    merged = sorted(shop_out + cat_out, key=lambda x: (x[0], x[1], x[2]))
+    return [m[3] for m in merged[:limit]]
+
+
+def ensure_search_indexes() -> None:
+    """
+    Trigram (pg_trgm) indexes so '%text%' suggestions stay fast with 50,000+ medicines. PostgreSQL only; every statement is
+    IF NOT EXISTS and a failure is logged and ignored (search still works, just slower).
+    """
+    try:
+        from database import engine
+        if engine.dialect.name != "postgresql":
+            return
+        stmts = [
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+            "CREATE INDEX IF NOT EXISTS idx_products_trgm_name ON products USING gin (product_name gin_trgm_ops)",
+            "CREATE INDEX IF NOT EXISTS idx_products_trgm_brand ON products USING gin (brand gin_trgm_ops)",
+            "CREATE INDEX IF NOT EXISTS idx_products_trgm_comp ON products USING gin (composition gin_trgm_ops)",
+            "CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_name ON medicine_catalog USING gin (product_name gin_trgm_ops)",
+            "CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_brand ON medicine_catalog USING gin (brand gin_trgm_ops)",
+            "CREATE INDEX IF NOT EXISTS idx_med_cat_trgm_comp ON medicine_catalog USING gin (composition gin_trgm_ops)",
+        ]
+        for sql in stmts:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(sql))
+            except Exception as e:                       # e.g. extension not permitted: keep going, search still works
+                logger.warning("[Search indexes] %s -> %s", sql.split(" ON ")[0][:70], str(e)[:120])
+    except Exception as e:
+        logger.warning("[Search indexes] skipped: %s", str(e)[:120])
 
 
 def _bad(detail: str, code: int = 400):

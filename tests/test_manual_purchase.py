@@ -238,7 +238,7 @@ class TestManualPurchase(unittest.TestCase):
     def test_medicine_search_shop_first_then_catalog(self):
         res = self.c.get("/purchases/medicine-search?q=dolo").json()
         self.assertEqual(res[0]["source"], "shop")
-        self.assertEqual(res[0]["batches"][0]["batch_number"], "D1")
+        self.assertEqual(res[0]["batches"], [])          # batch data is never suggested (a new purchase has its own batch)
         self.assertEqual(res[0]["last_purchase_rate"], 60.0)
         cat = self.c.get("/purchases/medicine-search?q=augmentin").json()
         self.assertEqual((cat[0]["source"], cat[0]["catalog_id"]), ("catalog", 1))
