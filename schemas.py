@@ -194,6 +194,27 @@ class ProductUpdate(BaseModel):
     price_per_unit: Optional[float] = None
 
 
+class ProductDetailsPatch(BaseModel):
+    """Partial edit of one stock batch from Live Inventory: only the fields that are sent are changed."""
+    product_name: Optional[str] = Field(default=None, max_length=200)
+    brand: Optional[str] = Field(default=None, max_length=200)
+    category: Optional[str] = Field(default=None, max_length=100)
+    composition: Optional[str] = Field(default=None, max_length=300)
+    pack_size_label: Optional[str] = Field(default=None, max_length=100)
+    tablets_per_strip: Optional[int] = Field(default=None, ge=0, le=10000)
+    units_per_pack: Optional[int] = Field(default=None, ge=0, le=10000)
+    batch_number: Optional[str] = Field(default=None, max_length=100)
+    expiry_date: Optional[Any] = None
+    manufacturing_date: Optional[Any] = None
+    quantity: Optional[int] = Field(default=None, ge=0, le=10000000)
+    mrp: Optional[float] = Field(default=None, ge=0, le=10000000)
+    purchase_price: Optional[float] = Field(default=None, ge=0, le=10000000)
+    loose_tablet_price: Optional[float] = Field(default=None, ge=0, le=10000000)
+    gst_rate: Optional[float] = Field(default=None, ge=0, le=40)
+    hsn_code: Optional[str] = Field(default=None, max_length=12)
+    confirm_mrp_below_cost: bool = False
+
+
 class BulkGstUpdate(BaseModel):
     hsn_code: str
     gst_rate: float = Field(ge=0.0, le=28.0)

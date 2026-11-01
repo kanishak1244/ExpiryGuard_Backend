@@ -253,6 +253,19 @@ def update_product(
     return updated
 
 
+@router.patch("/products/{product_id}/details")
+def patch_product_details(
+    product_id: int,
+    body: schemas.ProductDetailsPatch,
+    current_user: AuthenticatedUser = Depends(require_permission("INVENTORY_EDIT")),
+    db: Session = Depends(get_db),
+):
+    """Edit one stock batch (Live Inventory 'Edit'): partial update, ownership-checked, duplicate-safe."""
+    result = crud.patch_product_details(db, product_id, body, current_user.id)
+    fast_cache.invalidate_user(current_user.id)
+    return result
+
+
 @router.put("/products/{product_id}/quantity")
 def update_product_quantity(
     product_id: int,

@@ -582,9 +582,11 @@ window.changeInventoryPageSize = function(newSize) {
   fetchInventoryPage();
 };
 
+let inventoryFetchSeq = 0;
 async function fetchInventoryPage() {
   const tbody = document.getElementById('inventory-table-body');
   if (!tbody) return;
+  const fetchSeq = ++inventoryFetchSeq;      // only the newest request may draw the table
 
   const searchVal = (document.getElementById('inventory-search')?.value || '').trim();
 
@@ -596,6 +598,7 @@ async function fetchInventoryPage() {
       search: searchVal,
     });
 
+    if (fetchSeq !== inventoryFetchSeq) return;   // a newer page / filter / search was asked for meanwhile
     let items = [];
     if (Array.isArray(res)) {
       items = res;
@@ -805,9 +808,12 @@ function medRenderPanel(p, state) {
   else if (state === 'error') stateLine = '<div class="med-detail-error">Could not load the other batches. <button type="button" class="btn btn-secondary" style="padding:2px 8px;font-size:12px;" onclick="medRetryBatches()">Retry</button></div>';
   else if (!complete) stateLine = '<div class="med-detail-note">Showing batches on this page.</div>';
 
+  panel.setAttribute('data-med-id', String(p.id));     // the record shown, by id (never by name)
+  const editBtn = document.getElementById('inventory-page')
+    ? `<button type="button" class="btn btn-secondary med-edit-btn" style="padding:2px 10px;font-size:12px;" onclick="medOpenEdit(${Number(p.id)})">✎ Edit</button>` : '';
   panel.innerHTML = `
     <div class="med-detail-head">
-      <span class="med-detail-title">${medText(p.product_name)}</span>
+      <span class="med-detail-title">${medText(p.product_name)}</span>${editBtn}
       <span class="med-detail-sub">${medText(p.category)}${p.batch_number ? ' · batch ' + medText(p.batch_number) : ''}</span>
     </div>
     <div class="med-detail-summary">MRP ${medMoney(mrp)} · Batch ${medText(p.batch_number)} · Exp ${medText(p.expiry_date)}${medIsExpired(p) ? ' <span class="badge badge-danger">Expired</span>' : ''} · Stock ${medNum(p.quantity) === null ? '-' : medNum(p.quantity)} · GST ${pct(gstRaw)} · HSN ${medText(p.hsn_code)}</div>
@@ -912,6 +918,126 @@ function medShowPanel(force) {
   medRenderPanel(p, 'ready');
   medScheduleFetch(p);
 }
+// ---- Edit one stock batch (Live Inventory) -------------------------------------------------------------
+const MED_EDIT_FIELDS = [
+  // key, label, type, group, owner-only
+  ['product_name', 'Medicine name', 'text'], ['brand', 'Manufacturer / company', 'text'],
+  ['composition', 'Generic name / composition', 'text'], ['category', 'Category', 'text'],
+  ['pack_size_label', 'Packaging / unit label', 'text'], ['tablets_per_strip', 'Tablets per strip', 'number'],
+  ['units_per_pack', 'Units per pack', 'number'], ['batch_number', 'Batch number', 'text'],
+  ['expiry_date', 'Expiry date', 'date'], ['quantity', 'Quantity (strips / packs)', 'number'],
+  ['mrp', 'MRP / sale rate (₹)', 'number'], ['purchase_price', 'Purchase rate (₹)', 'number', true],
+  ['loose_tablet_price', 'Loose tablet price (₹)', 'number'], ['gst_rate', 'GST (%)', 'number'],
+  ['hsn_code', 'HSN code', 'text'],
+];
+
+function medEditValue(p, key) {
+  if (key === 'mrp') return p.unit_price;
+  if (key === 'expiry_date') return p.expiry_date ? String(p.expiry_date).slice(0, 10) : '';
+  if (key === 'gst_rate') return p.gst_rate !== undefined && p.gst_rate !== null ? p.gst_rate : p.gst_percentage;
+  return p[key];
+}
+
+// Looks the record up by its ID in the rows of this page, then in the ticked (locked) rows.
+function medRecordById(id) {
+  return medDetail.rows.get(id) || medDetail.lockedRows.get(id) || null;
+}
+
+window.medOpenEdit = function(id) {
+  const p = medRecordById(Number(id));
+  if (!p) return;
+  const owner = medIsOwnerView();
+  let host = document.getElementById('med-edit-modal');
+  if (host) host.remove();
+  host = document.createElement('div');
+  host.id = 'med-edit-modal';
+  host.className = 'modal-overlay active';
+  const fields = MED_EDIT_FIELDS.filter(f => !f[3] || owner).map(f => {
+    const v = medEditValue(p, f[0]);
+    const val = (v === null || v === undefined) ? '' : String(v);
+    const step = f[2] === 'number' ? ' step="any" min="0"' : '';
+    return `<div class="form-group" style="margin:0"><label class="form-label" for="med-edit-${f[0]}">${f[1]}</label>
+      <input id="med-edit-${f[0]}" class="form-input" type="${f[2]}"${step} data-key="${f[0]}" data-orig="${window.escapeHtml(val)}" value="${window.escapeHtml(val)}"></div>`;
+  }).join('');
+  host.innerHTML = `<div class="modal-card" style="max-width:720px;max-height:90vh;overflow:auto">
+    <div class="modal-header"><h3 class="panel-title">Edit ${window.escapeHtml(p.product_name || 'medicine')} · batch ${window.escapeHtml(p.batch_number || '-')}</h3>
+      <button type="button" class="btn btn-secondary" style="padding:2px 8px" onclick="medCloseEdit()">✕</button></div>
+    <form id="med-edit-form" novalidate>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:8px 0">${fields}</div>
+      <div id="med-edit-error" class="med-detail-error" style="display:none"></div>
+      <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px">
+        <button type="button" class="btn btn-secondary" onclick="medCloseEdit()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="med-edit-save">Save changes</button></div>
+    </form></div>`;
+  document.body.appendChild(host);
+  const form = host.querySelector('#med-edit-form');
+  form.addEventListener('submit', (ev) => { ev.preventDefault(); medSaveEdit(p.id); });
+  host.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') medCloseEdit(); });
+  const first = host.querySelector('input'); if (first) first.focus();
+};
+window.medCloseEdit = function() { const h = document.getElementById('med-edit-modal'); if (h) h.remove(); };
+
+// Only the fields the user changed are sent; the server edits exactly this batch id.
+function medCollectEdit() {
+  const body = {};
+  const problems = [];
+  document.querySelectorAll('#med-edit-form input[data-key]').forEach(inp => {
+    const key = inp.dataset.key;
+    const raw = inp.value.trim();
+    if (raw === inp.dataset.orig.trim()) return;
+    if (inp.type === 'number') {
+      if (raw === '') { if (['tablets_per_strip', 'units_per_pack', 'loose_tablet_price'].includes(key)) body[key] = 0; else problems.push(inp.previousElementSibling.textContent + ' is required'); return; }
+      const n = Number(raw);
+      if (!isFinite(n) || n < 0) { problems.push(inp.previousElementSibling.textContent + ' must be a number, 0 or more'); return; }
+      if (['quantity', 'tablets_per_strip', 'units_per_pack'].includes(key) && !Number.isInteger(n)) { problems.push(inp.previousElementSibling.textContent + ' must be a whole number'); return; }
+      if (key === 'mrp' && n <= 0) { problems.push('MRP must be more than 0'); return; }
+      if (key === 'gst_rate' && n > 40) { problems.push('GST must be between 0 and 40'); return; }
+      body[key] = n;
+    } else {
+      if (key === 'product_name' && !raw) { problems.push('Medicine name is required'); return; }
+      if (key === 'expiry_date' && !raw) { problems.push('Expiry date is required'); return; }
+      if (key === 'hsn_code' && raw && !/^\d{4,8}$/.test(raw.replace(/\s/g, ''))) { problems.push('HSN must be 4 to 8 digits'); return; }
+      body[key] = raw;
+    }
+  });
+  return { body, problems };
+}
+
+async function medSaveEdit(id, confirmBelowCost) {
+  const errBox = document.getElementById('med-edit-error');
+  const saveBtn = document.getElementById('med-edit-save');
+  const showErr = (m) => { if (errBox) { errBox.textContent = m; errBox.style.display = 'block'; } };
+  const { body, problems } = medCollectEdit();
+  if (problems.length) { showErr(problems.join('. ') + '.'); return; }
+  if (!Object.keys(body).length) { medCloseEdit(); return; }
+  if (confirmBelowCost) body.confirm_mrp_below_cost = true;
+  if (saveBtn) saveBtn.disabled = true;                       // one save at a time
+  try {
+    const saved = await api.request(`/products/${id}/details`, { method: 'PATCH', body: JSON.stringify(body) });
+    medCloseEdit();
+    medDetail.batchCache.clear();
+    try { localStorage.removeItem('expiryguard_cached_inventory'); localStorage.removeItem('expiryguard_cached_billing_products'); } catch (e) {}
+    if (saved && saved.id !== undefined) {
+      medDetail.rows.set(saved.id, saved);
+      if (medDetail.lockedRows.has(saved.id)) medDetail.lockedRows.set(saved.id, saved);
+    }
+    if (typeof showToastNotification === 'function') showToastNotification('Medicine updated.', true);
+    medShowPanel(true);                                       // the panel shows the saved record at once
+    if (typeof fetchInventoryPage === 'function') fetchInventoryPage();   // and the table is refreshed from the server
+    if (typeof loadIntelligence === 'function') { try { loadIntelligence(); } catch (e) {} }
+  } catch (err) {
+    const msg = String(err && err.message || err);
+    if (/MRP_BELOW_COST/.test(msg) && confirm('The MRP is lower than the purchase rate. Check both. Save anyway?')) {
+      if (saveBtn) saveBtn.disabled = false;
+      return medSaveEdit(id, true);
+    }
+    const m = msg.replace(/^API Error \(\d+\):\s*/, '');
+    let detail = m; try { detail = JSON.parse(m).detail || m; } catch (e) {}
+    showErr(detail.replace(/^[A-Z_]+:\s*/, ''));
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
 // A checkbox was ticked / unticked (or the selection was cleared): lock to the newest ticked medicine.
 window.medOnCheckChange = function(id, checked) {
   medDetail.lockOrder = medDetail.lockOrder.filter(x => x !== id);

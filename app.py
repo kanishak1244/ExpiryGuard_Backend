@@ -127,6 +127,8 @@ async def add_security_headers_and_csrf_guard(request: Request, call_next):
     took = time.perf_counter() - started
     if took > SLOW_REQUEST_SECONDS:
         slow_log.warning("slow request: %s %s took %.1fs status=%s", request.method, request.url.path, took, response.status_code)   # path only: no query string, no body
+    if request.url.path.startswith("/web/") and request.url.path.endswith((".html", "/")):
+        response.headers["Cache-Control"] = "no-cache"      # the page (and its script version numbers) is rechecked on every open
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"

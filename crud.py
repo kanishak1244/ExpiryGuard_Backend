@@ -8701,3 +8701,98 @@ def get_price_review(db: Session, user_id: int, limit: int = 500) -> dict:
             "reason_text": text,
         })
     return {"total": len(items), "counts": counts, "items": items}
+
+
+def patch_product_details(db: Session, product_id: int, patch: "schemas.ProductDetailsPatch", user_id: int) -> dict:
+    """
+    Edits ONE stock batch (identified by its id and the shop) from Live Inventory. Only the fields that were sent
+    change; nothing else on the record (image, OCR text, supplier / document links, history) is touched. A change
+    that would make this batch a duplicate of another batch (same medicine name and batch number) is refused.
+    """
+    prod = get_product(db, product_id, user_id)
+    if prod is None:
+        raise HTTPException(status_code=404, detail="Product not found for this shop.")
+    sent = patch.model_dump(exclude_unset=True)
+    confirm = bool(sent.pop("confirm_mrp_below_cost", False))
+
+    def clean(v):
+        v = (v or "").strip() if isinstance(v, str) else v
+        return v or None
+
+    if "product_name" in sent:
+        name = (sent["product_name"] or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Medicine name cannot be empty.")
+        prod.product_name = name
+    for field in ("brand", "composition", "pack_size_label"):
+        if field in sent:
+            setattr(prod, field, clean(sent[field]))
+    if "category" in sent:
+        prod.category = clean(sent["category"]) or prod.category or "General"
+    if "tablets_per_strip" in sent:
+        prod.tablets_per_strip = sent["tablets_per_strip"] or None
+    if "units_per_pack" in sent:
+        prod.units_per_pack = sent["units_per_pack"] or None
+    if "batch_number" in sent:
+        prod.batch_number = clean(sent["batch_number"])
+    if "expiry_date" in sent:
+        raw_exp = sent["expiry_date"]
+        # parse_date() quietly substitutes "+2 years" for text it cannot read; an edit must never do that.
+        if isinstance(raw_exp, str) and not re.match(
+            r"^\s*(\d{4}[-/]\d{1,2}([-/]\d{1,2})?|\d{1,2}[-/]\d{1,2}[-/]\d{4}|\d{1,2}[-/]\d{4})\s*$", raw_exp
+        ):
+            raise HTTPException(status_code=422, detail="Expiry date is not a valid date (use YYYY-MM-DD).")
+        expiry = parse_date(raw_exp)
+        if expiry is None:
+            raise HTTPException(status_code=422, detail="Expiry date is not a valid date.")
+        prod.expiry_date = expiry
+        prod.days_remaining, prod.status = calculate_product_status(expiry)
+    if "manufacturing_date" in sent:
+        prod.manufacturing_date = parse_date(sent["manufacturing_date"]) if sent["manufacturing_date"] else None
+    if "quantity" in sent:
+        prod.quantity = sent["quantity"]
+    if "purchase_price" in sent:
+        prod.purchase_price = float(sent["purchase_price"] or 0)
+    if "loose_tablet_price" in sent:
+        prod.loose_tablet_price = float(sent["loose_tablet_price"]) if sent["loose_tablet_price"] else None
+    if "gst_rate" in sent and sent["gst_rate"] is not None:
+        prod.gst_rate = float(sent["gst_rate"])
+        prod.gst_percentage = float(sent["gst_rate"])
+    if "hsn_code" in sent:
+        hsn = (sent["hsn_code"] or "").strip().replace(" ", "")
+        if hsn and not hsn.isdigit():
+            raise HTTPException(status_code=422, detail="HSN code must contain digits only.")
+        if hsn and not 4 <= len(hsn) <= 8:
+            raise HTTPException(status_code=422, detail="HSN code must have 4 to 8 digits.")
+        prod.hsn_code = hsn or prod.hsn_code or "3004"
+    if "mrp" in sent or "purchase_price" in sent:
+        mrp_in = sent["mrp"] if "mrp" in sent else prod.unit_price
+        prod.unit_price = validate_mrp(mrp_in, prod.purchase_price, name=prod.product_name, explicit_mrp=True,
+                                       confirm_below_cost=confirm)
+        prod.price_last_updated = datetime.utcnow()
+    prod.total_price = float(prod.quantity or 0) * float(prod.unit_price or 0)
+
+    # No duplicate of another batch: same medicine name and same non-empty batch number in this shop.
+    if prod.batch_number:
+        dup = (
+            db.query(models.Product.id)
+            .filter(
+                models.Product.user_id == user_id,
+                models.Product.is_deleted == False,
+                models.Product.id != prod.id,
+                func.lower(func.trim(models.Product.product_name)) == prod.product_name.strip().lower(),
+                func.lower(func.trim(models.Product.batch_number)) == prod.batch_number.strip().lower(),
+            )
+            .first()
+        )
+        if dup:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail=f"DUPLICATE_BATCH: '{prod.product_name}' already has a batch '{prod.batch_number}'. Change the batch number or edit that batch instead.",
+            )
+
+    db.commit()
+    db.refresh(prod)
+    invalidate_products_cache(user_id)
+    return serialize_product(prod)
