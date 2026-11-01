@@ -134,7 +134,17 @@ ipcMain.on('app-print', (event, options) => {
 });
 
 // App Lifecycle
-app.whenReady().then(createWindow);
+// The app is the live website: start from a clean HTTP cache so a new release of the web pages and scripts is
+// used at once instead of a copy cached by an earlier session.
+app.whenReady().then(async () => {
+  try {
+    const { session } = require('electron');
+    await session.defaultSession.clearCache();
+  } catch (e) {
+    console.warn('[DawaiFlow Desktop] Could not clear the cache:', e && e.message);
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
