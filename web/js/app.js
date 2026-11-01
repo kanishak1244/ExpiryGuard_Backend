@@ -703,7 +703,14 @@ function renderInventoryRows(items) {
 const medDetail = {
   rows: new Map(),          // id -> item of the rendered page
   order: [],                // ids in display order
+  // Two independent things (Live Inventory):
+  //   selectedId = the FOCUSED row (arrow keys / hover / row click). It never touches a checkbox.
+  //   lockOrder  = ids whose checkbox the user ticked, oldest first; the newest still-ticked one LOCKS the
+  //                details panel. lockedRows keeps its data so it survives paging and filtering.
   selectedId: null,
+  lockOrder: [],
+  lockedRows: new Map(),
+  shownId: null,            // what the panel currently shows (to skip pointless re-renders)
   batchCache: new Map(),    // normalised name -> array of batch rows (all pages)
   inflight: new Map(),      // normalised name -> promise
   fetchTimer: null,
@@ -860,21 +867,64 @@ function medScheduleFetch(p) {
   if (medDetail.batchCache.has(key)) return;
   const seq = ++medDetail.fetchSeq;
   medDetail.fetchTimer = setTimeout(async () => {
-    if (seq !== medDetail.fetchSeq || medDetail.selectedId !== p.id) return;
+    if (seq !== medDetail.fetchSeq || medShownId() !== p.id) return;
     medRenderPanel(p, 'loading');
     try {
       await medFetchBatches(p);
-      if (seq === medDetail.fetchSeq && medDetail.selectedId === p.id) medRenderPanel(p, 'ready');
+      if (seq === medDetail.fetchSeq && medShownId() === p.id) medRenderPanel(p, 'ready');
     } catch (e) {
-      if (seq === medDetail.fetchSeq && medDetail.selectedId === p.id) medRenderPanel(p, 'error');
+      if (seq === medDetail.fetchSeq && medShownId() === p.id) medRenderPanel(p, 'error');
     }
   }, 250);
 }
 
 window.medRetryBatches = function() {
-  const p = medDetail.rows.get(medDetail.selectedId);
+  const p = medShownItem();
   if (p) medScheduleFetch(p);
 };
+
+// The newest still-ticked medicine, or null. Drops ids that are no longer ticked (unticked, deleted, cleared).
+function medLockedId() {
+  if (typeof selectedStockIds === 'undefined') return null;
+  medDetail.lockOrder = medDetail.lockOrder.filter(id => selectedStockIds.has(id));
+  for (const id of [...medDetail.lockedRows.keys()]) {
+    if (!selectedStockIds.has(id)) medDetail.lockedRows.delete(id);
+  }
+  return medDetail.lockOrder.length ? medDetail.lockOrder[medDetail.lockOrder.length - 1] : null;
+}
+// What the panel shows: the locked (ticked) medicine if there is one, otherwise the focused row.
+function medShownId() {
+  const locked = medLockedId();
+  return locked !== null ? locked : medDetail.selectedId;
+}
+function medShownItem() {
+  const id = medShownId();
+  if (id === null || id === undefined) return null;
+  return medDetail.rows.get(id) || medDetail.lockedRows.get(id) || null;
+}
+// Shows what medShownItem() says, from data already in memory; only fetches other batches when not cached.
+function medShowPanel(force) {
+  const p = medShownItem();
+  const id = p ? p.id : null;
+  if (!force && id === medDetail.shownId) return;
+  medDetail.shownId = id;
+  if (!p) { medRenderPanel(null); return; }
+  medRenderPanel(p, 'ready');
+  medScheduleFetch(p);
+}
+// A checkbox was ticked / unticked (or the selection was cleared): lock to the newest ticked medicine.
+window.medOnCheckChange = function(id, checked) {
+  medDetail.lockOrder = medDetail.lockOrder.filter(x => x !== id);
+  if (checked) {
+    medDetail.lockOrder.push(id);
+    const row = medDetail.rows.get(id);
+    if (row) medDetail.lockedRows.set(id, row);
+  } else {
+    medDetail.lockedRows.delete(id);
+  }
+  medShowPanel();
+};
+window.medSyncLock = function() { medShowPanel(); };
 
 function medSelect(id, opts) {
   if (id === medDetail.selectedId) return;
@@ -888,8 +938,8 @@ function medSelect(id, opts) {
     if (opts && opts.scroll) tr.scrollIntoView({ block: 'nearest' });
   }
   medDetail.selectedId = id;
-  medRenderPanel(p, 'ready');
-  medScheduleFetch(p);
+  // Focus only: a ticked (locked) medicine keeps the panel until it is unticked.
+  if (medLockedId() === null) medShowPanel();
 }
 
 // Collapse / expand the pinned panel (remembered per browser). Safe to call more than once.
@@ -916,9 +966,10 @@ window.medInitPanelToggle = function() {
 
 // Used by Create New Bill: show a medicine that the page already has in memory (no request).
 window.medShowForBilling = function(p) {
-  if (!p) { medDetail.selectedId = null; medRenderPanel(null); return; }
+  if (!p) { medDetail.selectedId = null; medDetail.shownId = null; medRenderPanel(null); return; }
   medDetail.rows = new Map([[p.id, p]]);
   medDetail.selectedId = p.id;
+  medDetail.shownId = p.id;
   medRenderPanel(p, 'ready');
 };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => window.medInitPanelToggle());
@@ -983,8 +1034,12 @@ function medOnRowsRendered(items) {
   medWire();
   const keep = medDetail.rows.has(medDetail.selectedId) ? medDetail.selectedId : null;
   medDetail.selectedId = null;
+  // Refresh the data of locked medicines that are on this page (prices / stock may have changed).
+  for (const id of medDetail.lockedRows.keys()) {
+    if (medDetail.rows.has(id)) medDetail.lockedRows.set(id, medDetail.rows.get(id));
+  }
   if (keep !== null) medSelect(keep);
-  else medRenderPanel(null);
+  medShowPanel(true);          // the locked medicine (if any) stays shown across paging and filtering
 }
 window.medInvalidateBatchCache = function() { medDetail.batchCache.clear(); };
 
@@ -1141,6 +1196,7 @@ function onStockSelectionChange(productId, isChecked) {
   } else {
     selectedStockIds.delete(productId);
   }
+  if (typeof window.medOnCheckChange === 'function') window.medOnCheckChange(productId, isChecked);
   updateSelectionUI();
 }
 
@@ -1165,6 +1221,7 @@ function updateSelectionUI() {
   const selectAll = document.getElementById('select-all-stock');
 
   if (countSpan) countSpan.textContent = count;
+  if (typeof window.medSyncLock === 'function') window.medSyncLock();   // selection cleared / deleted: back to the focused row
 
   if (btnDeleteSelected) {
     btnDeleteSelected.style.display = count > 0 ? 'inline-flex' : 'none';
