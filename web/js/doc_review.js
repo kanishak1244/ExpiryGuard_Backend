@@ -1,8 +1,8 @@
 /**
  * Documents & OCR: side-by-side invoice review workspace.
  *   left  : the ORIGINAL uploaded bill (fetched with the user's login, never a public URL), zoom / open larger
- *   right : read-only supplier + invoice summary and the extracted medicine lines as a table
- *   bar   : Edit Bill Details (opens the correction editor, which saves corrections only) · Back · Confirm & Add to Stock
+ *   right : supplier + invoice summary and the extracted medicine lines as a table
+ *   bar   : Edit Bill Details (the same panel turns editable in place; Save Corrections saves corrections only) · Back · Confirm & Add to Stock
  * Reading and rendering here changes nothing. Stock is posted only by the explicit Confirm, on the server.
  * The pure render helpers are exported for Node tests.
  */
@@ -151,12 +151,111 @@
     };
   }
 
-  const exported = { drReconHtml, drExpiryText, drLinesTableHtml, drSummaryHtml, drProblemsHtml, drStatusBadge, drActions, drCell, drTaxable };
+  // ---- Edit Bill Details, inline: pure helpers (state -> html, state -> save body), exported for tests ----------------
+  // [key, label, input type, td class, required for stock]
+  const EDIT_COLS = [
+    ['product_name', 'Medicine', 'text', 'name', true], ['brand', 'Company', 'text', '', false], ['pack_size_label', 'Packing', 'text', '', false],
+    ['hsn_code', 'HSN', 'text', '', false], ['gst_rate', 'GST %', 'number', 'num', true], ['batch_number', 'Batch', 'text', '', true],
+    ['expiry_date', 'Expiry', 'text', '', true], ['quantity', 'Qty', 'number', 'num', true], ['free_qty', 'Free', 'number', 'num', false],
+    ['purchase_price', 'Rate', 'number', 'num', true], ['mrp', 'MRP', 'number', 'num', true], ['discount_percent', 'Disc %', 'number', 'num', false],
+    ['total_price', 'Amount', 'number', 'num', false],
+  ];
+  const EDIT_NUMBERS = EDIT_COLS.filter(c => c[2] === 'number').map(c => c[0]);
+
+  function drBlankRow() {
+    const r = { _problems: {} };
+    EDIT_COLS.forEach(c => { r[c[0]] = ''; });
+    return r;
+  }
+
+  // The editor's working copy: the invoice header and one editable row per extracted line (server problems kept per field).
+  function drEditStart(view, suppliers) {
+    const list = (suppliers || []).slice();
+    if (view.supplier && !list.some(s => Number(s.id) === Number(view.supplier.id))) list.push(view.supplier);
+    const h = view.header_figures || {};
+    return {
+      suppliers: list, supplier_id: view.supplier ? view.supplier.id : null, invoice_number: view.invoice_number || '', invoice_date: view.invoice_date || '',
+      total_amount: view.printed_total == null ? '' : view.printed_total, discount_amount: h.discount_amount == null ? '' : h.discount_amount,
+      other_amount: h.other_amount == null ? '' : h.other_amount, dirty: false,
+      items: (view.raw_items || []).map((it, i) => {
+        const row = Object.assign({}, it);
+        const gst = row.gst_rate != null ? row.gst_rate : row.gst_percentage;
+        row.gst_rate = gst == null ? '' : gst;
+        row._gst0 = row.gst_rate;                                           // to tell whether the user set the rate
+        row._problems = {};
+        ((view.lines[i] || {}).blocking || []).forEach(b => { row._problems[b.field] = b.message; });
+        EDIT_COLS.forEach(c => { if (row[c[0]] == null) row[c[0]] = ''; });
+        return row;
+      }),
+    };
+  }
+
+  // The body of PUT /review-data (and /save-draft): blank stays blank (null), nothing is invented, and the calculation stays on the server.
+  function drBuildBody(ed) {
+    const num = (v) => { if (v === '' || v == null) return null; const n = parseFloat(v); return isFinite(n) ? n : null; };
+    const txt = (v) => (String(v == null ? '' : v).trim() || null);
+    const items = [];
+    ed.items.forEach(r => {
+      if (!txt(r.product_name) && !txt(r.batch_number) && !txt(r.expiry_date) && !txt(r.quantity)) return;     // an untouched blank row
+      const o = {};
+      Object.keys(r).forEach(k => { if (k.charAt(0) !== '_') o[k] = r[k]; });
+      EDIT_COLS.forEach(c => { o[c[0]] = c[2] === 'number' ? num(r[c[0]]) : txt(r[c[0]]); });
+      o.gst_verified = r.gst_rate !== '' && r.gst_rate != null && (String(r.gst_rate) !== String(r._gst0) || r.gst_verified === true);
+      o.field_flags = {};
+      items.push(o);
+    });
+    return {
+      header: {
+        supplier_id: ed.supplier_id ? Number(ed.supplier_id) : null, invoice_number: txt(ed.invoice_number), invoice_date: txt(ed.invoice_date),
+        total_amount: num(ed.total_amount), discount_amount: num(ed.discount_amount), other_amount: num(ed.other_amount),
+      },
+      items,
+    };
+  }
+
+  function drEditSummaryHtml(ed, view) {
+    view = view || {};
+    const opts = ed.suppliers.map(s => `<option value="${esc(s.id)}"${Number(s.id) === Number(ed.supplier_id) ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+    const bill = view.extracted_supplier_name ? `<span class="dr-sub">&nbsp;· bill says <b>${esc(view.extracted_supplier_name)}</b></span>` : '';
+    const field = (label, key, type, extra) => `<label class="dr-f${extra && extra.wide ? ' wide' : ''}"><span>${label}</span>
+      <input class="dr-in${extra && extra.req && String(ed[key] == null ? '' : ed[key]).trim() === '' ? ' bad' : ''}" id="dr-e-${key}" data-h="${key}" type="${type}"${type === 'number' ? ' step="any" min="0"' : ''} value="${esc(ed[key])}" oninput="drEditHead(this)"></label>`;
+    return `<div class="dr-summary dr-edit-head">
+      <div class="dr-note info" style="margin:0 0 8px">Editing bill details against the original on the left. <b>Save Corrections</b> does not add anything to stock; only <b>Confirm &amp; Add to Stock</b> does.</div>
+      <div class="dr-fields">
+        <label class="dr-f wide"><span>Supplier ${bill}</span>
+          <span class="dr-supsel"><select class="dr-in${ed.supplier_id ? '' : ' bad'}" id="dr-e-supplier" onchange="drEditSupplier(this)"><option value="">-- Select supplier --</option>${opts}</select>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="drEditNewSupplier()">+ New</button></span></label>
+        ${field('Supplier invoice no.', 'invoice_number', 'text', { req: true })}
+        ${field('Invoice date', 'invoice_date', 'date', { req: true })}
+        ${field('Printed invoice total (₹)', 'total_amount', 'number')}
+        ${field('Bill discount (₹)', 'discount_amount', 'number')}
+        ${field('Other charges (₹)', 'other_amount', 'number')}
+      </div></div>`;
+  }
+
+  function drEditCellHtml(row, i, col) {
+    const key = col[0], v = row[key] == null ? '' : row[key];
+    const prob = row._problems && row._problems[key];
+    const empty = col[4] && String(v).trim() === '';
+    const title = prob || (empty ? col[1] + ' is required' : '');
+    return `<td class="${col[3]} c-${key}"><input class="dr-in${prob || empty ? ' bad' : ''}" data-r="${i}" data-k="${key}" data-req="${col[4] ? 1 : 0}" type="${col[2]}"${col[2] === 'number' ? ' step="any" min="0"' : ''} value="${esc(v)}"${title ? ` title="${esc(title)}"` : ''} aria-label="${esc(col[1])}, row ${i + 1}" oninput="drEditCell(this)"></td>`;
+  }
+
+  function drEditTableHtml(ed) {
+    const head = `<tr><th class="n">#</th>${EDIT_COLS.map(c => `<th class="${c[3]}">${c[1]}${c[4] ? ' *' : ''}</th>`).join('')}<th></th></tr>`;
+    const rows = ed.items.map((r, i) => `<tr><td class="n">${i + 1}</td>${EDIT_COLS.map(c => drEditCellHtml(r, i, c)).join('')}
+      <td><button type="button" class="btn btn-secondary dr-del" onclick="drEditDelRow(${i})" title="Delete this row" aria-label="Delete row ${i + 1}">🗑️</button></td></tr>`).join('');
+    return `<table class="dr-table dr-edit-table"><thead>${head}</thead><tbody>${rows}</tbody></table>
+      ${ed.items.length ? '' : '<div class="dr-empty">No medicine lines yet. Add them from the original bill on the left.</div>'}
+      <div class="dr-addrow"><button type="button" class="btn btn-secondary" onclick="drEditAddRow()">+ Add medicine</button> <small class="dr-sub">* needed before the bill can be added to stock</small></div>`;
+  }
+
+  const exported = { drEditStart, drBuildBody, drBlankRow, drEditSummaryHtml, drEditTableHtml, EDIT_COLS, drReconHtml, drExpiryText, drLinesTableHtml, drSummaryHtml, drProblemsHtml, drStatusBadge, drActions, drCell, drTaxable };
   if (typeof document === 'undefined') return exported;
 
   // ------------------------------------------------------------------------------------------------ browser part
   const $ = (id) => document.getElementById(id);
-  const S = { id: null, view: null, blobUrl: null, blobType: null, zoom: 1, busy: false };
+  const S = { id: null, view: null, edit: null, blobUrl: null, blobType: null, zoom: 1, busy: false };
 
   async function fetchOriginal(id) {
     const headers = await api.getHeaders(false);
@@ -206,7 +305,7 @@
 
   function setBusy(b) {
     S.busy = b;
-    ['dr-btn-confirm', 'dr-btn-edit', 'dr-btn-ocr', 'dr-btn-draft'].forEach(id => { const e = $(id); if (e) e.disabled = b; });
+    ['dr-btn-confirm', 'dr-btn-edit', 'dr-btn-ocr', 'dr-btn-draft', 'dr-btn-save', 'dr-btn-cancel'].forEach(id => { const e = $(id); if (e) e.disabled = b; });
   }
 
   function paint() {
@@ -217,6 +316,9 @@
     $('dr-lines').innerHTML = drLinesTableHtml(v.lines);
     $('dr-problems').innerHTML = drProblemsHtml(v);
     const a = drActions(v);
+    $('dr-workspace').classList.remove('dr-editing');
+    $('dr-btn-save').style.display = 'none';
+    $('dr-btn-cancel').style.display = 'none';
     $('dr-btn-edit').style.display = a.edit ? '' : 'none';
     $('dr-btn-draft').style.display = a.draft ? '' : 'none';
     $('dr-btn-confirm').style.display = a.confirm ? '' : 'none';
@@ -233,6 +335,7 @@
 
   window.openReviewWorkspace = async function (id) {
     S.id = id;
+    S.edit = null;
     $('docs-list-view').style.display = 'none';
     $('dr-workspace').style.display = 'block';
     $('dr-preview').innerHTML = '<div class="dr-pv-msg">Loading original bill…</div>';
@@ -248,6 +351,8 @@
   };
 
   window.drBack = function () {
+    if (S.edit && S.edit.dirty && !window.confirm('You have unsaved changes to this bill. Leave without saving?')) return;
+    leaveEdit();
     revoke();
     S.id = null;
     $('dr-workspace').style.display = 'none';
@@ -331,11 +436,6 @@
     } finally { setBusy(false); }
   };
 
-  window.drEdit = function (focus) {
-    if (!S.id || !S.view || !S.view.can_edit) return;
-    if (typeof openCorrectionEditor === 'function') openCorrectionEditor(S.id, S.view, focus);
-  };
-
   function draftFlash(res) {
     const ref = res && res.draft ? res.draft.reference : 'the draft';
     flash(`Saved as draft ${ref}. It is listed under Purchase Management → Drafts. Nothing was added to stock.`, 'ok');
@@ -343,6 +443,7 @@
 
   // Save as Draft from the read-only review: keeps the bill's current details as an open purchase draft.
   window.drSaveDraft = async function () {
+    if (S.edit) return persistEdit(true);                  // editing: keep the typed corrections with the draft
     if (!S.id || S.busy) return;
     setBusy(true);
     try {
@@ -353,6 +454,96 @@
       flash(apiMsg(e) + ' The bill and its details are unchanged.', 'bad');
     } finally { setBusy(false); }
   };
+
+
+  // ---- inline editing (browser) ----------------------------------------------------------------------------------
+  // S.edit is the working copy while editing; it is thrown away by Cancel and replaced by the server's review after a save.
+  function paintEdit() {
+    $('dr-workspace').classList.add('dr-editing');
+    $('dr-right-top').innerHTML = drEditSummaryHtml(S.edit, S.view);
+    $('dr-lines').innerHTML = drEditTableHtml(S.edit);
+    $('dr-problems').innerHTML = '';
+    ['dr-btn-edit', 'dr-btn-confirm', 'dr-btn-ocr'].forEach(id => { $(id).style.display = 'none'; });
+    ['dr-btn-save', 'dr-btn-cancel', 'dr-btn-draft'].forEach(id => { $(id).style.display = ''; });
+  }
+
+  function leaveEdit() { S.edit = null; $('dr-workspace').classList.remove('dr-editing'); }
+
+  window.drEdit = async function (focus) {
+    if (!S.id || !S.view || !S.view.can_edit || S.busy) return;
+    if (!S.edit) {
+      let suppliers = [];
+      try { suppliers = await api.getSuppliers(); } catch (e) { /* the linked supplier is still offered */ }
+      S.edit = drEditStart(S.view, suppliers);
+      $('dr-flash').style.display = 'none';
+      paintEdit();
+    }
+    if (focus === 'supplier' && $('dr-e-supplier')) $('dr-e-supplier').focus();
+  };
+
+  window.drEditHead = function (el) { S.edit[el.dataset.h] = el.value; S.edit.dirty = true; el.classList.toggle('bad', el.value.trim() === '' && /invoice_number|invoice_date/.test(el.dataset.h)); };
+  window.drEditSupplier = function (el) { S.edit.supplier_id = el.value ? Number(el.value) : null; S.edit.dirty = true; el.classList.toggle('bad', !el.value); };
+  window.drEditCell = function (el) {
+    const row = S.edit.items[Number(el.dataset.r)], key = el.dataset.k;
+    row[key] = el.value;
+    delete row._problems[key];                                              // the user is fixing it
+    S.edit.dirty = true;
+    const bad = el.dataset.req === '1' && el.value.trim() === '';
+    el.classList.toggle('bad', bad);
+    if (!bad) el.removeAttribute('title');
+  };
+  window.drEditAddRow = function () {
+    S.edit.items.push(drBlankRow());
+    S.edit.dirty = true;
+    const box = $('dr-lines');
+    box.innerHTML = drEditTableHtml(S.edit);
+    const last = box.querySelector(`input[data-r="${S.edit.items.length - 1}"][data-k="product_name"]`);
+    if (last) { last.scrollIntoView({ block: 'nearest' }); last.focus(); }
+  };
+  window.drEditDelRow = function (i) {
+    S.edit.items.splice(i, 1);
+    S.edit.dirty = true;
+    const box = $('dr-lines'), top = box.scrollTop, left = box.scrollLeft;
+    box.innerHTML = drEditTableHtml(S.edit);
+    box.scrollTop = top; box.scrollLeft = left;
+  };
+  window.drEditNewSupplier = async function () {
+    const name = window.prompt('New supplier name:', (S.view && S.view.extracted_supplier_name) || '');
+    if (!name || !name.trim()) return;
+    try {
+      const s = await api.createSupplier({ name: name.trim() });
+      if (!S.edit.suppliers.some(x => Number(x.id) === Number(s.id))) S.edit.suppliers.push(s);
+      S.edit.supplier_id = s.id; S.edit.dirty = true;
+      $('dr-right-top').innerHTML = drEditSummaryHtml(S.edit, S.view);
+    } catch (e) { flash('Could not create the supplier: ' + apiMsg(e), 'bad'); }
+  };
+
+  // Save Corrections / Save as Draft from the editor. Both send the same body; the server recalculates and returns the review.
+  async function persistEdit(asDraft) {
+    if (!S.id || !S.edit || S.busy) return;
+    const body = drBuildBody(S.edit);
+    setBusy(true);
+    flash('Saving…', 'info');
+    try {
+      if (asDraft) {
+        const res = await api.request('/documents/' + S.id + '/save-draft', { method: 'POST', body: JSON.stringify(body) });
+        leaveEdit(); S.view = res.review; paint(); draftFlash(res);
+      } else {
+        const view = await api.request('/documents/' + S.id + '/review-data', { method: 'PUT', body: JSON.stringify(body) });
+        leaveEdit(); S.view = view; paint();
+        flash('Corrections saved. Nothing was added to stock yet; review the recalculated details and confirm when ready.', 'ok');
+      }
+    } catch (e) {
+      flash(apiMsg(e) + ' Your entries are still on this screen.', 'bad');     // the editor stays open with everything typed
+    } finally { setBusy(false); }
+  }
+  window.drEditSave = function () { return persistEdit(false); };
+  window.drEditCancel = function () {
+    if (!S.edit) return;
+    if (S.edit.dirty && !window.confirm('You have unsaved changes to this bill. Discard them?')) return;
+    leaveEdit(); paint(); $('dr-flash').style.display = 'none';
+  };
+  window.addEventListener('beforeunload', function (e) { if (S.edit && S.edit.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   window.drAfterDraftSaved = async function (res) {
     await loadView();

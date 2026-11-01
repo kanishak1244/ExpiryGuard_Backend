@@ -265,6 +265,28 @@ class TestDocumentReview(unittest.TestCase):
         self.assertEqual(raw["corrected"]["items"][0]["batch_number"], "FIX1")
         self.assertEqual(self.counts(), before)
 
+    def test_inline_edit_recalculates_on_the_server_and_stock_only_follows_confirm(self):
+        doc = self.upload()
+        self.set_ocr(doc["id"], items=[ocr_item(0, brand=None, discount_percent=0)], total_amount=1120.0)
+        before = self.counts()
+        first = self.c.get("/documents/%d/review" % doc["id"]).json()
+        edited = ocr_item(0, brand="Acme Labs", pack_size_label="10 tabs", discount_percent=10, quantity=20, total_price=None)
+        body = {"header": {"supplier_id": 1, "invoice_number": "INV-100", "invoice_date": date.today().isoformat(), "total_amount": 2240.0,
+                           "discount_amount": 0.0, "other_amount": 0.0}, "items": [edited]}
+        r = self.c.put("/documents/%d/review-data" % doc["id"], json=body)
+        self.assertEqual(r.status_code, 200, r.text)
+        v = r.json()
+        line = v["lines"][0]
+        self.assertEqual((line["brand"], line["pack_size_label"], line["quantity"], line["discount_percent"]), ("Acme Labs", "10 tabs", 20, 10))
+        self.assertNotEqual(v["computed"]["total"], first["computed"]["total"])        # the server recalculated from the corrected lines
+        self.assertEqual(self.counts(), before)                                        # saving corrections adds no stock
+        ok = self.c.post("/documents/%d/confirm-review" % doc["id"], json={"acknowledge_warnings": True, "override_reason": "edited total check"})
+        self.assertEqual(ok.status_code, 200, ok.text)
+        d = self.S()
+        p = d.query(models.Product).one()
+        d.close()
+        self.assertEqual((p.quantity, p.brand, p.pack_size_label), (20, "Acme Labs", "10 tabs"))   # the corrected values reached stock
+
     def test_corrections_validate_supplier_and_date(self):
         doc = self.upload()
         self.set_ocr(doc["id"])
@@ -391,15 +413,24 @@ class TestDocumentReviewPage(unittest.TestCase):
         for needle in ('id="dr-preview"', 'id="dr-lines"', "Edit Bill Details", "← Back", "Confirm &amp; Add to Stock", "drConfirm()", "drEdit()",
                        "js/doc_review.js"):
             self.assertIn(needle, html)
-        ws = html[html.index('id="dr-workspace"'):html.index("<!-- SPLIT-VIEW REVIEW")]
-        self.assertNotIn("<input", ws)                                   # the review itself has no editable fields
+        ws = html[html.index('id="dr-workspace"'):html.index("</main>")]
+        self.assertNotIn("<input", ws)                                   # the editable fields are drawn in place by doc_review.js
+        for needle in ('id="dr-btn-save"', 'id="dr-btn-cancel"', "drEditSave()", "drEditCancel()"):
+            self.assertIn(needle, ws)
 
-    def test_editor_saves_corrections_only_and_asks_before_discarding(self):
-        html = self._read("web/documents.html")
-        self.assertIn("saveCorrections()", html)
-        self.assertNotIn("submitDocumentConfirmation", html)             # the editor can no longer post stock
-        self.assertIn("/review-data", html)
-        self.assertIn("unsaved changes", html)
+    def test_edit_bill_details_is_inline_not_a_separate_screen(self):
+        html, js = self._read("web/documents.html"), self._read("web/js/doc_review.js")
+        for gone in ("split-review-modal", "openCorrectionEditor", "modal-items-tbody", "persistEditor"):
+            self.assertNotIn(gone, html)
+            self.assertNotIn(gone, js)
+        self.assertIn("window.drEdit = async function", js)
+
+    def test_inline_editor_saves_corrections_only_and_asks_before_discarding(self):
+        js = self._read("web/js/doc_review.js")
+        self.assertIn("/review-data", js)
+        self.assertIn("method: 'PUT'", js)
+        self.assertNotIn("confirm-review", js[js.index("async function persistEdit"):js.index("window.drEditSave")])   # saving never confirms stock
+        self.assertIn("unsaved changes", js)
 
     def test_original_is_loaded_with_the_login_not_a_public_url(self):
         js = self._read("web/js/doc_review.js")

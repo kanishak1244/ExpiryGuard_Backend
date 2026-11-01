@@ -36,36 +36,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    .split-modal-overlay {
-      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;
-    }
-    .split-modal-overlay.active { display: flex; }
-    .split-modal-container {
-      background: var(--white); width: 95%; max-width: 1280px; height: 90vh;
-      border-radius: var(--radius-lg); overflow: hidden; display: flex; flex-direction: column;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-    }
-    .split-modal-header {
-      padding: 16px 24px; border-bottom: 1px solid var(--border-color);
-      display: flex; justify-content: space-between; align-items: center;
-      background-color: var(--bg-main);
-    }
-    .split-modal-body {
-      display: flex; flex: 1; overflow: hidden;
-    }
-    .split-pane-left {
-      width: 50%; border-right: 1px solid var(--border-color); background: #334155;
-      display: flex; align-items: center; justify-content: center; overflow: hidden;
-    }
-    .split-pane-right {
-      width: 50%; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
-    }
-    .preview-frame {
-      width: 100%; height: 100%; border: none; background: white;
-    }
-
-    /* ---- Invoice review workspace (two panels: original bill | read-only summary + lines) ---- */
+    /* ---- Invoice review workspace (two panels: original bill | summary + lines, editable in place) ---- */
     #dr-workspace { display: none; height: calc(100vh - 120px); min-height: 440px; }
     .dr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; height: 100%; }
     .dr-panel { min-height: 0; display: flex; flex-direction: column; background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
@@ -113,11 +84,22 @@
     .dr-bar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--color-border); background: var(--color-surface-card); }
     .dr-bar .sp { flex: 1; }
     #dr-flash { display: none; margin: 4px 12px 0; }
+    .dr-fields .dr-f.wide { grid-column: span 2; }
+    .dr-in { width: 100%; min-width: 64px; box-sizing: border-box; padding: 3px 5px; font: inherit; font-size: 11.5px; color: var(--dark-text); background: var(--color-surface-card); border: 1px solid var(--color-border); border-radius: 4px; }
+    .dr-in:focus { outline: 2px solid #2563EB; outline-offset: -1px; }
+    #dr-workspace .dr-in.bad { border: 1px solid #DC2626 !important; background: rgba(220,38,38,.16) !important; }
+    .dr-fields .dr-in { font-size: 13px; padding: 4px 6px; }
+    .dr-supsel { display: flex; gap: 6px; align-items: center; } .dr-supsel .dr-in { flex: 1; }
+    .dr-edit-head .dr-f { font-weight: 600; }
+    .dr-editing .dr-edit-table { min-width: 1180px; }
+    .dr-edit-table td { vertical-align: middle; }
+    .dr-edit-table .c-product_name .dr-in { min-width: 160px; } .dr-edit-table .c-brand .dr-in { min-width: 110px; }
+    .dr-edit-table .c-pack_size_label .dr-in, .dr-edit-table .c-expiry_date .dr-in { min-width: 84px; }
+    .dr-edit-table .num .dr-in { text-align: right; }
+    .dr-del { padding: 1px 6px; color: #DC2626; }
+    .dr-addrow { padding: 8px 0; }
     @media (max-width: 900px) { #dr-workspace { height: auto; } .dr-grid { grid-template-columns: 1fr; height: auto; } .dr-preview { height: 60vh; flex: none; } .dr-lines { max-height: 55vh; } .dr-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .form-input.flagged { border: 2px solid #dc2626 !important; background: #fef2f2 !important; }
-    .preview-img {
-      max-width: 100%; max-height: 100%; object-fit: contain;
-    }
   </style>
 </head>
 <body>
@@ -293,6 +275,8 @@
               <div id="dr-problems"></div>
               <div class="dr-bar">
                 <button type="button" class="btn btn-secondary" id="dr-btn-edit" onclick="drEdit()">✏️ Edit Bill Details</button>
+                <button type="button" class="btn btn-primary" id="dr-btn-save" onclick="drEditSave()" style="display:none">Save Corrections</button>
+                <button type="button" class="btn btn-secondary" id="dr-btn-cancel" onclick="drEditCancel()" style="display:none">Cancel</button>
                 <button type="button" class="btn btn-secondary" id="dr-btn-draft" onclick="drSaveDraft()">💾 Save as Draft</button>
                 <button type="button" class="btn btn-secondary" id="dr-btn-ocr" onclick="drRunOcr()" style="display:none">⚡ Run / Retry OCR</button>
                 <span id="dr-verified-note" class="dr-badge ok" style="display:none">Verified · stock added</span>
@@ -308,151 +292,15 @@
     </div>
   </div>
 
-  <!-- SPLIT-VIEW REVIEW & VERIFICATION MODAL -->
-  <div id="split-review-modal" class="split-modal-overlay">
-    <div class="split-modal-container">
-      <div class="split-modal-header">
-        <div>
-          <h3 id="split-modal-title" style="margin: 0; font-size: 18px;">Edit Bill Details</h3>
-          <p id="split-modal-subtitle" style="font-size: 12px; color: var(--muted-text); margin: 0;">Correct the details against the original bill. Saving corrections does not add anything to stock.</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-secondary" onclick="closeSplitModal()">Cancel</button>
-          <button class="btn btn-secondary" id="editor-draft-btn" onclick="saveEditorDraft()">Save as Draft</button>
-          <button class="btn btn-primary" id="editor-save-btn" onclick="saveCorrections()">Save Corrections</button>
-        </div>
-      </div>
-      
-      <div class="split-modal-body">
-        <!-- Left Pane: PDF / Image Preview -->
-        <div class="split-pane-left" id="split-preview-pane">
-          <p style="color: white;">Loading Document Preview...</p>
-        </div>
-
-        <!-- Right Pane: Extracted Metadata & Editable Items -->
-        <div class="split-pane-right">
-          <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">1. Document Header & Supplier Information</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group" style="grid-column: span 2;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label class="form-label" style="margin: 0; font-weight: 600;">Linked Supplier</label>
-                <span id="modal-supplier-status-badge" style="font-size: 12px; font-weight: 600;"></span>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <select id="modal-supplier-select" class="form-input" onchange="handleModalSupplierChange(this.value)" style="flex: 1;">
-                  <option value="">-- Select Supplier --</option>
-                </select>
-                <button type="button" class="btn btn-secondary" id="modal-add-supplier-btn" onclick="promptCreateNewSupplier()" style="white-space: nowrap; font-size: 12px; padding: 7px 12px;" title="Register new supplier profile">+ New Supplier</button>
-              </div>
-              <!-- Multiple Matches Selection Strip -->
-              <div id="modal-supplier-candidates-strip" style="display: none; margin-top: 8px; padding: 10px 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-md); font-size: 12.5px;">
-                <div style="font-weight: 600; color: #92400E; margin-bottom: 6px;">⚠️ Multiple existing suppliers matched the bill name. Please choose one:</div>
-                <div id="modal-supplier-candidates-list" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
-              </div>
-              <!-- No Match / Create New Pre-filled Strip -->
-              <div id="modal-supplier-no-match-strip" style="display: none; margin-top: 8px; padding: 10px 12px; background: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 12.5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                <span id="modal-supplier-no-match-text" style="color: var(--muted-text);">No supplier found matching invoice name.</span>
-                <button type="button" class="btn btn-primary" id="modal-quick-create-btn" style="padding: 4px 12px; font-size: 12px;" onclick="quickCreateSupplierFromExtracted()">+ Create as Supplier</button>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Invoice Number</label>
-              <input type="text" id="modal-inv-number" class="form-input" placeholder="INV-2048">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Invoice Date</label>
-              <input type="date" id="modal-inv-date" class="form-input">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Bill discount (₹) as printed</label>
-              <input type="number" step="0.01" id="modal-inv-discount" class="form-input" placeholder="0">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Other charges (₹)</label>
-              <input type="number" step="0.01" id="modal-inv-other" class="form-input" placeholder="0">
-            </div>
-            <div class="form-group" style="grid-column: span 2;">
-              <label class="form-label">Printed invoice total (₹)</label>
-              <input type="number" step="0.01" id="modal-inv-total" class="form-input">
-            </div>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-top: 12px;">
-            <h4 style="margin: 0;">2. Extracted Medicine Line Items</h4>
-            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" onclick="addModalItemRow()">+ Add Medicine</button>
-          </div>
-
-          <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
-            <table class="data-table" style="font-size: 12px;">
-              <thead>
-                <tr>
-                  <th>Product Name</th>
-                  <th>HSN Code</th>
-                  <th>GST Rate %</th>
-                  <th>Batch #</th>
-                  <th>Qty</th>
-                  <th>Purchase Price (₹)</th>
-                  <th>MRP (₹, required)</th>
-                  <th>Expiry Date</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="modal-items-tbody">
-                <!-- Rendered dynamically -->
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script>
-    let editorDirty = false;
-    document.addEventListener('input', function (e) { if (e.target.closest && e.target.closest('#split-review-modal')) editorDirty = true; });
-    document.addEventListener('change', function (e) { if (e.target.closest && e.target.closest('#split-review-modal')) editorDirty = true; });
-    window.addEventListener('beforeunload', function (e) { if (editorDirty) { e.preventDefault(); e.returnValue = ''; } });
-    let activeDocId = null;
-    let activeDocData = null;
     let allSuppliersList = [];
-
-    const HSN_GST_LOOKUP_MAP = {
-      "3004": 12.0,
-      "3003": 12.0,
-      "3002": 5.0,
-      "3001": 5.0,
-      "3005": 12.0,
-      "3006": 12.0,
-      "9993": 18.0
-    };
-
-    function getGstRateFromHsn(code) {
-      const clean = String(code || '').trim().replace(/\./g, '');
-      if (HSN_GST_LOOKUP_MAP[clean]) return HSN_GST_LOOKUP_MAP[clean];
-      if (clean.length >= 4 && HSN_GST_LOOKUP_MAP[clean.substring(0, 4)]) return HSN_GST_LOOKUP_MAP[clean.substring(0, 4)];
-      if (clean.startsWith('3002') || clean.startsWith('3001')) return 5.0;
-      return 12.0;
-    }
-
-    function handleHsnInputChange(inputElem) {
-      const tr = inputElem.closest('tr');
-      if (!tr) return;
-      const gstInput = tr.querySelector('.item-gst');
-      if (gstInput) {
-        const rate = getGstRateFromHsn(inputElem.value);
-        gstInput.value = rate.toFixed(1);
-      }
-    }
 
     function populateSuppliersDropdown(suppliers) {
       if (!Array.isArray(suppliers)) return;
       allSuppliersList = suppliers;
       const docFilter = document.getElementById('doc-supplier-filter');
-      const modalSelect = document.getElementById('modal-supplier-select');
       const opts = suppliers.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
       if (docFilter) docFilter.innerHTML = '<option value="">All Suppliers</option>' + opts;
-      if (modalSelect) modalSelect.innerHTML = '<option value="">-- Select Supplier --</option>' + opts;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -587,420 +435,6 @@
       openReviewWorkspace(docId);
     }
 
-    let editorDocId = null;
-
-    // Edit Bill Details: the existing correction form, filled with the corrected-or-extracted values.
-    async function openCorrectionEditor(docId, view, focus) {
-      editorDocId = docId;
-      try {
-        await loadSuppliersDropdown();
-        const docData = await api.getDocumentDetail(docId);
-        const ocr = (function () { try { return JSON.parse(docData.ocr_raw_json || '{}'); } catch (e) { return {}; } })();
-        ocr.items = view.raw_items || ocr.items || [];
-        ocr.invoice_number = view.invoice_number || ocr.invoice_number;
-        ocr.invoice_date = view.invoice_date || ocr.invoice_date;
-        docData.ocr_raw_json = JSON.stringify(ocr);
-        docData.invoice_number = view.invoice_number || docData.invoice_number;
-        docData.invoice_date = view.invoice_date || docData.invoice_date;
-        docData.total_amount = view.printed_total != null ? view.printed_total : docData.total_amount;
-        docData._header = view.header_figures || {};
-        populateReviewModalWithDoc(docData);
-        document.getElementById('split-modal-title').textContent = `Edit Bill Details: ${docData.title}`;
-        document.getElementById('split-review-modal').classList.add('active');
-        editorDirty = false;
-        if (focus === 'supplier') setTimeout(() => document.getElementById('modal-supplier-select').focus(), 50);
-      } catch (err) {
-        alert(`Failed to open the editor: ${err.message}`);
-      }
-    }
-
-    let currentExtractedSupplierName = '';
-    let currentExtractedGstin = '';
-
-    function setSupplierStatusBadge(name, state) {
-      const badge = document.getElementById('modal-supplier-status-badge');
-      if (!badge) return;
-      if (state === 'matched') {
-        badge.innerHTML = `<span style="color: #16A34A; background: #DCFCE7; padding: 2px 8px; border-radius: 12px; font-size: 11.5px; border: 1px solid #86EFAC; font-weight: 700;">Linked: ${escapeHtml(name)} ✓</span>`;
-      } else if (state === 'manual') {
-        badge.innerHTML = `<span style="color: #2563EB; background: #EFF6FF; padding: 2px 8px; border-radius: 12px; font-size: 11.5px; border: 1px solid #BFDBFE; font-weight: 600;">Selected: ${escapeHtml(name)} ✓</span>`;
-      } else if (state === 'multiple') {
-        badge.innerHTML = `<span style="color: #D97706; background: #FEF3C7; padding: 2px 8px; border-radius: 12px; font-size: 11.5px; border: 1px solid #FCD34D; font-weight: 600;">⚠️ Multiple Matches</span>`;
-      } else {
-        badge.innerHTML = `<span style="color: var(--muted-text); background: var(--bg-main); padding: 2px 8px; border-radius: 12px; font-size: 11.5px; border: 1px solid var(--border-color);">Unlinked</span>`;
-      }
-    }
-
-    function handleModalSupplierChange(val) {
-      const candStrip = document.getElementById('modal-supplier-candidates-strip');
-      const noMatchStrip = document.getElementById('modal-supplier-no-match-strip');
-      if (candStrip) candStrip.style.display = 'none';
-      if (noMatchStrip) noMatchStrip.style.display = 'none';
-
-      if (val) {
-        const sId = parseInt(val);
-        if (activeDocData) activeDocData.supplier_id = sId;
-        const sup = allSuppliersList.find(s => Number(s.id) === sId);
-        const sName = sup ? sup.name : 'Selected Supplier';
-        setSupplierStatusBadge(sName, 'manual');
-      } else {
-        if (activeDocData) activeDocData.supplier_id = null;
-        setSupplierStatusBadge('', 'no_match');
-      }
-    }
-
-    function chooseCandidateSupplier(supplierId, supplierName) {
-      const select = document.getElementById('modal-supplier-select');
-      if (select) select.value = String(supplierId);
-      if (activeDocData) activeDocData.supplier_id = supplierId;
-      const candStrip = document.getElementById('modal-supplier-candidates-strip');
-      if (candStrip) candStrip.style.display = 'none';
-      setSupplierStatusBadge(supplierName, 'matched');
-    }
-
-    async function quickCreateSupplierFromExtracted() {
-      if (!currentExtractedSupplierName) return;
-      const btn = document.getElementById('modal-quick-create-btn');
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = '⏳ Creating...';
-      }
-
-      try {
-        const payload = {
-          name: currentExtractedSupplierName,
-          gstin: currentExtractedGstin || null
-        };
-        const createdOrFound = await api.createSupplier(payload);
-        await loadSuppliersDropdown();
-
-        const select = document.getElementById('modal-supplier-select');
-        if (select) select.value = String(createdOrFound.id);
-        if (activeDocData) activeDocData.supplier_id = createdOrFound.id;
-
-        const noMatchStrip = document.getElementById('modal-supplier-no-match-strip');
-        if (noMatchStrip) noMatchStrip.style.display = 'none';
-
-        setSupplierStatusBadge(createdOrFound.name, 'matched');
-      } catch (err) {
-        alert(`Failed to register supplier: ${err.message}`);
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '+ Create as Supplier';
-        }
-      }
-    }
-
-    async function promptCreateNewSupplier() {
-      const defaultName = currentExtractedSupplierName || '';
-      const name = prompt("Enter new Supplier Name:", defaultName);
-      if (!name || !name.trim()) return;
-
-      try {
-        const createdOrFound = await api.createSupplier({ name: name.trim() });
-        await loadSuppliersDropdown();
-        const select = document.getElementById('modal-supplier-select');
-        if (select) select.value = String(createdOrFound.id);
-        if (activeDocData) activeDocData.supplier_id = createdOrFound.id;
-        setSupplierStatusBadge(createdOrFound.name, 'matched');
-      } catch (err) {
-        alert(`Failed to create supplier: ${err.message}`);
-      }
-    }
-
-    function performLocalSupplierMatch(rawName) {
-      if (!rawName || !Array.isArray(allSuppliersList)) return;
-      const normalizeJs = (str) => {
-        if (!str) return '';
-        return String(str).toLowerCase()
-          .replace(/[&+]/g, ' and ')
-          .replace(/[\.,\-_\'\"/\\;:!\?@#\$%\*\(\)\[\]\{\}]/g, ' ')
-          .trim().split(/\s+/).join(' ');
-      };
-      const normQuery = normalizeJs(rawName);
-      const exacts = allSuppliersList.filter(s => normalizeJs(s.name) === normQuery);
-      const select = document.getElementById('modal-supplier-select');
-      if (exacts.length === 1) {
-        select.value = String(exacts[0].id);
-        if (activeDocData) activeDocData.supplier_id = exacts[0].id;
-        setSupplierStatusBadge(exacts[0].name, 'matched');
-      } else if (exacts.length > 1) {
-        chooseCandidateSupplier(exacts[0].id, exacts[0].name);
-      }
-    }
-
-    async function resolveAndDisplaySupplierMatch(docData) {
-      currentExtractedSupplierName = '';
-      currentExtractedGstin = '';
-
-      const candStrip = document.getElementById('modal-supplier-candidates-strip');
-      const noMatchStrip = document.getElementById('modal-supplier-no-match-strip');
-      if (candStrip) candStrip.style.display = 'none';
-      if (noMatchStrip) noMatchStrip.style.display = 'none';
-      setSupplierStatusBadge('', 'no_match');
-
-      // Extract name & gstin from ocr_raw_json if present
-      if (docData.ocr_raw_json) {
-        try {
-          const parsed = JSON.parse(docData.ocr_raw_json);
-          if (parsed.supplier_name) currentExtractedSupplierName = String(parsed.supplier_name).trim();
-          if (parsed.supplier_gstin) currentExtractedGstin = String(parsed.supplier_gstin).trim();
-        } catch (e) {}
-      }
-      if (!currentExtractedSupplierName && docData.extracted_supplier_name) {
-        currentExtractedSupplierName = docData.extracted_supplier_name.trim();
-      }
-
-      const select = document.getElementById('modal-supplier-select');
-
-      // Case 1: Document already has supplier_id linked
-      if (docData.supplier_id) {
-        let opt = Array.from(select.options).find(o => Number(o.value) === Number(docData.supplier_id));
-        if (!opt && docData.supplier_name) {
-          select.insertAdjacentHTML('beforeend', `<option value="${docData.supplier_id}">${escapeHtml(docData.supplier_name)}</option>`);
-        }
-        select.value = String(docData.supplier_id);
-        const existing = allSuppliersList.find(s => Number(s.id) === Number(docData.supplier_id));
-        const sName = existing ? existing.name : (docData.supplier_name || 'Linked Supplier');
-        setSupplierStatusBadge(sName, 'matched');
-        return;
-      }
-
-      // Case 2: No extracted supplier name found in document
-      if (!currentExtractedSupplierName) {
-        select.value = '';
-        setSupplierStatusBadge('', 'no_match');
-        return;
-      }
-
-      // Case 3: We have an extracted supplier name, let's match it via backend
-      try {
-        let matchRes = docData.supplier_match;
-        if (!matchRes || typeof matchRes !== 'object') {
-          matchRes = await api.matchSupplier(currentExtractedSupplierName, currentExtractedGstin);
-        }
-
-        if (matchRes.status === 'exact_match' && matchRes.matched_supplier) {
-          const matched = matchRes.matched_supplier;
-          let opt = Array.from(select.options).find(o => Number(o.value) === Number(matched.id));
-          if (!opt) {
-            select.insertAdjacentHTML('beforeend', `<option value="${matched.id}">${escapeHtml(matched.name)}</option>`);
-          }
-          select.value = String(matched.id);
-          if (activeDocData) activeDocData.supplier_id = matched.id;
-          setSupplierStatusBadge(matched.name, 'matched');
-        } else if (matchRes.status === 'multiple_matches' && Array.isArray(matchRes.candidate_matches) && matchRes.candidate_matches.length > 0) {
-          select.value = '';
-          const list = document.getElementById('modal-supplier-candidates-list');
-          list.innerHTML = matchRes.candidate_matches.map(c => `
-            <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;"
-                    onclick="chooseCandidateSupplier(${c.id}, '${escapeHtml(c.name).replace(/'/g, "\\'")}')">
-              🏢 <strong>${escapeHtml(c.name)}</strong>
-              ${c.gstin ? `<span style="font-size: 11px; color: var(--muted-text);">(${escapeHtml(c.gstin)})</span>` : ''}
-            </button>
-          `).join('');
-          candStrip.style.display = 'block';
-          setSupplierStatusBadge('', 'multiple');
-        } else {
-          // No match
-          select.value = '';
-          document.getElementById('modal-supplier-no-match-text').innerHTML =
-            `No existing supplier matched "<strong>${escapeHtml(currentExtractedSupplierName)}</strong>".`;
-          document.getElementById('modal-quick-create-btn').innerHTML =
-            `+ Create "<strong>${escapeHtml(currentExtractedSupplierName)}</strong>" as Supplier`;
-          noMatchStrip.style.display = 'flex';
-          setSupplierStatusBadge('', 'no_match');
-        }
-      } catch (err) {
-        console.warn("Supplier auto-match notice:", err);
-        performLocalSupplierMatch(currentExtractedSupplierName);
-      }
-    }
-
-    function populateReviewModalWithDoc(docData) {
-      activeDocData = docData;
-      activeDocId = docData.id;
-
-      document.getElementById('split-modal-title').textContent = `Review: ${docData.title}`;
-      document.getElementById('modal-inv-number').value = docData.invoice_number || '';
-      document.getElementById('modal-inv-date').value = docData.invoice_date || '';
-      document.getElementById('modal-inv-total').value = docData.total_amount || 0.0;
-      document.getElementById('modal-inv-discount').value = (docData._header && docData._header.discount_amount) || '';
-      document.getElementById('modal-inv-other').value = (docData._header && docData._header.other_amount) || '';
-
-      // Automated Supplier Matching & Linking
-      resolveAndDisplaySupplierMatch(docData);
-
-      // Left pane: the original bill (fetched with the user's login by doc_review.js)
-      const paneLeft = document.getElementById('split-preview-pane');
-      if (typeof drCurrentOriginalUrl === 'function' && drCurrentOriginalUrl()) {
-        const url = drCurrentOriginalUrl();
-        paneLeft.innerHTML = docData.file_type === 'application/pdf'
-          ? `<iframe src="${url}#toolbar=1&navpanes=0&view=FitH" class="preview-frame"></iframe>`
-          : `<img src="${url}" class="preview-img" alt="Original invoice">`;
-      } else {
-        paneLeft.innerHTML = '<p style="color: white;">Original bill is not loaded.</p>';
-      }
-
-      // Render extracted items table
-      let items = [];
-      if (docData.ocr_raw_json) {
-        try {
-          const parsed = JSON.parse(docData.ocr_raw_json);
-          items = parsed.items || [];
-          if (parsed.invoice_number && !document.getElementById('modal-inv-number').value) {
-            document.getElementById('modal-inv-number').value = parsed.invoice_number;
-          }
-          if (parsed.invoice_date && !document.getElementById('modal-inv-date').value) {
-            document.getElementById('modal-inv-date').value = parsed.invoice_date;
-          }
-          if (parsed.total_amount && (!document.getElementById('modal-inv-total').value || parseFloat(document.getElementById('modal-inv-total').value) === 0)) {
-            document.getElementById('modal-inv-total').value = parsed.total_amount;
-          }
-        } catch(e) {
-          console.error("Error parsing OCR raw JSON:", e);
-        }
-      }
-
-      renderModalItems(items);
-    }
-
-    function renderModalItems(items) {
-      const tbody = document.getElementById('modal-items-tbody');
-      if (!items || items.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td><input type="text" class="form-input item-name" placeholder="Medicine Name" style="padding: 4px;"></td>
-            <td><input type="text" class="form-input item-hsn" value="3004" oninput="handleHsnInputChange(this)" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.5" class="form-input item-gst" value="12.0" style="padding: 4px; width: 65px;"></td>
-            <td><input type="text" class="form-input item-batch" placeholder="Batch #" style="padding: 4px; width: 85px;"></td>
-            <td><input type="number" class="form-input item-qty" value="1" style="padding: 4px; width: 55px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-pprice" value="0.00" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-sprice" value="0.00" style="padding: 4px; width: 75px;"></td>
-            <td><input type="date" class="form-input item-exp" value="" style="padding: 4px; width: 110px;"></td>
-            <td><button class="btn btn-secondary" style="padding: 2px 6px; color: var(--error-red);" onclick="this.closest('tr').remove()">🗑️</button></td>
-          </tr>
-        `;
-        return;
-      }
-
-      // Fields the server checks could not trust arrive BLANK and flagged: highlight them in red with the reason.
-      const esc = (t) => String(t).replace(/"/g, '&quot;');
-      tbody.innerHTML = items.map((item, idx) => {
-        const flags = item.field_flags || {};
-        const fl = (k) => (flags[k] ? 'flagged' : '');
-        const tt = (k) => (flags[k] ? `title="${esc(flags[k])}"` : '');
-        const hsn = item.hsn_code || '';                 // never invent an HSN
-        const gstRaw = item.gst_rate != null ? item.gst_rate : item.gst_percentage;
-        const gst = gstRaw == null ? '' : gstRaw;      // blank = not read; the server resolves or blocks it, no silent default
-        const extra = esc(JSON.stringify({ brand: item.brand, free_qty: item.free_qty, discount_percent: item.discount_percent, total_price: item.total_price, manufacturing_date: item.manufacturing_date }));
-        return `
-          <tr data-extra="${extra}">
-            <td><input type="text" class="form-input item-name ${fl('product_name')}" ${tt('product_name')} value="${esc(item.product_name || '')}" style="padding: 4px;"></td>
-            <td><input type="text" class="form-input item-hsn ${fl('hsn_code')}" ${tt('hsn_code')} value="${hsn}" oninput="this.classList.remove('flagged'); handleHsnInputChange(this)" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.5" class="form-input item-gst ${fl('gst_rate')}" ${tt('gst_rate')} value="${gst}" data-orig="${gst}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 65px;"></td>
-            <td><input type="text" class="form-input item-batch ${fl('batch_number')}" ${tt('batch_number')} value="${esc(item.batch_number || '')}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 85px;"></td>
-            <td><input type="number" class="form-input item-qty ${fl('quantity')}" ${tt('quantity')} value="${item.quantity || ''}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 55px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-pprice ${fl('purchase_price')}" ${tt('purchase_price')} value="${item.purchase_price || ''}" placeholder="Purchase" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 75px;"></td>
-            <td><input type="number" step="0.01" class="form-input item-sprice ${fl('mrp')}" ${tt('mrp')} value="${item.mrp || ''}" placeholder="MRP" required oninput="this.classList.remove('flagged')" style="padding: 4px; width: 75px;"></td>
-            <td><input type="date" class="form-input item-exp ${fl('expiry_date')}" ${tt('expiry_date')} value="${item.expiry_date || ''}" oninput="this.classList.remove('flagged')" style="padding: 4px; width: 110px;"></td>
-            <td><button class="btn btn-secondary" style="padding: 2px 6px; color: var(--error-red);" onclick="this.closest('tr').remove()">🗑️</button></td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function addModalItemRow() {
-      const tbody = document.getElementById('modal-items-tbody');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input type="text" class="form-input item-name" placeholder="Medicine Name" style="padding: 4px;"></td>
-        <td><input type="text" class="form-input item-hsn" value="3004" oninput="handleHsnInputChange(this)" style="padding: 4px; width: 75px;"></td>
-        <td><input type="number" step="0.5" class="form-input item-gst" value="12.0" style="padding: 4px; width: 65px;"></td>
-        <td><input type="text" class="form-input item-batch" placeholder="Batch #" style="padding: 4px; width: 85px;"></td>
-        <td><input type="number" class="form-input item-qty" value="10" style="padding: 4px; width: 55px;"></td>
-        <td><input type="number" step="0.01" class="form-input item-pprice" value="15.00" style="padding: 4px; width: 75px;"></td>
-        <td><input type="number" step="0.01" class="form-input item-sprice" value="30.00" style="padding: 4px; width: 75px;"></td>
-        <td><input type="date" class="form-input item-exp" value="2027-12-31" style="padding: 4px; width: 110px;"></td>
-        <td><button class="btn btn-secondary" style="padding: 2px 6px; color: var(--error-red);" onclick="this.closest('tr').remove()">🗑️</button></td>
-      `;
-      tbody.appendChild(tr);
-    }
-
-    // Saves corrections only (no stock). Blank fields stay blank so the review shows them as Missing.
-    function collectEditorBody() {
-      const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
-      const items = [];
-      document.querySelectorAll('#modal-items-tbody tr').forEach(r => {
-        const name = r.querySelector('.item-name')?.value.trim();
-        const batch = r.querySelector('.item-batch')?.value.trim();
-        const exp = r.querySelector('.item-exp')?.value;
-        const qty = r.querySelector('.item-qty')?.value;
-        if (!name && !batch && !exp && !qty) return;       // untouched blank row
-        let extra = {};
-        try { extra = JSON.parse(r.dataset.extra || '{}'); } catch (e) { extra = {}; }
-        items.push(Object.assign({}, extra, {
-          product_name: name || null,
-          hsn_code: r.querySelector('.item-hsn')?.value.trim() || null,
-          gst_rate: num(r.querySelector('.item-gst')?.value),
-          gst_verified: (() => { const g = r.querySelector('.item-gst'); return !!g && g.value !== '' && g.value !== g.dataset.orig; })(),   // true only when the user typed this rate
-          batch_number: batch || null,
-          quantity: qty === '' || qty == null ? null : parseInt(qty, 10),
-          purchase_price: num(r.querySelector('.item-pprice')?.value),
-          mrp: num(r.querySelector('.item-sprice')?.value),
-          expiry_date: exp || null,
-          field_flags: {},
-        }));
-      });
-      const supplierId = document.getElementById('modal-supplier-select').value;
-      return {
-        header: {
-          supplier_id: supplierId ? parseInt(supplierId, 10) : null,
-          invoice_number: document.getElementById('modal-inv-number').value.trim() || null,
-          invoice_date: document.getElementById('modal-inv-date').value || null,
-          total_amount: num(document.getElementById('modal-inv-total').value),
-          discount_amount: num(document.getElementById('modal-inv-discount').value),
-          other_amount: num(document.getElementById('modal-inv-other').value),
-        },
-        items,
-      };
-    }
-
-    // Saves corrections only (no stock). Blank fields stay blank so the review shows them as Missing.
-    // asDraft: the same save, plus the purchase draft that points at this bill (still no stock).
-    async function persistEditor(asDraft) {
-      if (!editorDocId) return;
-      const btn = document.getElementById(asDraft ? 'editor-draft-btn' : 'editor-save-btn');
-      const label = btn ? btn.textContent : '';
-      const body = collectEditorBody();
-      document.querySelectorAll('#split-review-modal .split-modal-header button').forEach(b => { b.disabled = true; });
-      if (btn) btn.textContent = 'Saving…';
-      try {
-        let draftRes = null;
-        if (asDraft) draftRes = await api.request(`/documents/${editorDocId}/save-draft`, { method: 'POST', body: JSON.stringify(body) });
-        else await api.request(`/documents/${editorDocId}/review-data`, { method: 'PUT', body: JSON.stringify(body) });
-        editorDirty = false;
-        document.getElementById('split-review-modal').classList.remove('active');
-        if (asDraft && typeof drAfterDraftSaved === 'function') await drAfterDraftSaved(draftRes);
-        else if (typeof drAfterCorrectionsSaved === 'function') await drAfterCorrectionsSaved();
-      } catch (err) {
-        // the editor stays open with everything the user typed
-        alert(`Could not save: ${typeof drApiMsg === 'function' ? drApiMsg(err) : err.message}\nYour entries are still on this screen.`);
-      } finally {
-        document.querySelectorAll('#split-review-modal .split-modal-header button').forEach(b => { b.disabled = false; });
-        if (btn) btn.textContent = label;
-      }
-    }
-    function saveCorrections() { return persistEditor(false); }
-    function saveEditorDraft() { return persistEditor(true); }
-
-    function closeSplitModal() {
-      if (editorDirty && !confirm('You have unsaved changes to this bill. Close without saving?')) return;
-      editorDirty = false;
-      document.getElementById('split-review-modal').classList.remove('active');
-    }
-
     async function deleteDoc(docId) {
       const proceed = async () => {
         try {
@@ -1032,6 +466,6 @@
   <script src="js/confirm_modal.js?v=9.4" defer></script>
   <script src="js/app.js?v=9.4" defer></script>
   <script src="js/add_inventory_flow.js?v=9.6" defer></script>
-  <script src="js/doc_review.js?v=1.6" defer></script>
+  <script src="js/doc_review.js?v=1.7" defer></script>
 </body>
 </html>

@@ -25,7 +25,7 @@ import purchase_calc
 import purchase_entry
 from ai import invoice_validation as val
 
-LINE_FIELDS = ("product_name", "brand", "hsn_code", "gst_rate", "batch_number", "expiry_date", "quantity", "free_qty",
+LINE_FIELDS = ("product_name", "brand", "pack_size_label", "hsn_code", "gst_rate", "batch_number", "expiry_date", "quantity", "free_qty",
                "purchase_price", "mrp", "discount_percent", "total_price", "manufacturing_date")
 TOTAL_TOLERANCE_ABS = 5.0
 TOTAL_TOLERANCE_PCT = 0.01
@@ -74,6 +74,7 @@ def _line_view(n: int, item: dict) -> dict:
     return {
         "row": n,
         "product_name": (item.get("product_name") or "").strip() or None,
+        "brand": (str(item.get("brand") or "").strip() or None), "pack_size_label": (str(item.get("pack_size_label") or "").strip() or None),
         "hsn_code": hsn, "gst_rate": gst, "gst_verified": bool(item.get("gst_verified")),
         "uncertain_fields": [str(f) for f in (item.get("uncertain_fields") or [])],
         "batch_number": (str(item.get("batch_number") or "").strip() or None),
@@ -251,6 +252,10 @@ def _to_purchase(doc: models.Document, supplier_id: int, eff: dict, lines: List[
         }
         if ln["hsn_code"]:
             it["hsn_code"] = str(ln["hsn_code"]).strip()
+        if ln.get("brand"):
+            it["brand"] = ln["brand"][:200]
+        if ln.get("pack_size_label"):
+            it["pack_size_label"] = ln["pack_size_label"][:100]
         if mfg:
             it["manufacturing_date"] = mfg
         items.append(it)

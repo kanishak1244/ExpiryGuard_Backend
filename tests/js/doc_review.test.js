@@ -52,6 +52,63 @@ test('summary is read-only: no inputs or editable fields', () => {
   assert.ok(!/<input|<select|<textarea|contenteditable/i.test(html));
 });
 
+const view = (o) => Object.assign({
+  supplier: { id: 1, name: 'Alpha Pharma' }, invoice_number: 'I-1', invoice_date: '2026-10-26', printed_total: 1000, header_figures: { discount_amount: 5 },
+  extracted_supplier_name: 'ALPHA PHARMA', raw_items: [{ product_name: 'DOLO 650', brand: 'Micro Labs', gst_rate: 12, quantity: 10, batch_number: 'D1', expiry_date: '2028-01-31', purchase_price: 50, mrp: null }],
+  lines: [{ blocking: [{ field: 'mrp', message: 'MRP is missing.' }] }],
+}, o);
+
+test('inline editor: every invoice field and every line field is an input, missing ones are marked with the reason', () => {
+  const ed = m.drEditStart(view(), [{ id: 1, name: 'Alpha Pharma' }, { id: 2, name: 'Beta Drugs' }]);
+  const head = m.drEditSummaryHtml(ed, view());
+  for (const id of ['dr-e-supplier', 'dr-e-invoice_number', 'dr-e-invoice_date', 'dr-e-total_amount', 'dr-e-discount_amount', 'dr-e-other_amount']) assert.ok(head.includes(id), id);
+  assert.ok(head.includes('Beta Drugs') && head.includes('bill says'));
+  const table = m.drEditTableHtml(ed);
+  for (const k of ['product_name', 'brand', 'pack_size_label', 'hsn_code', 'gst_rate', 'batch_number', 'expiry_date', 'quantity', 'free_qty', 'purchase_price', 'mrp', 'discount_percent', 'total_price']) {
+    assert.ok(table.includes(`data-k="${k}"`), k);
+  }
+  assert.ok(table.includes('MRP is missing.'), 'server reason shown on the field');
+  assert.ok(/class="dr-in bad"[^>]*data-k="hsn_code"/.test(table) === false, 'optional empty fields are not flagged');
+  assert.ok(table.includes('drEditAddRow()') && table.includes('drEditDelRow(0)'));
+});
+
+test('inline editor: values are escaped', () => {
+  const ed = m.drEditStart(view({ raw_items: [{ product_name: '"><img src=x onerror=alert(1)>' }], lines: [{}] }), []);
+  assert.ok(!m.drEditTableHtml(ed).includes('<img src=x'));
+});
+
+test('save body: blanks stay null, numbers are numbers, untouched blank rows are dropped, flags cleared', () => {
+  const ed = m.drEditStart(view(), []);
+  ed.items.push(m.drBlankRow());                                              // user added a row but left it empty
+  ed.items[0].mrp = '90.5'; ed.items[0].quantity = '12'; ed.items[0].pack_size_label = ' 10 tabs ';
+  const b = m.drBuildBody(ed);
+  assert.equal(b.items.length, 1);
+  const it = b.items[0];
+  assert.deepEqual([it.mrp, it.quantity, it.pack_size_label, it.free_qty, it.hsn_code, it.brand], [90.5, 12, '10 tabs', null, null, 'Micro Labs']);
+  assert.deepEqual(it.field_flags, {});
+  assert.ok(!Object.keys(it).some(k => k.charAt(0) === '_'), 'no editor-only keys are sent');
+  assert.deepEqual(b.header, { supplier_id: 1, invoice_number: 'I-1', invoice_date: '2026-10-26', total_amount: 1000, discount_amount: 5, other_amount: null });
+});
+
+test('save body: GST counts as verified only when the user typed or confirmed it', () => {
+  const ed = m.drEditStart(view(), []);
+  assert.equal(m.drBuildBody(ed).items[0].gst_verified, false);              // read from the bill, not touched
+  ed.items[0].gst_rate = '5';
+  assert.equal(m.drBuildBody(ed).items[0].gst_verified, true);
+  const again = m.drEditStart(view({ raw_items: [{ product_name: 'X', gst_rate: 5, gst_verified: true }], lines: [{}] }), []);
+  assert.equal(m.drBuildBody(again).items[0].gst_verified, true, 'a previously verified rate stays verified');
+  ed.items[0].gst_rate = '';
+  assert.equal(m.drBuildBody(ed).items[0].gst_rate, null);
+});
+
+test('adding and removing rows works on the working copy only', () => {
+  const ed = m.drEditStart(view(), []);
+  ed.items.push(Object.assign(m.drBlankRow(), { product_name: 'NEW MED', quantity: '3' }));
+  assert.equal(m.drBuildBody(ed).items.length, 2);
+  ed.items.splice(0, 1);
+  assert.deepEqual(m.drBuildBody(ed).items.map(i => i.product_name), ['NEW MED']);
+});
+
 test('problems list shows the count and the first problems', () => {
   const v = { blocking_count: 7, verified: false, blocking: Array.from({ length: 7 }, (_, i) => ({ field: 'row ' + i, message: 'bad ' + i })) };
   const html = m.drProblemsHtml(v);
