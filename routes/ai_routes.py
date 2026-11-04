@@ -9,7 +9,7 @@ import logging
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Response, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, Request, Response, status
 from sqlalchemy.orm import Session
 
 from dependencies import (
@@ -22,6 +22,7 @@ from dependencies import (
 import models
 import schemas
 import crud
+from ai import scan_fallback
 from ai.gemini_service import scan_label
 from ai.multi_item_scan_service import scan_multi_item
 from ai.invoice_service import scan_invoice
@@ -245,6 +246,41 @@ def scan_batch_label_endpoint(
         "inventory_match": lookup_res,
         "duration_ms": duration_ms
     }
+
+
+@router.post("/scan-medicine-fallback")
+@limiter.limit("30/minute")
+def scan_medicine_fallback_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    ocr_batch: Optional[str] = Form(None),
+    ocr_expiry: Optional[str] = Form(None),
+    ocr_mrp: Optional[str] = Form(None),
+    ocr_name: Optional[str] = Form(None),
+    ocr_batch_conf: Optional[str] = Form(None),
+    ocr_expiry_conf: Optional[str] = Form(None),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """
+    Medicine pack scan fallback. The phone reads the pack with on-device OCR first and sends the photo here only
+    when batch/expiry are missing or unclear. DawaiFlow AI is called only if the server kill switch is on and the
+    pharmacy is under its caps; otherwise the OCR values come back with the unclear fields flagged.
+    """
+    file_bytes = file.file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded image file is empty.")
+    _validate_file_magic(file_bytes, Path(file.filename or "").suffix.lower() or ".jpg")
+    try:
+        return scan_fallback.resolve_scan(file_bytes, {
+            "batch": ocr_batch, "expiry": ocr_expiry, "mrp": ocr_mrp, "name": ocr_name,
+            "batch_conf": ocr_batch_conf, "expiry_conf": ocr_expiry_conf,
+        }, current_user.id)
+    except Exception as exc:  # never crash the scanner: tell the app to enter manually
+        logger.error("[SCAN_FALLBACK] unexpected error: %s", type(exc).__name__)
+        return {"success": False, "scan_source": "failed", "batch_number": None, "expiry_date": None, "mrp": None,
+                "medicine_name": None, "uncertain_fields": ["batch_number", "expiry_date"],
+                "needs_manual_review": True, "gemini_calls": 0, "reason": "error",
+                "message": "DawaiFlow AI could not read this. Please enter manually."}
 
 
 @router.post("/scan-multi-item")
