@@ -213,6 +213,7 @@ class ProductDetailsPatch(BaseModel):
     gst_rate: Optional[float] = Field(default=None, ge=0, le=40)
     hsn_code: Optional[str] = Field(default=None, max_length=12)
     confirm_mrp_below_cost: bool = False
+    expected_version: Optional[str] = Field(default=None, max_length=64)
 
 
 class BulkGstUpdate(BaseModel):
@@ -1868,4 +1869,4 @@ class PrioritySaleResponse(BaseModel):
 
 
 
-
+

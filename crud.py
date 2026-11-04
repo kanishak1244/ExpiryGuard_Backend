@@ -91,6 +91,35 @@ def safe_iso_format(val):
         return val.isoformat()
     return str(val)
 
+_ROW_VERSION_FIELDS = (
+    "product_name", "brand", "category", "composition", "pack_size_label", "tablets_per_strip", "units_per_pack",
+    "batch_number", "expiry_date", "manufacturing_date", "quantity", "unit_price", "purchase_price",
+    "loose_tablet_price", "gst_rate", "hsn_code",
+)
+
+
+def product_row_version(get) -> str:
+    """
+    Version token of one stock batch, derived from its editable values (no schema change needed). A client sends the
+    token it last saw; if the batch changed since (another device edited it, or a sale moved the stock) the token no
+    longer matches and the edit is refused instead of silently overwriting. `get(name)` returns a field value.
+    """
+    import hashlib
+    parts = []
+    for f in _ROW_VERSION_FIELDS:
+        v = get(f)
+        if v is None:
+            v = ""
+        elif f in ("expiry_date", "manufacturing_date"):
+            v = str(v)[:10]
+        elif isinstance(v, (int, float)):
+            v = "%.2f" % float(v)
+        else:
+            v = str(v).strip().lower()
+        parts.append(v)
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
 def serialize_product(p):
     return {
         "id": p.id,
@@ -452,6 +481,7 @@ def get_products(
                 "deleted_by": row[36],
                 "barcode": row[37] if len(row) > 37 else None,
             })
+            serialized[-1]["row_version"] = product_row_version(serialized[-1].get)
 
         return {
             "items": serialized,
@@ -504,6 +534,7 @@ def get_products(
                 "deleted_by": row[36],
                 "barcode": row[37] if len(row) > 37 else None,
             })
+            serialized[-1]["row_version"] = product_row_version(serialized[-1].get)
         return serialized
 
 
@@ -8714,6 +8745,12 @@ def patch_product_details(db: Session, product_id: int, patch: "schemas.ProductD
         raise HTTPException(status_code=404, detail="Product not found for this shop.")
     sent = patch.model_dump(exclude_unset=True)
     confirm = bool(sent.pop("confirm_mrp_below_cost", False))
+    expected = sent.pop("expected_version", None)
+    if expected and expected != product_row_version(lambda f: getattr(prod, f, None)):
+        raise HTTPException(
+            status_code=409,
+            detail="STALE_RECORD: This medicine was changed on another device or by a sale. Reload it and edit again.",
+        )
 
     def clean(v):
         v = (v or "").strip() if isinstance(v, str) else v
@@ -8795,4 +8832,11 @@ def patch_product_details(db: Session, product_id: int, patch: "schemas.ProductD
     db.commit()
     db.refresh(prod)
     invalidate_products_cache(user_id)
-    return serialize_product(prod)
+    out = serialize_product(prod)
+    out.update({
+        "gst_percentage": prod.gst_percentage, "pack_size_label": prod.pack_size_label,
+        "units_per_pack": prod.units_per_pack, "days_remaining": prod.days_remaining, "status": prod.status,
+        "total_price": prod.total_price, "price_per_unit": prod.price_per_unit,
+        "row_version": product_row_version(lambda f: getattr(prod, f, None)),
+    })
+    return out

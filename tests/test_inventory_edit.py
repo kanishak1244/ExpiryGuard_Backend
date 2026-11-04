@@ -98,6 +98,43 @@ class TestInventoryEdit(unittest.TestCase):
         p = self.row(pid)
         self.assertEqual((p.product_name, p.unit_price, p.quantity, p.hsn_code), ("GLIMDA MV1", 100.0, 10, "3004"))
 
+    def listed(self, pid):
+        r = self.c.get("/products?page=1&limit=50")
+        self.assertEqual(r.status_code, 200, r.text)
+        return next(i for i in r.json()["items"] if i["id"] == pid)
+
+    def test_version_token_conflict_is_refused_not_overwritten(self):
+        pid = self.add()
+        v1 = self.listed(pid)["row_version"]
+        r = self.patch(pid, mrp=111.0, expected_version=v1)                   # first device saves
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertNotEqual(r.json()["row_version"], v1)
+        self.assertEqual(r.json()["row_version"], self.listed(pid)["row_version"])   # list and save agree
+        r2 = self.patch(pid, mrp=222.0, expected_version=v1)                  # second device still holds the old version
+        self.assertEqual(r2.status_code, 409)
+        self.assertIn("STALE_RECORD", r2.text)
+        self.assertEqual(self.row(pid).unit_price, 111.0)                     # newer data not overwritten
+        self.assertEqual(self.patch(pid, mrp=222.0, expected_version=r.json()["row_version"]).status_code, 200)
+        self.assertEqual(self.patch(pid, mrp=223.0).status_code, 200)         # clients without a token still work
+
+    def test_zero_stock_and_expired_batches_are_editable_without_duplicates(self):
+        pid = self.add()
+        d = self.S()
+        p = d.get(models.Product, pid)
+        p.quantity, p.expiry_date = 0, date.today() - timedelta(days=30)
+        d.commit()
+        before = d.query(models.Product).count()
+        d.close()
+        r = self.patch(pid, batch_number="Z9", expiry_date=FUT2, mrp=150.0, quantity=5)
+        self.assertEqual(r.status_code, 200, r.text)
+        q = self.row(pid)
+        self.assertEqual((q.id, q.batch_number, q.quantity, q.unit_price, str(q.expiry_date)), (pid, "Z9", 5, 150.0, FUT2))
+        d = self.S()
+        self.assertEqual(d.query(models.Product).count(), before)             # edited in place, no new rows
+        d.close()
+        self.assertEqual(self.patch(pid, quantity=0).status_code, 200)        # selling out to zero is allowed
+        self.assertEqual(self.patch(pid, expiry_date="2020-01-01").status_code, 200)   # a past date is valid (expired stock)
+
 
 del _doc
 

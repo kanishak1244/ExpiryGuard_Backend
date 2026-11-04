@@ -621,6 +621,22 @@ async function fetchInventoryPage() {
   }
 }
 
+// Live sync: edits made on another device (e.g. the mobile app) appear here without a manual refresh.
+// Same 5-second REST polling the dashboard uses; paused while the tab is hidden or an Edit dialog is open.
+let inventorySyncTimer = null;
+function startInventorySync() {
+  if (inventorySyncTimer || !document.getElementById('inventory-table-body')) return;
+  inventorySyncTimer = setInterval(async () => {
+    if (document.hidden || document.getElementById('med-edit-modal')) return;
+    const search = document.getElementById('inventory-search');
+    if (search && document.activeElement === search) return;
+    await fetchInventoryPage();
+    if (typeof medShowPanel === 'function') { try { medShowPanel(true); } catch (e) {} }
+  }, 8000);
+}
+document.addEventListener('DOMContentLoaded', startInventorySync);
+if (document.readyState !== 'loading') startInventorySync();
+
 function updatePaginationUI() {
   const rangeEl = document.getElementById('pagination-range-info');
   const totalEl = document.getElementById('pagination-total-count');
@@ -1011,6 +1027,8 @@ async function medSaveEdit(id, confirmBelowCost) {
   if (problems.length) { showErr(problems.join('. ') + '.'); return; }
   if (!Object.keys(body).length) { medCloseEdit(); return; }
   if (confirmBelowCost) body.confirm_mrp_below_cost = true;
+  const seen = medDetail.rows.get(id);
+  if (seen && seen.row_version) body.expected_version = seen.row_version;   // refuse to overwrite a newer edit
   if (saveBtn) saveBtn.disabled = true;                       // one save at a time
   try {
     const saved = await api.request(`/products/${id}/details`, { method: 'PATCH', body: JSON.stringify(body) });
@@ -1034,6 +1052,7 @@ async function medSaveEdit(id, confirmBelowCost) {
     const m = msg.replace(/^API Error \(\d+\):\s*/, '');
     let detail = m; try { detail = JSON.parse(m).detail || m; } catch (e) {}
     showErr(detail.replace(/^[A-Z_]+:\s*/, ''));
+    if (/STALE_RECORD/.test(msg) && typeof fetchInventoryPage === 'function') fetchInventoryPage();   // load the newer values; close and re-open Edit
     if (saveBtn) saveBtn.disabled = false;
   }
 }
